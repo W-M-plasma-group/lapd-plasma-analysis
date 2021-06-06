@@ -1,13 +1,14 @@
 # Make sure to add code comments!
+import numpy
 
 from hdf5reader import *
 
 
 def getIsweepVsweep(filename, nodesmin=-0.54, sample_sec=(100/16*10**6)**(-1)):
 
-    file = openHDF5File(filename)
+    file = open_HDF5(filename)
 
-    motor_data = structuresAtPath(file, '/Raw data + config/6K Compumotor')
+    motor_data = structures_at_path(file, '/Raw data + config/6K Compumotor')
     # print("Datasets in motor_data structure: "+str(motor_data["Datasets"]))
 
     probe_name = (motor_data["Datasets"])[0]
@@ -60,7 +61,7 @@ def getIsweepVsweep(filename, nodesmin=-0.54, sample_sec=(100/16*10**6)**(-1)):
     # SKIP REMAINING X, Y POSITION DATA PROCESSING
 
     # SIS crate data
-    sis_group = structuresAtPath(file, '/Raw data + config/SIS crate/')
+    sis_group = structures_at_path(file, '/Raw data + config/SIS crate/')
     print("Datasets in sis_data structure: " + str(sis_group["Datasets"]))
 
     isweep_data_path = (sis_group['Datasets'])[2]
@@ -187,12 +188,20 @@ def getIsweepVsweep(filename, nodesmin=-0.54, sample_sec=(100/16*10**6)**(-1)):
     # for i in range(raw_size[0]):
     #    for j in range(raw_size[1]):
     #        print(" ")
+    """
 
     # TRY TO CREATE A CHARACTERISTIC OBJECT?
-    # isweep_quantities = isweep_means*u.A
-    # vsweep_quantities = vsweep_means*u.V
-    characteristic = Characteristic(u.Quantity(vsweep_means, u.V), u.Quantity(isweep_means, u.A))
-    characteristic.plot()
+    # THIS RETURNS AN INVERTED-CURRENT CHARACTERISTIC! (As of 6/4/21)
+
+    # THE RETURN FUNCTION HAS BEEN TEMPORARILY CHANGED TO RETURN ONLY A SLICE OF A CHARACTERISTIC AT ONE X,Y POSITION
+    # MUST CONVERT TO REAL UNITS FIRST!!! OTHERWISE ARE IN ABSTRACT UNITS. MATLAB CODE GIVES VALUES:
+    #    REAL CURRENT = I / 11 OHMS; REAL BIAS = V * 100
+    characteristic = Characteristic(u.Quantity(vsweep_means[0, 0, 25000:25620]*100., u.V),
+                                    u.Quantity(np.multiply(isweep_means[0, 0, 25000:25620], -1/11.), u.A))
+    # characteristic = Characteristic(u.Quantity(vsweep_means, u.V), u.Quantity(-1*isweep_means, u.A))
+
+    """
+    # characteristic.plot()
     # plt.plot([0, 1])
     plt.show(block=True)
     plt.interactive(False)
@@ -211,5 +220,32 @@ def getIsweepVsweep(filename, nodesmin=-0.54, sample_sec=(100/16*10**6)**(-1)):
     """
 
     file.close()
+    return characteristic
 
-getIsweepVsweep('HDF5/8-3500A.hdf5')
+
+def smooth_characteristic(characteristic, num_points_each_side):
+
+    size = characteristic.bias.shape
+    length = size[len(size) - 1]
+    if num_points_each_side < 0:
+        raise ValueError("Cannot smooth over a negative number of points!")
+    if length < 2*num_points_each_side:
+        raise ValueError("Characteristic is too short to take average over!")
+    smooth_bias = numpy.zeros(size)
+    smooth_current = numpy.zeros(size)
+
+    for i in range(length):
+        if i < num_points_each_side:
+            smooth_bias[..., i] = numpy.mean(characteristic.bias[..., :2*num_points_each_side])
+            smooth_current[..., i] = numpy.mean(characteristic.current[..., :2*num_points_each_side])
+        elif i >= length - num_points_each_side:
+            smooth_bias[..., i] = numpy.mean(characteristic.bias[..., -2*num_points_each_side-1:])
+            smooth_current[..., i] = numpy.mean(characteristic.current[..., -2*num_points_each_side-1:])
+        else:
+            smooth_bias[..., i] = numpy.mean(characteristic.bias[..., i-num_points_each_side:i+num_points_each_side+1])
+            smooth_current[..., i] = numpy.mean(characteristic.current[...,
+                                                i-num_points_each_side:i+num_points_each_side+1])
+
+    return Characteristic(u.Quantity(smooth_bias, u.V), u.Quantity(smooth_current, u.A))
+
+#getIsweepVsweep('HDF5/09_radial_line_25press_4kA_redo.hdf5')
