@@ -4,7 +4,7 @@ import numpy as np
 import os
 import h5py
 
-from pprint import pprint
+# from pprint import pprint
 
 from plasmapy.diagnostics.langmuir import Characteristic, swept_probe_analysis
 
@@ -14,15 +14,15 @@ from plasmapy.diagnostics.langmuir import Characteristic, swept_probe_analysis
 
 # Make sure to add code comments!
 
-def openHDF5File(filename):
+def open_HDF5(filename):
     return h5py.File(filename, 'r')
 
 
-def groupAtPath(file, subpath):
+def group_at_path(file, subpath):
     return file[subpath]
 
 
-def structuresAtPath(file, subpath):
+def structures_at_path(file, subpath):
     curr = file[subpath]
     # print(list(curr.keys()))
     groups = []
@@ -45,7 +45,7 @@ def structuresAtPath(file, subpath):
     return categs
 
 
-test = openHDF5File('HDF5/8-3500A.hdf5')
+test = open_HDF5('HDF5/8-3500A.hdf5')
 # print(list(test.keys()))
 msi = test['MSI']
 # print(list(msi.keys()))
