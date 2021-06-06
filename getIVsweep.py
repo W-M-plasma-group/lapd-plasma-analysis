@@ -1,6 +1,5 @@
 # Make sure to add code comments!
 import numpy
-
 from hdf5reader import *
 
 
@@ -196,8 +195,9 @@ def getIsweepVsweep(filename, nodesmin=-0.54, sample_sec=(100/16*10**6)**(-1)):
     # THE RETURN FUNCTION HAS BEEN TEMPORARILY CHANGED TO RETURN ONLY A SLICE OF A CHARACTERISTIC AT ONE X,Y POSITION
     # MUST CONVERT TO REAL UNITS FIRST!!! OTHERWISE ARE IN ABSTRACT UNITS. MATLAB CODE GIVES VALUES:
     #    REAL CURRENT = I / 11 OHMS; REAL BIAS = V * 100
-    characteristic = Characteristic(u.Quantity(vsweep_means[0, 0, 25000:25620]*100., u.V),
-                                    u.Quantity(np.multiply(isweep_means[0, 0, 25000:25620], -1/11.), u.A))
+
+    characteristic = Characteristic(u.Quantity(vsweep_means[0, 0, 25000:25620] * 100, u.V),
+                                    u.Quantity(isweep_means[0, 0, 25000:25620] * (-1./11.), u.A))
     # characteristic = Characteristic(u.Quantity(vsweep_means, u.V), u.Quantity(-1*isweep_means, u.A))
 
     """
@@ -210,13 +210,6 @@ def getIsweepVsweep(filename, nodesmin=-0.54, sample_sec=(100/16*10**6)**(-1)):
     print("Characteristic V data:", characteristic.bias)
     print("Characteristic I data:", characteristic.current)
 
-    # Calculate the cylindrical probe surface area
-    probe_length = 1.145 * u.mm
-    probe_diameter = 1.57 * u.mm
-    probe_area = (probe_length * np.pi * probe_diameter + np.pi * 0.25 * probe_diameter ** 2)
-
-    # pprint(swept_probe_analysis(characteristic, probe_area, 'He-4+', visualize=True, plot_EEDF=True))
-    
     """
 
     file.close()
@@ -226,6 +219,8 @@ def getIsweepVsweep(filename, nodesmin=-0.54, sample_sec=(100/16*10**6)**(-1)):
 def smooth_characteristic(characteristic, num_points_each_side):
 
     size = characteristic.bias.shape
+    """LEO ADDITION TO FOLLOW"""
+    print(size)
     length = size[len(size) - 1]
     if num_points_each_side < 0:
         raise ValueError("Cannot smooth over a negative number of points!")
