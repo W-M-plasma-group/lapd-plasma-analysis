@@ -1,30 +1,32 @@
 import matplotlib.pyplot as plt
 
-from hdf5reader import *
 from getIVsweep import *
 from astropy import visualization
 from pprint import pprint
 
-print("Finished importing helper files")
-plateau = getIsweepVsweep('HDF5/8-3500A.hdf5')
-print("Finished calculating I-V plasma characteristic")
+print("Imported helper files")
+# plateau = get_isweep_vsweep('HDF5/8-3500A.hdf5')
+plateau = create_ranged_characteristic('HDF5/8-3500A.hdf5', 25000, 25620)
+print("Finished creating I-V plasma Characteristic object")
 
-plateau.plot()
-plt.show()
+# debug
+# plateau.plot()
+# plt.show()
 
 # characteristic_plateau = Characteristic(characteristic.bias[25000:25620], characteristic.current[25000:25620])
 
-smooth_plateau = smooth_characteristic(plateau, 12)
+smooth_plateau = smooth_characteristic(plateau, 7)
 
 # Create the Characteristic object, taking into account the correct units
 # characteristic = Characteristic(u.Quantity(bias,  u.V), u.Quantity(current, u.A))
 
-# """
+"""
+# debug
 with visualization.quantity_support():
     plt.plot(plateau.bias, plateau.current)
     plt.plot(smooth_plateau.bias, smooth_plateau.current)
     plt.show()
-# """
+"""
 
 """
 # Calculate the cylindrical probe surface area
