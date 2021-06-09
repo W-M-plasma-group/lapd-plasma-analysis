@@ -6,7 +6,6 @@ from hdf5reader import *
 
 
 def get_xy(filename):
-
     file = open_HDF5(filename)
 
     motor_data = structures_at_path(file, '/Raw data + config/6K Compumotor')
@@ -19,7 +18,7 @@ def get_xy(filename):
     # print("Raw y data summary: ", probe_motion['y'])
 
     rnd = 0.10  # Change the x rounding step value here
-    dec = 100   # Change number of decimal points to consider here
+    dec = 100  # Change number of decimal points to consider here
     prod = int(rnd * dec)
     x_round = tuple(round(dec * xin / prod) * prod / dec for xin in tuple(probe_motion['x']))
     y_round = tuple(round(dec * yin / prod) * prod / dec for yin in tuple(probe_motion['y']))
@@ -65,7 +64,7 @@ def get_xy(filename):
     # SKIP REMAINING X, Y POSITION DATA PROCESSING
 
 
-def get_isweep_vsweep(filename, nodesmin=-0.54, sample_sec=(100 / 16 * 10 ** 6) ** (-1)):
+def get_isweep_vsweep(filename, sample_sec=(100 / 16 * 10 ** 6) ** (-1)):  # removed nodesmin parameter
 
     file = open_HDF5(filename)  # Should I make the previous function take a file as a parameter and not a filename?
 
@@ -172,16 +171,137 @@ def get_isweep_vsweep(filename, nodesmin=-0.54, sample_sec=(100 / 16 * 10 ** 6) 
     print("Characteristic I data:", characteristic.current)
     """
 
-    # Note: This function returns the bias values first, then the current.
+    # Note: This function returns the bias values first, then the current
     file.close()
     return vsweep_means, isweep_means
 
 
-def create_ranged_characteristic(filename, start, end):
+def isolate_plateaus(filename):  # Change to taking bias&current, then call near start of create_ranged_characteristic?
 
     bias, current = get_isweep_vsweep(filename)
+    last_axis = len(bias.shape) - 1
+
+    max_num_plateaus = 1
+
+    # Should plateau_start_frames be a nested list?
+    # plateau_start_frames = np.ndarray()
+
+    # "Threshold for voltage quench slope"
+    quench_slope = -1
+
+    # "Threshold for different voltage quenchs" (??)
+    quench_diff = 10
+
+    # NOTE: Can I make all "last axes" -1 ??
+
+    bias_gradient = np.gradient(bias, axis=last_axis)
+
+    # normalized_bias_gradient = bias_gradient/np.amax(bias_gradient, axis=last_axis)
+    normalized_bias_gradient = bias_gradient / np.amax(bias_gradient, axis=last_axis, keepdims=True)
+    # normalized_bias_gradient = np.divide(bias_gradient, np.amax(bias_gradient, axis=last_axis))
+    # debug
+    # print("Normalized bias gradient [0, 0, 1:100]:", normalized_bias_gradient[0, 0, 600:750].tolist())
+    # print("Normalized bias gradient max in each x,y position across all frames:",
+    #       np.max(normalized_bias_gradient, axis=-1))
+    # plt.plot(normalized_bias_gradient[0, 0, 600:750])
+    # plt.show()
+    #
+
+    # debug (resolved; use keepdims=True)
+    # print("Should be maximum gradient for averaged shot at each position:", np.amax(bias_gradient, axis=last_axis))
+    # print("Shape of bias gradient:", bias_gradient.shape)
+    # print("Shape of maxima of bias gradients at each position:", np.amax(bias_gradient, axis=last_axis).shape)
+    # print("Shape of normalized gradient:", normalized_bias_gradient.shape)
+    #
+
+    # quench_frames = np.array((normalized_bias_gradient < quench_slope).nonzero())
+
+    quench_frames = (normalized_bias_gradient < quench_slope).nonzero()
+    # print("Coordinates of quench frames:", quench_frames)
+    # print("These should be indices for quench frames at position 0,0:", normalized_bias_gradient[0, 0] < quench_slope,
+    #       ", or in list form: ", (normalized_bias_gradient[0, 0] < quench_slope).tolist())
+
+    # This line should create an array with same shape as bias (x,y,frames), but frames are simply their own index
+    #    instead of a bias or current value
+    frame_array = np.full(bias.shape, np.arange(bias.shape[-1]))
+    # print("All frame indices at each x,y position", frame_array)
+    # quench_frames_by_position = frame_array[..., normalized_bias_gradient < quench_slope]
+
+    # FINE! LET ME TRY LIST COMPREHENSION. I HOPE IT ISN'T SLOW.
+    # for i in range(bias.shape[0]):
+    #     for j in range(bias.shape[1]):
+    #         frame_array[i, j] = frame_array[i, j, normalized_bias_gradient[i, j] < quench_slope]
+    quench_frames_stacked = np.array([[frame_array[i, j, normalized_bias_gradient[i, j] < quench_slope]
+                                       for j in range(normalized_bias_gradient.shape[1])]
+                                      for i in range(normalized_bias_gradient.shape[0])])
+
+    # print("This should be the quench frame array:", quench_frames_stacked)
+
+    # Now, on to significant quench frames. quench_frames_diff sig_quench_frames_stacked = np.array([[[
+    # quench_frames_stacked[i, j, (normalized_bias_gradient[i, j] - normalized_bias_gradient[i, j, -1:-1]) >
+    #    quench_diff]] for j in range(quench_frames_stacked.shape[1])] for i in range(quench_frames_stacked.shape[0])])
+    # print("A boolean mask:", np.diff(quench_frames_stacked[0, 0]) > quench_diff)
+    sig_quench_frames_stacked = np.array([[same_xy[(np.diff(same_xy) > quench_diff).tolist() + [True]]
+                                           for same_xy in same_y]
+                                          for same_y in quench_frames_stacked])
+
+    print("This should be the significant quench frame array:", sig_quench_frames_stacked)
+
+    """
+    # Filter frame array itself
+    frame_array[:, :] = (normalized_bias_gradient < quench_slope).nonzero()
+    print("Quench frames by x,y position:", frame_array)
+
+    # sig_quench_frames = quench_frames[(np.diff(quench_frames) > quench_diff).nonzero()]
+    print("All quench frames:", quench_frames)
+    # Next line produces the indices within quench_frames (the array of indices with corresponding rows x, y, and frame)
+    #    of all the "coordinates" (indices of where the correct coordinates are stored in quench_frames) where the
+    #    difference between the next frame and the current frame is more than quench_diff
+    #    (Result is a 1D array: the linear index within the third row (frames) of quench_frames
+    sig_quench_indices = (np.diff(quench_frames[2]) > quench_diff).nonzero()
+    # print("Significant indices (of coordinate column) in quench_frames:", sig_quench_indices[0])
+    # sig_quench_frames = tuple(quench_frames[:, sig_quench_indices[0]])
+    # This line creates an array containing indices (3D coordinates as columns across 3 rows) within the bias (subset of
+    #    quench_frame coordinates) of, at each x,y position, significant (last in a series of) quench frames
+    # sig_quench_frames = np.array(quench_frames[:, sig_quench_indices[0]])
+    # sig_quench_frames = quench_frames[:, sig_quench_indices[0]]
+    print()
+    sig_quench_frames = tuple(np.array(quench_frames)[:, sig_quench_indices[0]])
+
+    # This should create an array with all the significant quench (well, not first or last) stored at each x,y position
+    sig_quench_array = frame_array[sig_quench_frames]
+    print("Significant quench frames at each x,y position, incomplete:", sig_quench_array)
+
+    # new_frame_array = frame_array[..., ]
+    # print("New frame array:", new_frame_array)
+
+    # print(quench_frames)
+    # print(quench_frames[2].tolist())
+    print("Sig_quench_frames:", sig_quench_frames)
+    # print("Biases at significant quenching frames:", bias[sig_quench_frames.tolist()])
+    # the following line is hard-coded and should be removed later
+    # sig_quench_corner_indices = ((sig_quench_frames[0] == 0).nonzero() and (sig_quench_frames[1] == 0).nonzero())
+    # print("First corner sig indices:", sig_quench_corner_indices)
+    # sig_quench_frames_corner = sig_quench_frames[sig_quench_frames[:, 0] == 0 and sig_quench_frames[:, 1] == 0]
+    # print("First corner sig frames:", sig_quench_frames_corner)
+
+    # plt.plot(quench_frames[last_axis], bias[quench_frames], 'ro')
+    # plt.plot(bias[0, 0], 'b-', quench_frames[last_axis], bias[quench_frames], 'ro')
+    # plt.plot(bias[0, 0], 'b-', sig_quench_frames[last_axis],
+    #          bias[0, 0, (np.array(sig_quench_frames))[sig_quench_frames[0] == 0]], 'ro')
+    # print("These are all the sig_quench_frames in the first shot (x = 0, y = 0):" )
+    # plt.plot(bias[0, 0], 'b-')
+    plt.plot(bias[0, 0], 'b-', (sig_quench_frames[..., sig_quench_frames[0] == 0])[last_axis],
+             bias[0, 0, (sig_quench_frames[..., sig_quench_frames[0] == 0])[last_axis]], 'ro')
+    # plt.plot(y=current[0, 0], fmt='b-', y2=bias[quench_frames], current[quench_frames], 'ro')
+    plt.show()
+    """
+
+
+def create_ranged_characteristic(filename, start, end):
+    bias, current = get_isweep_vsweep(filename)
     dimensions = len(bias.shape)
-    zero_indices = tuple(np.zeros(dimensions-1, dtype=int).tolist())
+    zero_indices = tuple(np.zeros(dimensions - 1, dtype=int).tolist())
     # debug
     # print("Dimensions of incoming bias array:", bias.shape)
     # print("Zero_indices:", zero_indices)
@@ -203,20 +323,19 @@ def create_ranged_characteristic(filename, start, end):
     #    later, when the plateau function is added to separate shots into single plateaus. (Also see end-exception line)
     #    (In the future, having more than one dimension for bias or current arrays should raise error?)
     return Characteristic(u.Quantity(bias[zero_indices + (slice(start, end),)] * 100, u.V),
-                          u.Quantity(current[zero_indices + (slice(start, end),)] * (-1./11.), u.A))
+                          u.Quantity(current[zero_indices + (slice(start, end),)] * (-1. / 11.), u.A))
     # return Characteristic(u.Quantity(bias[0, 0, start:end] * 100, u.V),
     #                       u.Quantity(current[0, 0, start:end] * (-1./11.), u.A))
 
 
 def smooth_characteristic(characteristic, num_points_each_side):
-
     size = characteristic.bias.shape
     # debug
     # print(size)
     length = size[len(size) - 1]
     if num_points_each_side < 0:
         raise ValueError("Cannot smooth over negative number", num_points_each_side, "of points")
-    if length < 2*num_points_each_side:
+    if length < 2 * num_points_each_side:
         raise ValueError("Characteristic of", length, "data points is too short to take", num_points_each_side +
                          "-point average over")
     smooth_bias = numpy.zeros(size)
@@ -224,17 +343,19 @@ def smooth_characteristic(characteristic, num_points_each_side):
 
     for i in range(length):
         if i < num_points_each_side:
-            smooth_bias[..., i] = numpy.mean(characteristic.bias[..., :2*num_points_each_side])
-            smooth_current[..., i] = numpy.mean(characteristic.current[..., :2*num_points_each_side])
+            smooth_bias[..., i] = numpy.mean(characteristic.bias[..., :2 * num_points_each_side])
+            smooth_current[..., i] = numpy.mean(characteristic.current[..., :2 * num_points_each_side])
         elif i >= length - num_points_each_side:
-            smooth_bias[..., i] = numpy.mean(characteristic.bias[..., -2*num_points_each_side-1:])
-            smooth_current[..., i] = numpy.mean(characteristic.current[..., -2*num_points_each_side-1:])
+            smooth_bias[..., i] = numpy.mean(characteristic.bias[..., -2 * num_points_each_side - 1:])
+            smooth_current[..., i] = numpy.mean(characteristic.current[..., -2 * num_points_each_side - 1:])
         else:
-            smooth_bias[..., i] = numpy.mean(characteristic.bias[..., i-num_points_each_side:i+num_points_each_side+1])
+            smooth_bias[..., i] = numpy.mean(
+                characteristic.bias[..., i - num_points_each_side:i + num_points_each_side + 1])
             smooth_current[..., i] = numpy.mean(characteristic.current[...,
-                                                i-num_points_each_side:i+num_points_each_side+1])
+                                                i - num_points_each_side:i + num_points_each_side + 1])
 
     return Characteristic(u.Quantity(smooth_bias, u.V), u.Quantity(smooth_current, u.A))
 
 
+isolate_plateaus('HDF5/8-3500A.hdf5')
 # get_isweep_vsweep('HDF5/09_radial_line_25press_4kA_redo.hdf5')
