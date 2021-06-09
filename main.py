@@ -40,5 +40,6 @@ probe_area = (1.*u.mm)**2
 
 
 # pprint(swept_probe_analysis(characteristic, probe_area, 'He-4+', visualize=True, plot_EEDF=True))
+# Remember to make ion type customizable by user
 pprint(swept_probe_analysis(smooth_plateau, probe_area, 'He-4+', visualize=True, plot_EEDF=True))
 plt.show()
