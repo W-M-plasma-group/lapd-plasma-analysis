@@ -179,7 +179,6 @@ def get_isweep_vsweep(filename, sample_sec=(100 / 16 * 10 ** 6) ** (-1)):  # rem
 def isolate_plateaus(filename):  # Change to taking bias&current, then call near start of create_ranged_characteristic?
 
     bias, current = get_isweep_vsweep(filename)
-    last_axis = len(bias.shape) - 1
 
     max_num_plateaus = 1
 
@@ -189,19 +188,14 @@ def isolate_plateaus(filename):  # Change to taking bias&current, then call near
     # "Threshold for voltage quench slope"
     quench_slope = -1
 
-    # Threshold for separating distinct voltage quenches
+    # Threshold for separating distinct voltage quench frames
     quench_diff = 10
 
-    # NOTE: Can I make all "last axes" -1 ??
+    bias_gradient = np.gradient(bias, axis=-1)
 
-    bias_gradient = np.gradient(bias, axis=last_axis)
-
-    # normalized_bias_gradient = bias_gradient/np.amax(bias_gradient, axis=last_axis)
-    normalized_bias_gradient = bias_gradient / np.amax(bias_gradient, axis=last_axis, keepdims=True)
+    normalized_bias_gradient = bias_gradient / np.amax(bias_gradient, axis=-1, keepdims=True)
 
     # quench_frames = np.array((normalized_bias_gradient < quench_slope).nonzero())
-
-    # quench_frames = (normalized_bias_gradient < quench_slope).nonzero()
     # print("Coordinates of quench frames:", quench_frames)
 
     # This line should create an array with same shape as bias (x,y,frames), but frames are simply their own index
@@ -210,23 +204,23 @@ def isolate_plateaus(filename):  # Change to taking bias&current, then call near
     # print("All frame indices at each x,y position", frame_array)
     # quench_frames_by_position = frame_array[..., normalized_bias_gradient < quench_slope]
 
-    # Using list comprehension, this line fills each x,y position in array with quench frames
-    quench_frames_stacked = np.array([[frame_array[i, j, normalized_bias_gradient[i, j] < quench_slope]
-                                       for j in range(normalized_bias_gradient.shape[1])]
-                                      for i in range(normalized_bias_gradient.shape[0])])
+    # Using list comprehension, this line fills each x,y position in array with a list of quench frames
+    quench_frames = np.array([[frame_array[i, j, normalized_bias_gradient[i, j] < quench_slope]
+                               for j in range(normalized_bias_gradient.shape[1])]
+                              for i in range(normalized_bias_gradient.shape[0])])
 
-    # print("This should be the quench frame array:", quench_frames_stacked)
+    # print("This is the quench frame array:", quench_frames)
 
-    # Using list comprehension, this line creates an array storing *significant* quench frames (plus the last one, which
+    # Using list comprehension, this line creates an array storing significant quench frames (plus the last one, which
     #    should also be significant) for each x,y position
-    sig_quench_frames_stacked = np.array([[same_xy[(np.diff(same_xy) > quench_diff).tolist() + [True]]
-                                           for same_xy in same_y]
-                                          for same_y in quench_frames_stacked])
+    sig_quench_frames = np.array([[same_xy[(np.diff(same_xy) > quench_diff).tolist() + [True]]
+                                   for same_xy in same_y]
+                                  for same_y in quench_frames])
 
-    # print("This should be the significant quench frame array:", sig_quench_frames_stacked)
+    # print("This is the significant quench frame array:", sig_quench_frames)
 
-    plt.plot(bias[0, 0], 'b-', sig_quench_frames_stacked[0, 0], bias[0, 0, sig_quench_frames_stacked[0, 0]], 'ro')
-    # plt.plot(y=current[0, 0], fmt='b-', y2=bias[quench_frames], current[quench_frames], 'ro')
+    # Sample for first position (0,0)
+    plt.plot(bias[0, 0], 'b-', sig_quench_frames[0, 0], bias[0, 0, sig_quench_frames[0, 0]], 'ro')
     plt.show()
 
 
@@ -253,11 +247,11 @@ def create_ranged_characteristic(filename, start, end):
     # IMPORTANT: If there is more than one dimension to the bias and current arrays passed into the function,
     #    the function will only consider the first element of all the other dimensions. This will have to be addressed
     #    later, when the plateau function is added to separate shots into single plateaus. (Also see end-exception line)
+    #    (This is done by the zero_indices variable. It is a tuple coordinate just for accessing the position (0, 0).)
     #    (In the future, having more than one dimension for bias or current arrays should raise error?)
     return Characteristic(u.Quantity(bias[zero_indices + (slice(start, end),)] * 100, u.V),
                           u.Quantity(current[zero_indices + (slice(start, end),)] * (-1. / 11.), u.A))
-    # return Characteristic(u.Quantity(bias[0, 0, start:end] * 100, u.V),
-    #                       u.Quantity(current[0, 0, start:end] * (-1./11.), u.A))
+    # The addition involves adding to the (0,0) position accessor a slice in the last dimension from start to end frame.
 
 
 def smooth_characteristic(characteristic, num_points_each_side):
