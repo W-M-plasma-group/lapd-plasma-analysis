@@ -278,7 +278,7 @@ def get_time_array(shape_of_frames, sample_sec):  # Is this strictly necessary? 
     return np.full(shape=shape_of_frames, fill_value=(np.arange(shape_of_frames[-1])*sample_sec).to(u.ms))
 
 
-# def split_plateaus(bias, current, sig_quench_frames):  # Return array x, y, plateau number in shot, frame in plateau
+# def split_plateaus(bias, current, sig_quench_frames):  # Return 4D array x,y,plateau number in shot,frame in plateau
 
     # returns split bias and current in tuple
 #     return np.split(bias, sig_quench_frames, axis=-1), np.split(current, sig_quench_frames, axis=-1)
