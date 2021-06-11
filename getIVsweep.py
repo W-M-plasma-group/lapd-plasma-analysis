@@ -64,7 +64,7 @@ def get_xy(filename):
     # SKIP REMAINING X, Y POSITION DATA PROCESSING
 
 
-def get_isweep_vsweep(filename, sample_sec=(100 / 16 * 10 ** 6) ** (-1)):  # removed nodesmin parameter
+def get_isweep_vsweep(filename, sample_sec=(100 / 16 * 10 ** 6) ** (-1)):
 
     file = open_HDF5(filename)  # Should I make the previous function take a file as a parameter and not a filename?
 
@@ -125,17 +125,15 @@ def get_isweep_vsweep(filename, sample_sec=(100 / 16 * 10 ** 6) ** (-1)):  # rem
 
     print("Finished decompressing compressed isweep and vsweep data")
 
-    ### Note: Clean up these comments
-    # Take average and standard deviation for isweep and vsweep values at each shot over time MAYBE I SHOULDN'T TAKE
-    # AVERAGE FOR EACH SHOT! AFTER ALL, ISN'T EACH SHOT A SERIES OF _DIFFERENT_ BIASES? CONSULT MATLAB CODE! IF THEY
-    # DON'T TAKE AVERAGE FOR EACH SHOT, I SHOULDN'T EITHER! I SHOULD NOT! DON'T TAKE AVERAGE OVER ALL TIMES/FRAMES
-    # FOR EACH SHOT, BUT JUST CONDENSE SHOTS AT SAME LOCATION INTO EACH OTHER WHILE KEEPING TIMES/FRAMES SEPARATE!
+    # Note: clean up and review some of the following comments
+    # Take average of voltage and current across all shots at each unique position, preserving time dimension
+    # To reflect MATLAB code, should I take (pointwise?) standard deviation for each across these shots too? (For error)
 
     # We want to try to create the mean value over all shots taken at same position for each time (frame) in the shot.
     # This creates an array of averages at each time, unique x pos, and unique y pos.
     # Try all the categorizing needed down here. (For example, store shot references in unique x, unique y grid)
 
-    # Creates 4D array! The first two dimensions correspond to all combinations of unique x and y positions,
+    # Create 4D array: the first two dimensions correspond to all combinations of unique x and y positions,
     #    the third dimension represents the nth shot taken at that unique positions
     #    and the fourth dimensions lists all the frames in that nth shot.
     isweep_xy_shots = [
@@ -176,52 +174,44 @@ def get_isweep_vsweep(filename, sample_sec=(100 / 16 * 10 ** 6) ** (-1)):  # rem
     return vsweep_means, isweep_means
 
 
-def isolate_plateaus(filename):  # Change to taking bias&current, then call near start of create_ranged_characteristic?
-
-    bias, current = get_isweep_vsweep(filename)
-
-    max_num_plateaus = 1
+def isolate_plateaus(bias, current):  # call near start of create_ranged_characteristic? Does this need current?
 
     # Should plateau_start_frames be a nested list?
     # plateau_start_frames = np.ndarray()
 
-    # "Threshold for voltage quench slope"
-    quench_slope = -1
-
-    # Threshold for separating distinct voltage quench frames
-    quench_diff = 10
+    quench_slope = -1  # "Threshold for voltage quench slope"
+    quench_diff = 10   # Threshold for separating distinct voltage quench frames
 
     bias_gradient = np.gradient(bias, axis=-1)
-
     normalized_bias_gradient = bias_gradient / np.amax(bias_gradient, axis=-1, keepdims=True)
 
     # quench_frames = np.array((normalized_bias_gradient < quench_slope).nonzero())
     # print("Coordinates of quench frames:", quench_frames)
-
-    # This line should create an array with same shape as bias (x,y,frames), but frames are simply their own index
-    #    instead of a bias or current value
-    frame_array = np.full(bias.shape, np.arange(bias.shape[-1]))
-    # print("All frame indices at each x,y position", frame_array)
     # quench_frames_by_position = frame_array[..., normalized_bias_gradient < quench_slope]
 
     # Using list comprehension, this line fills each x,y position in array with a list of quench frames
-    quench_frames = np.array([[frame_array[i, j, normalized_bias_gradient[i, j] < quench_slope]
-                               for j in range(normalized_bias_gradient.shape[1])]
-                              for i in range(normalized_bias_gradient.shape[0])])
+    quench_frames = np.array([[(same_xy < quench_slope).nonzero()[0]
+                               for same_xy in same_x]
+                              for same_x in normalized_bias_gradient])
 
     # print("This is the quench frame array:", quench_frames)
 
     # Using list comprehension, this line creates an array storing significant quench frames (plus the last one, which
     #    should also be significant) for each x,y position
     sig_quench_frames = np.array([[same_xy[(np.diff(same_xy) > quench_diff).tolist() + [True]]
-                                   for same_xy in same_y]
-                                  for same_y in quench_frames])
+                                   for same_xy in same_x]
+                                  for same_x in quench_frames])
 
     # print("This is the significant quench frame array:", sig_quench_frames)
 
-    # Sample for first position (0,0)
-    plt.plot(bias[0, 0], 'b-', sig_quench_frames[0, 0], bias[0, 0, sig_quench_frames[0, 0]], 'ro')
-    plt.show()
+    # Sample for first position (0,0); not needed in final function
+    # plt.plot(bias[0, 0], 'b-', sig_quench_frames[0, 0], bias[0, 0, sig_quench_frames[0, 0]], 'ro')
+    # plt.show()
+
+    max_num_plateaus = sig_quench_frames.shape[-1]
+    # print("Maximum number of plateaus:", max_num_plateaus)
+
+    return sig_quench_frames
 
 
 def create_ranged_characteristic(filename, start, end):
@@ -230,7 +220,7 @@ def create_ranged_characteristic(filename, start, end):
     zero_indices = tuple(np.zeros(dimensions - 1, dtype=int).tolist())
     # debug
     # print("Dimensions of incoming bias array:", bias.shape)
-    # print("Zero_indices:", zero_indices)
+    # print("Zero coordinates to access first corner of bias and current:", zero_indices)
 
     if bias.shape != current.shape:
         raise ValueError("Bias and current must be of the same dimensions and shape")
@@ -255,9 +245,8 @@ def create_ranged_characteristic(filename, start, end):
 
 
 def smooth_characteristic(characteristic, num_points_each_side):
+
     size = characteristic.bias.shape
-    # debug
-    # print(size)
     length = size[len(size) - 1]
     if num_points_each_side < 0:
         raise ValueError("Cannot smooth over negative number", num_points_each_side, "of points")
@@ -283,5 +272,17 @@ def smooth_characteristic(characteristic, num_points_each_side):
     return Characteristic(u.Quantity(smooth_bias, u.V), u.Quantity(smooth_current, u.A))
 
 
-isolate_plateaus('HDF5/8-3500A.hdf5')
+def get_time_array(shape_of_frames, sample_sec):  # Is this strictly necessary? All piles (pages) are identical anyways
+
+    # x, y, time in milliseconds since start of that average shot using sample_sec in milliseconds
+    return np.full(shape=shape_of_frames, fill_value=(np.arange(shape_of_frames[-1])*sample_sec).to(u.ms))
+
+
+# def split_plateaus(bias, current, sig_quench_frames):  # Return array x, y, plateau number in shot, frame in plateau
+
+    # returns split bias and current in tuple
+#     return np.split(bias, sig_quench_frames, axis=-1), np.split(current, sig_quench_frames, axis=-1)
+
+
+# isolate_plateaus(get_isweep_vsweep('HDF5/8-3500A.hdf5'))
 # get_isweep_vsweep('HDF5/09_radial_line_25press_4kA_redo.hdf5')
