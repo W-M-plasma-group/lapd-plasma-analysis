@@ -6,7 +6,7 @@ from pprint import pprint
 
 print("Imported helper files")
 # plateau = get_isweep_vsweep('HDF5/8-3500A.hdf5')
-sample_sec = (100 / 16 * 10 ** 6) ** (-1) * u.s  # Note that this is a small number. 10^6 is in the denominator
+# sample_sec = (100 / 16 * 10 ** 6) ** (-1) * u.s  # Note that this is a small number. 10^6 is in the denominator
 filename = 'HDF5/8-3500A.hdf5'
 plateau = create_ranged_characteristic(filename, 25000, 25620)
 print("Finished creating I-V plasma Characteristic object")

@@ -14,6 +14,7 @@ def get_xy(filename):
     # print("Data type of probe_motion dataset: ", probe_motion.dtype)
 
     print("Rounding position data...")
+    """
     # print("Raw x data summary: ", probe_motion['x'])
     # print("Raw y data summary: ", probe_motion['y'])
 
@@ -24,17 +25,23 @@ def get_xy(filename):
     y_round = tuple(round(dec * yin / prod) * prod / dec for yin in tuple(probe_motion['y']))
     x = sorted(tuple(set(x_round)))  # only the unique x position values
     y = sorted(tuple(set(y_round)))  # only the unique y position values
+    """
+    places = 1
+    x_round = np.round(probe_motion['x'], decimals=places)
+    y_round = np.round(probe_motion['y'], decimals=places)
+    x, x_loc = np.unique(x_round, return_inverse=True)
+    y, y_loc = np.unique(y_round, return_inverse=True)
     x_length = len(x)
     y_length = len(y)
 
     # CAN I TURN these into np arrays too?
 
     # Act as soft warnings in case of limited x,y data
-    if len(x) == 1 and len(y) == 1:
+    if x_length == 1 and y_length == 1:
         print("Only one position value. No plots can be made")
-    elif len(x) == 1:
+    elif x_length == 1:
         print("Only one unique x value. Will only consider y position")
-    elif len(y) == 1:
+    elif y_length == 1:
         print("Only one unique y value. Will only consider x position")
 
     shot_list = tuple(probe_motion['Shot number'])
@@ -47,10 +54,11 @@ def get_xy(filename):
     #    (for example, a shot might have been taken at the combination of the 10th unique
     #       x position and the 15th unique y position in the lists x and y)
     # NOTE: THIS CODE USED TO BE AFTER "try all the categorizing needed down here" in get_isweep_vsweep
+    # For every shot index i, x_round[i] and y_round[i] give the position of the shot taken at that index
     print("Categorizing shots by x,y position...")
     xy_shot_ref = [[[] for j in range(y_length)] for i in range(x_length)]
     for i in range(num_shots):
-        xy_shot_ref[x.index(x_round[i])][y.index(y_round[i])].append(i)  # full of references to nth shot taken
+        xy_shot_ref[x_loc[i]][y_loc[i]].append(i)  # full of references to nth shot taken
     # print("xy shot refs:", xy_shot_ref)
 
     file.close()
@@ -114,6 +122,7 @@ def get_isweep_vsweep(filename, sample_sec=(100 / 16 * 10 ** 6) ** (-1)):
     #   of measurements per shot ("frames")
 
     print("Decompressing raw data...")
+    """
     isweep_processed = np.ndarray((raw_size[0], raw_size[1]), float)
     vsweep_processed = np.ndarray((raw_size[0], raw_size[1]), float)
     # Is the below also necessary? Check the MATLAB code
@@ -122,6 +131,9 @@ def get_isweep_vsweep(filename, sample_sec=(100 / 16 * 10 ** 6) ** (-1)):
     for i in range(raw_size[0]):
         isweep_processed[i] = isweep_scales_array[i] * isweep_raw_array[i] + isweep_offsets_array[i]
         vsweep_processed[i] = vsweep_scales_array[i] * vsweep_raw_array[i] + vsweep_offsets_array[i]
+    """
+    isweep_processed = isweep_scales_array[:, np.newaxis] * isweep_raw_array + isweep_offsets_array[:, np.newaxis]
+    vsweep_processed = vsweep_scales_array[:, np.newaxis] * vsweep_raw_array + vsweep_offsets_array[:, np.newaxis]
 
     print("Finished decompressing compressed isweep and vsweep data")
 
@@ -136,14 +148,11 @@ def get_isweep_vsweep(filename, sample_sec=(100 / 16 * 10 ** 6) ** (-1)):
     # Create 4D array: the first two dimensions correspond to all combinations of unique x and y positions,
     #    the third dimension represents the nth shot taken at that unique positions
     #    and the fourth dimensions lists all the frames in that nth shot.
-    isweep_xy_shots = [
-        [[isweep_processed[shot] for shot in range(len(xy_shot_ref[i][j]))] for j in range(len(xy_shot_ref[i]))]
-        for i in range(len(xy_shot_ref))]
-    isweep_xy_shots_array = np.array(isweep_xy_shots)
-    vsweep_xy_shots = [
-        [[vsweep_processed[shot] for shot in range(len(xy_shot_ref[i][j]))] for j in range(len(xy_shot_ref[i]))]
-        for i in range(len(xy_shot_ref))]
-    vsweep_xy_shots_array = np.array(vsweep_xy_shots)
+
+    # Can this be done using numpy array functions?
+
+    isweep_xy_shots_array = isweep_processed[xy_shot_ref]
+    vsweep_xy_shots_array = vsweep_processed[xy_shot_ref]
     # print("Shape of isweep_xy_shots_array:", isweep_xy_shots_array.shape)
 
     # Graph vsweep vs isweep for all frames in one shot (namely the first shot in the first unique x,y position)
