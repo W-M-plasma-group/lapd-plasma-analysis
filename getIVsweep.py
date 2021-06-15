@@ -51,12 +51,14 @@ def get_xy(filename):
     #    each shot is stored at the cell representing the x,y position where it was taken
     #    (for example, a shot might have been taken at the combination of the 10th unique
     #       x position and the 15th unique y position in the lists x and y)
-    # NOTE: THIS CODE USED TO BE AFTER "try all the categorizing needed down here" in get_isweep_vsweep
+    # NOTE: This code used to be after "try all the categorizing needed down here" in get_isweep_vsweep
     # For every shot index i, x_round[i] and y_round[i] give the position of the shot taken at that index
     print("Categorizing shots by x,y position...")
-    xy_shot_ref = [[[] for j in range(y_length)] for i in range(x_length)]
+    xy_shot_ref = [[[] for _ in range(y_length)] for _ in range(x_length)]
     for i in range(num_shots):
+        # noinspection PyTypeChecker
         xy_shot_ref[x_loc[i]][y_loc[i]].append(i)  # full of references to nth shot taken
+    #
     # print("xy shot refs:", xy_shot_ref)
 
     file.close()
@@ -141,7 +143,7 @@ def get_isweep_vsweep(filename, sample_sec=(100 / 16 * 10 ** 6) ** (-1)):
 
     isweep_xy_shots_array = isweep_processed[xy_shot_ref]
     vsweep_xy_shots_array = vsweep_processed[xy_shot_ref]
-    # print("Shape of isweep_xy_shots_array:", isweep_xy_shots_array.shape)
+    print("Shape of isweep_xy_shots_array:", isweep_xy_shots_array.shape)
 
     # Calculate means: "horizontally" average all shots taken at same position
     #    (average all corresponding frames into a single "average shot" with same number of frames)
@@ -168,20 +170,11 @@ def get_isweep_vsweep(filename, sample_sec=(100 / 16 * 10 ** 6) ** (-1)):
 
 def isolate_plateaus(bias, current):  # call near start of create_ranged_characteristic? Does this need current?
 
-    # Should plateau_start_frames be a nested list?
-    # plateau_start_frames = np.ndarray()
-
     quench_slope = -1  # "Threshold for voltage quench slope"
     quench_diff = 10  # Threshold for separating distinct voltage quench frames
-    # Not in MATLAB code
-    rise_slope = 1
 
     bias_gradient = np.gradient(bias, axis=-1)
     normalized_bias_gradient = bias_gradient / np.amax(bias_gradient, axis=-1, keepdims=True)
-    # debug
-    # lt.plot(normalized_bias_gradient[30, 0])
-    # plt.show()
-    #
 
     # quench_frames = np.array((normalized_bias_gradient < quench_slope).nonzero())
     # print("Coordinates of quench frames:", quench_frames)
@@ -215,8 +208,8 @@ def isolate_plateaus(bias, current):  # call near start of create_ranged_charact
 def create_ranged_characteristic(filename, start, end):
     bias, current = get_isweep_vsweep(filename)
     dimensions = len(bias.shape)
-    indices = tuple(np.zeros(dimensions - 1, dtype=int).tolist())
-    # zero_indices = indices
+    # indices = tuple(np.zeros(dimensions - 1, dtype=int).tolist())
+    zero_indices = (0,) * (dimensions - 1)
     zero_indices = (30, 0)
     # debug
     # print("Dimensions of incoming bias array:", bias.shape)
@@ -255,7 +248,7 @@ def smooth_characteristic(characteristic, num_points_each_side):
     # smooth_bias = np.zeros(size)
     smooth_current = np.zeros(size)
 
-    # Should the ends (which I set to be constant) just be chopped off instead?
+    # Should the ends (which I set to be constant) just be chopped off instead? Probably yes.
 
     for i in range(length):
         if i < num_points_each_side:
@@ -285,7 +278,10 @@ def split_plateaus(bias, current, sig_quench_frames):
     # New: Return (4D array: x, y, plateau number in shot, frame number in plateau; padded with zeros),
     #             (4D array: x, y, plateau number in shot, start & end significant frame in plateau)
 
-    # print("Shapes: bias =", bias.shape, ", current =", current.shape, ", sig_quench_frames =", sig_quench_frames.shape)
+    # Not in MATLAB code
+    rise_slope = 0.5  # Threshold for increases in slope
+
+    # print("Shapes: bias =", bias.shape, sig_quench_frames =", sig_quench_frames.shape)
 
     max_number_plateaus = sig_quench_frames.shape[-1]
     frames_per_plateau = np.diff(np.insert(sig_quench_frames, 0, 0, axis=-1), axis=-1)
@@ -296,8 +292,8 @@ def split_plateaus(bias, current, sig_quench_frames):
     x_length = bias.shape[0]
     y_length = bias.shape[1]
 
-    split_bias = np.zeros((x_length, y_length, max_number_plateaus, max_number_frames), dtype=float)
-    split_current = np.zeros((x_length, y_length, max_number_plateaus, max_number_frames), dtype=float)
+    split_bias = np.full((x_length, y_length, max_number_plateaus, max_number_frames), np.nan, dtype=float)
+    split_current = np.full((x_length, y_length, max_number_plateaus, max_number_frames), np.nan, dtype=float)
 
     # Is there a better-performance way (for example, without a for loop) to do this? Note in documentation
     print("Splitting frames into plateaus...")
@@ -310,6 +306,20 @@ def split_plateaus(bias, current, sig_quench_frames):
                 split_current[i, j, f, :frames_per_plateau[i, j, f]] = split_current_list[f]
         # print("x position", i, "done")
 
+    max_bias_indices = np.nanargmax(split_bias, axis=-1)
+
+    # Should plateau_start_frames be a nested list?
+    # normalized_bias_gradient =
+    ramp_start_frames = np.zeros_like(max_bias_indices)
+
+    print("Isolating rising segments...")
+    for i in range(x_length):
+        for j in range(y_length):
+            for f in range(max_number_plateaus):
+                plateau_before_max = split_bias[i, j, f, :max_bias_indices[i, j, f]]
+                normalized_plateau_gradient = np.gradient(plateau_before_max) / np.max(np.gradient(plateau_before_max))
+                ramp_start_frames[i, j, f] = np.amax((normalized_plateau_gradient < rise_slope).nonzero())
+
     """
     split_bias = np.array([[np.split(bias[i, j], sig_quench_frames[i, j], axis=-1)[:max_number_plateaus]
                             for j in range(y_length)]
@@ -320,17 +330,19 @@ def split_plateaus(bias, current, sig_quench_frames):
     """
 
     # print("Shape of bias plateau array:", split_bias.shape, "; shape of current plateau array:", split_current.shape)
-    max_bias_indices = np.argmax(split_bias, axis=-1)
+
     # This part is not in the MATLAB code explicitly, but based on PlasmaPy's plasma potential calculation it is needed
     # Could I move/combine this with the isolate_plateaus function?
     # plt.plot(split_bias[30, 0, 7], split_current[30, 0, 7])
-    # plt.show()
-    # plt.plot(np.gradient(split_bias[30, 0, 7], -1))
-    # plt.show()
-    ramp_start_indices = 3
-    # print(max_bias_indices)
 
-    plateau_ranges = np.stack([np.zeros_like(max_bias_indices), max_bias_indices], axis=-1)
+    # debug
+    # test_gradient = np.gradient(split_bias[30, 0, 7, 0:max_bias_indices[30, 0, 7]], axis=-1)
+    # plt.plot(test_gradient[ramp_start_frames/np.amax(bias_gradient, axis=-1, keepdims=True))
+    # plt.plot(test_gradient / np.amax(test_gradient))
+    # plt.show()
+    #
+
+    plateau_ranges = np.stack([ramp_start_frames, max_bias_indices], axis=-1)
     # print("Start and stop frames of plateaus:", plateau_ranges)
 
     # First corner plot

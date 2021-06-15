@@ -37,13 +37,17 @@ probe_area = (1.*u.mm)**2
 bias, current = get_isweep_vsweep(filename)
 frames = isolate_plateaus(bias, current)
 # print(split_plateaus(bias, current, frames)[0])
-sample_indices = (30, 0, 7)
+sample_indices = (30, 0, 7)  # x position, y position, plateau number within frame
 split_bias, split_current, plateau_range = split_plateaus(bias, current, frames)
 middle_bias = split_bias[sample_indices][plateau_range[sample_indices][0]:plateau_range[sample_indices][1]]
 middle_current = split_current[sample_indices][plateau_range[sample_indices][0]:plateau_range[sample_indices][1]]
 middle_plateau = Characteristic(middle_bias * 100 * u.V, middle_current * (-1. / 11) * u.A)
-middle_plateau_smooth = smooth_characteristic(middle_plateau, 7)
-middle_plateau_smooth.plot()
-plt.show()
-# pprint(swept_probe_analysis(middle_plateau_smooth, probe_area, 'He-4+', bimaxwellian=True, visualize=True, plot_EEDF=True))
+middle_plateau_smooth = smooth_characteristic(middle_plateau, 9)
+# middle_plateau_smooth.plot()
 # plt.show()
+pprint(swept_probe_analysis(middle_plateau_smooth, probe_area, 'He-4+', bimaxwellian=False, visualize=True, plot_EEDF=True))
+plt.show()
+
+# Note: The (non-bimaxwellian) plasmapy electron temperature seems almost to be the *reciprocal* of the correct value?
+# Attempt to make a (basic) contour or surface plot of electron temperature across positions to investigate further
+
