@@ -1,6 +1,4 @@
 # Make sure to add code comments!
-import numpy
-import numpy as np
 
 from hdf5reader import *
 
@@ -34,8 +32,6 @@ def get_xy(filename):
     x_length = len(x)
     y_length = len(y)
 
-    # CAN I TURN these into np arrays too?
-
     # Act as soft warnings in case of limited x,y data
     if x_length == 1 and y_length == 1:
         print("Only one position value. No plots can be made")
@@ -43,6 +39,8 @@ def get_xy(filename):
         print("Only one unique x value. Will only consider y position")
     elif y_length == 1:
         print("Only one unique y value. Will only consider x position")
+
+    # Can these be rewritten as NumPy arrays?
 
     shot_list = tuple(probe_motion['Shot number'])
     num_shots = len(shot_list)
@@ -73,7 +71,6 @@ def get_xy(filename):
 
 
 def get_isweep_vsweep(filename, sample_sec=(100 / 16 * 10 ** 6) ** (-1)):
-
     file = open_HDF5(filename)  # Should I make the previous function take a file as a parameter and not a filename?
 
     xy_shot_ref = get_xy(filename)
@@ -122,18 +119,11 @@ def get_isweep_vsweep(filename, sample_sec=(100 / 16 * 10 ** 6) ** (-1)):
     #   of measurements per shot ("frames")
 
     print("Decompressing raw data...")
-    """
-    isweep_processed = np.ndarray((raw_size[0], raw_size[1]), float)
-    vsweep_processed = np.ndarray((raw_size[0], raw_size[1]), float)
-    # Is the below also necessary? Check the MATLAB code
-    # isweep_sumsq = np.ndarray((1065,), float)
 
-    for i in range(raw_size[0]):
-        isweep_processed[i] = isweep_scales_array[i] * isweep_raw_array[i] + isweep_offsets_array[i]
-        vsweep_processed[i] = vsweep_scales_array[i] * vsweep_raw_array[i] + vsweep_offsets_array[i]
-    """
     isweep_processed = isweep_scales_array[:, np.newaxis] * isweep_raw_array + isweep_offsets_array[:, np.newaxis]
     vsweep_processed = vsweep_scales_array[:, np.newaxis] * vsweep_raw_array + vsweep_offsets_array[:, np.newaxis]
+    # Is the below necessary? Check the MATLAB code
+    # isweep_sumsq = np.ndarray((1065,), float)
 
     print("Finished decompressing compressed isweep and vsweep data")
 
@@ -149,16 +139,9 @@ def get_isweep_vsweep(filename, sample_sec=(100 / 16 * 10 ** 6) ** (-1)):
     #    the third dimension represents the nth shot taken at that unique positions
     #    and the fourth dimensions lists all the frames in that nth shot.
 
-    # Can this be done using numpy array functions?
-
     isweep_xy_shots_array = isweep_processed[xy_shot_ref]
     vsweep_xy_shots_array = vsweep_processed[xy_shot_ref]
     # print("Shape of isweep_xy_shots_array:", isweep_xy_shots_array.shape)
-
-    # Graph vsweep vs isweep for all frames in one shot (namely the first shot in the first unique x,y position)
-    # plt.plot(vsweep_xy_shots_array[0, 0, 0], isweep_xy_shots_array[0, 0, 0])
-    # plt.plot(isweep_xy_shots_array[0, 0, 0])
-    # plt.show()
 
     # Calculate means: "horizontally" average all shots taken at same position
     #    (average all corresponding frames into a single "average shot" with same number of frames)
@@ -189,10 +172,16 @@ def isolate_plateaus(bias, current):  # call near start of create_ranged_charact
     # plateau_start_frames = np.ndarray()
 
     quench_slope = -1  # "Threshold for voltage quench slope"
-    quench_diff = 10   # Threshold for separating distinct voltage quench frames
+    quench_diff = 10  # Threshold for separating distinct voltage quench frames
+    # Not in MATLAB code
+    rise_slope = 1
 
     bias_gradient = np.gradient(bias, axis=-1)
     normalized_bias_gradient = bias_gradient / np.amax(bias_gradient, axis=-1, keepdims=True)
+    # debug
+    # lt.plot(normalized_bias_gradient[30, 0])
+    # plt.show()
+    #
 
     # quench_frames = np.array((normalized_bias_gradient < quench_slope).nonzero())
     # print("Coordinates of quench frames:", quench_frames)
@@ -201,8 +190,7 @@ def isolate_plateaus(bias, current):  # call near start of create_ranged_charact
     # Using list comprehension, this line fills each x,y position in array with a list of quench frames
     quench_frames = np.array([[(same_xy < quench_slope).nonzero()[0]
                                for same_xy in same_x]
-                              for same_x in normalized_bias_gradient])
-
+                              for same_x in normalized_bias_gradient], dtype=object)
     # print("This is the quench frame array:", quench_frames)
 
     # Using list comprehension, this line creates an array storing significant quench frames (plus the last one, which
@@ -210,23 +198,26 @@ def isolate_plateaus(bias, current):  # call near start of create_ranged_charact
     sig_quench_frames = np.array([[same_xy[(np.diff(same_xy) > quench_diff).tolist() + [True]]
                                    for same_xy in same_x]
                                   for same_x in quench_frames])
-
     # print("This is the significant quench frame array:", sig_quench_frames)
 
     # Sample for first position (0,0); not needed in final function
     # plt.plot(bias[0, 0], 'b-', sig_quench_frames[0, 0], bias[0, 0, sig_quench_frames[0, 0]], 'ro')
     # plt.show()
 
-    max_num_plateaus = sig_quench_frames.shape[-1]
+    # max_num_plateaus = sig_quench_frames.shape[-1]
+    # max_length_plateaus =
     # print("Maximum number of plateaus:", max_num_plateaus)
 
+    # return sig_quench_frames, max_num_plateaus
     return sig_quench_frames
 
 
 def create_ranged_characteristic(filename, start, end):
     bias, current = get_isweep_vsweep(filename)
     dimensions = len(bias.shape)
-    zero_indices = tuple(np.zeros(dimensions - 1, dtype=int).tolist())
+    indices = tuple(np.zeros(dimensions - 1, dtype=int).tolist())
+    # zero_indices = indices
+    zero_indices = (30, 0)
     # debug
     # print("Dimensions of incoming bias array:", bias.shape)
     # print("Zero coordinates to access first corner of bias and current:", zero_indices)
@@ -254,7 +245,6 @@ def create_ranged_characteristic(filename, start, end):
 
 
 def smooth_characteristic(characteristic, num_points_each_side):
-
     size = characteristic.bias.shape
     length = size[len(size) - 1]
     if num_points_each_side < 0:
@@ -262,36 +252,93 @@ def smooth_characteristic(characteristic, num_points_each_side):
     if length < 2 * num_points_each_side:
         raise ValueError("Characteristic of", length, "data points is too short to take", num_points_each_side +
                          "-point average over")
-    smooth_bias = numpy.zeros(size)
-    smooth_current = numpy.zeros(size)
+    # smooth_bias = np.zeros(size)
+    smooth_current = np.zeros(size)
+
+    # Should the ends (which I set to be constant) just be chopped off instead?
 
     for i in range(length):
         if i < num_points_each_side:
-            smooth_bias[..., i] = numpy.mean(characteristic.bias[..., :2 * num_points_each_side])
-            smooth_current[..., i] = numpy.mean(characteristic.current[..., :2 * num_points_each_side])
+            # smooth_bias[..., i] = np.mean(characteristic.bias[..., :2 * num_points_each_side])
+            smooth_current[..., i] = np.mean(characteristic.current[..., :2 * num_points_each_side])
         elif i >= length - num_points_each_side:
-            smooth_bias[..., i] = numpy.mean(characteristic.bias[..., -2 * num_points_each_side - 1:])
-            smooth_current[..., i] = numpy.mean(characteristic.current[..., -2 * num_points_each_side - 1:])
+            # smooth_bias[..., i] = np.mean(characteristic.bias[..., -2 * num_points_each_side - 1:])
+            smooth_current[..., i] = np.mean(characteristic.current[..., -2 * num_points_each_side - 1:])
         else:
-            smooth_bias[..., i] = numpy.mean(
-                characteristic.bias[..., i - num_points_each_side:i + num_points_each_side + 1])
-            smooth_current[..., i] = numpy.mean(characteristic.current[...,
-                                                i - num_points_each_side:i + num_points_each_side + 1])
+            # smooth_bias[..., i] = np.mean(
+            #     characteristic.bias[..., i - num_points_each_side:i + num_points_each_side + 1])
+            smooth_current[..., i] = np.mean(characteristic.current[...,
+                                             i - num_points_each_side:i + num_points_each_side + 1])
 
-    return Characteristic(u.Quantity(smooth_bias, u.V), u.Quantity(smooth_current, u.A))
+    # return Characteristic(u.Quantity(smooth_bias, u.V), u.Quantity(smooth_current, u.A))
+    return Characteristic(u.Quantity(characteristic.bias, u.V), u.Quantity(smooth_current, u.A))
 
 
 def get_time_array(shape_of_frames, sample_sec):  # Is this strictly necessary? All piles (pages) are identical anyways
 
     # x, y, time in milliseconds since start of that average shot using sample_sec in milliseconds
-    return np.full(shape=shape_of_frames, fill_value=(np.arange(shape_of_frames[-1])*sample_sec).to(u.ms))
+    return np.full(shape=shape_of_frames, fill_value=(np.arange(shape_of_frames[-1]) * sample_sec).to(u.ms))
 
 
-# def split_plateaus(bias, current, sig_quench_frames):  # Return 4D array x,y,plateau number in shot,frame in plateau
+def split_plateaus(bias, current, sig_quench_frames):
+    # Old: Return 4D array x,y,plateau number in shot,frame in plateau
+    # New: Return (4D array: x, y, plateau number in shot, frame number in plateau; padded with zeros),
+    #             (4D array: x, y, plateau number in shot, start & end significant frame in plateau)
 
-    # returns split bias and current in tuple
-#     return np.split(bias, sig_quench_frames, axis=-1), np.split(current, sig_quench_frames, axis=-1)
+    # print("Shapes: bias =", bias.shape, ", current =", current.shape, ", sig_quench_frames =", sig_quench_frames.shape)
 
+    max_number_plateaus = sig_quench_frames.shape[-1]
+    frames_per_plateau = np.diff(np.insert(sig_quench_frames, 0, 0, axis=-1), axis=-1)
+    max_number_frames = np.amax(frames_per_plateau)
+    # print("Frames per each plateau:", frames_per_plateau)
+    # print("Max number of frames:", max_number_frames)
+
+    x_length = bias.shape[0]
+    y_length = bias.shape[1]
+
+    split_bias = np.zeros((x_length, y_length, max_number_plateaus, max_number_frames), dtype=float)
+    split_current = np.zeros((x_length, y_length, max_number_plateaus, max_number_frames), dtype=float)
+
+    # Is there a better-performance way (for example, without a for loop) to do this? Note in documentation
+    print("Splitting frames into plateaus...")
+    for i in range(x_length):
+        for j in range(y_length):
+            split_bias_list = np.split(bias[i, j], sig_quench_frames[i, j])
+            split_current_list = np.split(current[i, j], sig_quench_frames[i, j])
+            for f in range(max_number_plateaus):
+                split_bias[i, j, f, :frames_per_plateau[i, j, f]] = split_bias_list[f]
+                split_current[i, j, f, :frames_per_plateau[i, j, f]] = split_current_list[f]
+        # print("x position", i, "done")
+
+    """
+    split_bias = np.array([[np.split(bias[i, j], sig_quench_frames[i, j], axis=-1)[:max_number_plateaus]
+                            for j in range(y_length)]
+                           for i in range(x_length)])
+    split_current = np.array([[np.split(current[i, j], sig_quench_frames[i, j], axis=-1)[:max_number_plateaus]
+                               for j in range(bias.shape[1])]
+                              for i in range(bias.shape[0])])
+    """
+
+    # print("Shape of bias plateau array:", split_bias.shape, "; shape of current plateau array:", split_current.shape)
+    max_bias_indices = np.argmax(split_bias, axis=-1)
+    # This part is not in the MATLAB code explicitly, but based on PlasmaPy's plasma potential calculation it is needed
+    # Could I move/combine this with the isolate_plateaus function?
+    # plt.plot(split_bias[30, 0, 7], split_current[30, 0, 7])
+    # plt.show()
+    # plt.plot(np.gradient(split_bias[30, 0, 7], -1))
+    # plt.show()
+    ramp_start_indices = 3
+    # print(max_bias_indices)
+
+    plateau_ranges = np.stack([np.zeros_like(max_bias_indices), max_bias_indices], axis=-1)
+    # print("Start and stop frames of plateaus:", plateau_ranges)
+
+    # First corner plot
+    # plt.plot(split_bias[30, 0, 7, :max_bias_indices[30, 0, 7]],
+    #          split_current[30, 0, 7, :max_bias_indices[30, 0, 7]], 'bo')
+    # plt.show()
+
+    return split_bias, split_current, plateau_ranges
 
 # isolate_plateaus(get_isweep_vsweep('HDF5/8-3500A.hdf5'))
 # get_isweep_vsweep('HDF5/09_radial_line_25press_4kA_redo.hdf5')
