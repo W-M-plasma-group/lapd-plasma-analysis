@@ -170,7 +170,7 @@ def isolate_plateaus(bias, current=None):  # Current is optional for maximum com
     sig_quench_frames = np.array([[same_xy[(np.diff(same_xy) > quench_diff).tolist() + [True]]
                                    for same_xy in same_x]
                                   for same_x in quench_frames])
-    # print("This is the significant quench frame array:", sig_quench_frames)
+    print("This is the significant quench frame array:", sig_quench_frames)
 
     # Sample for first position (0,0), can be used for debugging; not needed in final function
     # plt.plot(bias[0, 0], 'b-', sig_quench_frames[0, 0], bias[0, 0, sig_quench_frames[0, 0]], 'ro')
@@ -180,6 +180,7 @@ def isolate_plateaus(bias, current=None):  # Current is optional for maximum com
 
 
 def to_real_units(bias, current):
+
     # The conversion factors from abstract units to real bias (V) and current values (A) are hard-coded in here.
     # Note that current is multiplied by -1 to get the "upright" traditional Isweep-Vsweep curve. Add to documentation?
 
@@ -191,12 +192,8 @@ def to_real_units(bias, current):
 
 
 def create_ranged_characteristic(bias, current, start, end):
-    dimensions = len(bias.shape)
 
-    # debug
-    # print("Dimensions of incoming bias array:", bias.shape)
-    # print("Zero coordinates to access first corner of bias and current:", zero_indices)
-    #
+    dimensions = len(bias.shape)
 
     if bias.shape != current.shape:
         raise ValueError("Bias and current must be of the same dimensions and shape")
@@ -223,37 +220,25 @@ def create_ranged_characteristic(bias, current, start, end):
     return characteristic
 
 
-def smooth_characteristic(characteristic, num_points_each_side):
+def smooth_characteristic(characteristic, margin):
 
     # Note: smooth_characteristic changes (distorts) characteristic; use SLM-like fitting instead of smoothing later on?
 
-    size = characteristic.bias.shape
-    length = size[len(size) - 1]
-    if num_points_each_side < 0:
-        raise ValueError("Cannot smooth over negative number", num_points_each_side, "of points")
-    if length < 2 * num_points_each_side:
-        raise ValueError("Characteristic of", length, "data points is too short to take", num_points_each_side,
-                         "-point average over")
-    # smooth_bias = np.zeros(size)
-    smooth_current = np.zeros(size)
+    if len(characteristic.bias.shape) > 1:
+        raise ValueError("Characteristic bias should be 1D; has", len(characteristic.bias.shape), "dimensions instead")
+    length = len(characteristic.bias)
+    if margin < 0:
+        raise ValueError("Cannot smooth over negative number", margin, "of points")
+    if length < 2 * margin + 1:
+        raise ValueError("Characteristic of", length, "data points is too short to take", margin, "-point average over")
 
-    # Should the ends (which I set to be constant) just be chopped off instead? Yes.
+    # Note: Bias is not smoothed
+    smooth_current = np.zeros(length - 2 * margin) * u.A
 
-    for i in range(length):
-        if i < num_points_each_side:
-            # smooth_bias[..., i] = np.mean(characteristic.bias[..., :2 * num_points_each_side])
-            smooth_current[..., i] = np.mean(characteristic.current[..., :2 * num_points_each_side])
-        elif i >= length - num_points_each_side:
-            # smooth_bias[..., i] = np.mean(characteristic.bias[..., -2 * num_points_each_side - 1:])
-            smooth_current[..., i] = np.mean(characteristic.current[..., -2 * num_points_each_side - 1:])
-        else:
-            # smooth_bias[..., i] = np.mean(
-            #     characteristic.bias[..., i - num_points_each_side:i + num_points_each_side + 1])
-            smooth_current[..., i] = np.mean(characteristic.current[...,
-                                             i - num_points_each_side:i + num_points_each_side + 1])
+    for i in range(length - 2 * margin):
+        smooth_current[i] = np.mean(characteristic.current[i:i + 2 * margin])
 
-    # return Characteristic(u.Quantity(smooth_bias, u.V), u.Quantity(smooth_current, u.A))
-    return Characteristic(u.Quantity(characteristic.bias, u.V), u.Quantity(smooth_current, u.A))
+    return Characteristic(characteristic.bias[margin:length - margin], smooth_current)
 
 
 def get_time_array(shape_of_frames, sample_sec):  # Is this strictly necessary? All piles (pages) are identical anyways
@@ -267,21 +252,26 @@ def split_plateaus(bias, current, sig_quench_frames):
     # Old: Return 4D array x,y,plateau number in shot,frame in plateau
     # New: Return (4D array: x, y, plateau number in shot, frame number in plateau; padded with nans),
     #             (4D array: x, y, plateau number in shot, start & end significant frame in plateau)
+    # Possible: don't split into separate plateaus at all; just save start and stop indices to convert easily to time
+    #    coordinates, use create_range_characteristic to populate characteristic array
 
     # Not in MATLAB code
     rise_slope = 0.5  # Threshold for increases in slope
 
     max_number_plateaus = sig_quench_frames.shape[-1]
     frames_per_plateau = np.diff(np.insert(sig_quench_frames, 0, 0, axis=-1), axis=-1)
-    max_number_frames = np.amax(frames_per_plateau)
+    # max_number_frames = np.amax(frames_per_plateau)
     # print("Frames per each plateau:", frames_per_plateau)
     # print("Max number of frames:", max_number_frames)
 
     x_length = bias.shape[0]
     y_length = bias.shape[1]
 
-    split_bias = np.full((x_length, y_length, max_number_plateaus, max_number_frames), np.nan, dtype=float)
-    split_current = np.full((x_length, y_length, max_number_plateaus, max_number_frames), np.nan, dtype=float)
+    # split_bias = np.full((x_length, y_length, max_number_plateaus, max_number_frames), np.nan, dtype=float)
+    # split_current = np.full((x_length, y_length, max_number_plateaus, max_number_frames), np.nan, dtype=float)
+
+    plateau_ranges = np.full((x_length, y_length, max_number_plateaus, 2), np.nan, dtype=int)
+    plateau_ranges[..., 1] = np.nanargmax()
 
     # Is there a better-performance way (for example, without a for loop) to do this? Note in documentation
     print("Splitting frames into plateaus...")
@@ -290,11 +280,10 @@ def split_plateaus(bias, current, sig_quench_frames):
             split_bias_list = np.split(bias[i, j], sig_quench_frames[i, j])
             split_current_list = np.split(current[i, j], sig_quench_frames[i, j])
             for f in range(max_number_plateaus):
-                split_bias[i, j, f, :frames_per_plateau[i, j, f]] = split_bias_list[f]
-                split_current[i, j, f, :frames_per_plateau[i, j, f]] = split_current_list[f]
+                pass
         # print("x position", i, "done")
 
-    max_bias_indices = np.nanargmax(split_bias, axis=-1)
+    max_bias_indices = np.nanargmax(np.arange(1), axis=-1)
 
     # Note: The selection of ramps (increasing bias section only) from plateaus (constant and increasing bias sections)
     #    is not in the original MATLAB code, but is judged to be necessary based on the performance of PlasmaPy
@@ -306,7 +295,7 @@ def split_plateaus(bias, current, sig_quench_frames):
     for i in range(x_length):
         for j in range(y_length):
             for f in range(max_number_plateaus):
-                plateau_before_max = split_bias[i, j, f, :max_bias_indices[i, j, f]]
+                plateau_before_max = 1
                 normalized_plateau_gradient = np.gradient(plateau_before_max) / np.max(np.gradient(plateau_before_max))
                 ramp_start_frames[i, j, f] = np.amax((normalized_plateau_gradient < rise_slope).nonzero())
 
@@ -341,29 +330,31 @@ def split_plateaus(bias, current, sig_quench_frames):
     #          split_current[30, 0, 7, :max_bias_indices[30, 0, 7]], 'bo')
     # plt.show()
 
-    return split_bias, split_current, plateau_ranges
+    return plateau_ranges
 
 
 # isolate_plateaus(get_isweep_vsweep('HDF5/8-3500A.hdf5'))
 # get_isweep_vsweep('HDF5/09_radial_line_25press_4kA_redo.hdf5')
 
 
-def get_characteristic_array(split_bias, split_current, plateau_ranges):
+def get_characteristic_array(bias, current, plateau_ranges):
     # Are split arrays needed? Use create_ranged_characteristic (original bias/current + start/stop indices for each?
-    # Use ragged arrays????? Then can create zeros_like or something to match
+    # Use ragged arrays????? Then can create zeros_like or something to match; no
     # Still need to do plateau filtering
 
     # characteristic_array = np.empty((split_bias.shape[:3]))  # x, y, plateau
-    smooth_characteristic_array = np.empty((split_bias.shape[:3]), dtype=object)  # x, y, plateau; hard-coded in
+    smooth_characteristic_array = np.empty((bias.shape[:3]), dtype=object)  # x, y, plateau; hard-coded in
     # Address case where there are an irregular number of plateaus in a frame to begin with!
+    #    This should be addressed by creating a secondary array (or list?) containing the indices of valid plateaus
+    #    to analyze. Invalid ones should be skipped, but preserved in the array.
 
     print("Creating characteristic array... (May take about 30 seconds)")
-    for i in range(split_bias.shape[0]):
-        for j in range(split_bias.shape[1]):
-            for p in range(split_bias.shape[2]):
+    for i in range(bias.shape[0]):
+        for j in range(bias.shape[1]):
+            for p in range(bias.shape[2]):
                 # characteristic_array[i, j, p] = smooth_characteristic(create_ranged_characteristic(
                 smooth_characteristic_array[i, j, p] = (smooth_characteristic(create_ranged_characteristic(
-                    split_bias[i, j, p], split_current[i, j, p],
+                     dbias[i, j, p], current[i, j, p],
                     plateau_ranges[i, j, p, 0], plateau_ranges[i, j, p, 1]), 10)
                                                         if plateau_ranges[i, j, p, 1] - plateau_ranges[
                     i, j, p, 0] > 2 * 10 else None)
