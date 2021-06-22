@@ -180,6 +180,7 @@ def isolate_plateaus(bias, current=None):  # Current is optional for maximum com
 
 
 def to_real_units(bias, current):
+
     # The conversion factors from abstract units to real bias (V) and current values (A) are hard-coded in here.
     # Note that current is multiplied by -1 to get the "upright" traditional Isweep-Vsweep curve. Add to documentation?
 
@@ -191,12 +192,8 @@ def to_real_units(bias, current):
 
 
 def create_ranged_characteristic(bias, current, start, end):
-    dimensions = len(bias.shape)
 
-    # debug
-    # print("Dimensions of incoming bias array:", bias.shape)
-    # print("Zero coordinates to access first corner of bias and current:", zero_indices)
-    #
+    dimensions = len(bias.shape)
 
     if bias.shape != current.shape:
         raise ValueError("Bias and current must be of the same dimensions and shape")
@@ -223,37 +220,26 @@ def create_ranged_characteristic(bias, current, start, end):
     return characteristic
 
 
-def smooth_characteristic(characteristic, num_points_each_side):
+def smooth_characteristic(characteristic, margin):
 
     # Note: smooth_characteristic changes (distorts) characteristic; use SLM-like fitting instead of smoothing later on?
 
-    size = characteristic.bias.shape
-    length = size[len(size) - 1]
-    if num_points_each_side < 0:
-        raise ValueError("Cannot smooth over negative number", num_points_each_side, "of points")
-    if length < 2 * num_points_each_side:
-        raise ValueError("Characteristic of", length, "data points is too short to take", num_points_each_side,
-                         "-point average over")
-    # smooth_bias = np.zeros(size)
-    smooth_current = np.zeros(size)
+    if len(characteristic.bias.shape) > 1:
+        raise ValueError("Characteristic bias should be 1D; has", len(characteristic.bias.shape), "dimensions instead")
+    length = len(characteristic.bias)
+    if margin < 0:
+        raise ValueError("Cannot smooth over negative number", margin, "of points")
+    # if length < 2 * margin:
+    if length < 2 * margin + 1:
+        raise ValueError("Characteristic of", length, "data points is too short to take", margin, "-point average over")
 
-    # Should the ends (which I set to be constant) just be chopped off instead? Yes.
+    # Note: Bias is not smoothed
+    smooth_current = np.zeros(length - 2 * margin) * u.A
 
-    for i in range(length):
-        if i < num_points_each_side:
-            # smooth_bias[..., i] = np.mean(characteristic.bias[..., :2 * num_points_each_side])
-            smooth_current[..., i] = np.mean(characteristic.current[..., :2 * num_points_each_side])
-        elif i >= length - num_points_each_side:
-            # smooth_bias[..., i] = np.mean(characteristic.bias[..., -2 * num_points_each_side - 1:])
-            smooth_current[..., i] = np.mean(characteristic.current[..., -2 * num_points_each_side - 1:])
-        else:
-            # smooth_bias[..., i] = np.mean(
-            #     characteristic.bias[..., i - num_points_each_side:i + num_points_each_side + 1])
-            smooth_current[..., i] = np.mean(characteristic.current[...,
-                                             i - num_points_each_side:i + num_points_each_side + 1])
+    for i in range(length - 2 * margin):
+        smooth_current[i] = np.mean(characteristic.current[i:i + 2 * margin])
 
-    # return Characteristic(u.Quantity(smooth_bias, u.V), u.Quantity(smooth_current, u.A))
-    return Characteristic(u.Quantity(characteristic.bias, u.V), u.Quantity(smooth_current, u.A))
+    return Characteristic(characteristic.bias[margin:length - margin], smooth_current)
 
 
 def get_time_array(shape_of_frames, sample_sec):  # Is this strictly necessary? All piles (pages) are identical anyways
