@@ -4,6 +4,7 @@ from hdf5reader import *
 
 
 def get_xy(filename):
+
     file = open_HDF5(filename)
 
     motor_data = structures_at_path(file, '/Raw data + config/6K Compumotor')
@@ -57,6 +58,7 @@ def get_xy(filename):
 
 
 def get_isweep_vsweep(filename):
+
     xy_shot_ref = get_xy(filename)
     file = open_HDF5(filename)
 
@@ -142,8 +144,8 @@ def get_isweep_vsweep(filename):
 
 def isolate_plateaus(bias, current=None):  # Current is optional for maximum compatibility
 
-    quench_slope = -1  # "Threshold for voltage quench slope": MATLAB code comment
-    quench_diff = 10  # Threshold for separating distinct voltage quench frames
+    quench_slope = -1   # "Threshold for voltage quench slope": MATLAB code comment
+    quench_diff = 10    # Threshold for separating distinct voltage quench frames
 
     # The bias has three types of regions: constant low, increase at constant rate (ramp), and rapid decrease
     #    down to minimum value (quench). The ramp region is where useful Isweep-Vsweep data points are collected.
