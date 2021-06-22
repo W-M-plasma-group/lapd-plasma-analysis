@@ -205,12 +205,13 @@ def isolate_plateaus(bias, current):  # call near start of create_ranged_charact
     return sig_quench_frames
 
 
-def create_ranged_characteristic(filename, start, end):
-    bias, current = get_isweep_vsweep(filename)
+def create_ranged_characteristic(bias, current, start, end):  # This used to accept filename as an argument, not A and V
+
+    # bias, current = get_isweep_vsweep(filename)
+
     dimensions = len(bias.shape)
-    # indices = tuple(np.zeros(dimensions - 1, dtype=int).tolist())
     zero_indices = (0,) * (dimensions - 1)
-    zero_indices = (30, 0)
+    # zero_indices = (30, 0)
     # debug
     # print("Dimensions of incoming bias array:", bias.shape)
     # print("Zero coordinates to access first corner of bias and current:", zero_indices)
@@ -219,9 +220,17 @@ def create_ranged_characteristic(filename, start, end):
         raise ValueError("Bias and current must be of the same dimensions and shape")
     if start < 0:
         raise ValueError("Start index must be non-negative")
-    if (dimensions == 1 and end > len(bias)) or (end > len(bias[zero_indices])):
-        raise ValueError("End index", end, "out of range of bias and current arrays of last-dimension length",
-                         len(bias[zero_indices]))
+    if dimensions == 1:
+        if end > len(bias):
+            raise ValueError("End index", end, "out of range of bias and current arrays of length", len(bias))
+        characteristic = Characteristic(u.Quantity(bias[start:end] * 100, u.V),
+                                        u.Quantity(current[start:end] * (-1. / 11.), u.A))
+    else:
+        if end > len(bias[zero_indices]):
+            raise ValueError("End index", end, "out of range of bias and current arrays of last-dimension length",
+                             len(bias[zero_indices]))
+        characteristic = Characteristic(u.Quantity(bias[zero_indices + (slice(start, end),)] * 100, u.V),
+                                        u.Quantity(current[zero_indices + (slice(start, end),)] * (-1. / 11.), u.A))
 
     # IMPORTANT: This function returns a characteristic with isweep values multiplied by a factor of -1. (As of 6/4/21)
     # Furthermore, these values have been converted into real quantities (Volts, Amps) from their abstract former units.
@@ -232,8 +241,7 @@ def create_ranged_characteristic(filename, start, end):
     #    later, when the plateau function is added to separate shots into single plateaus. (Also see end-exception line)
     #    (This is done by the zero_indices variable. It is a tuple coordinate just for accessing the position (0, 0).)
     #    (In the future, having more than one dimension for bias or current arrays should raise error?)
-    return Characteristic(u.Quantity(bias[zero_indices + (slice(start, end),)] * 100, u.V),
-                          u.Quantity(current[zero_indices + (slice(start, end),)] * (-1. / 11.), u.A))
+    return characteristic
     # The addition involves adding to the (0,0) position accessor a slice in the last dimension from start to end frame.
 
 
@@ -243,7 +251,7 @@ def smooth_characteristic(characteristic, num_points_each_side):
     if num_points_each_side < 0:
         raise ValueError("Cannot smooth over negative number", num_points_each_side, "of points")
     if length < 2 * num_points_each_side:
-        raise ValueError("Characteristic of", length, "data points is too short to take", num_points_each_side +
+        raise ValueError("Characteristic of", length, "data points is too short to take", num_points_each_side,
                          "-point average over")
     # smooth_bias = np.zeros(size)
     smooth_current = np.zeros(size)
@@ -275,7 +283,7 @@ def get_time_array(shape_of_frames, sample_sec):  # Is this strictly necessary? 
 
 def split_plateaus(bias, current, sig_quench_frames):
     # Old: Return 4D array x,y,plateau number in shot,frame in plateau
-    # New: Return (4D array: x, y, plateau number in shot, frame number in plateau; padded with zeros),
+    # New: Return (4D array: x, y, plateau number in shot, frame number in plateau; padded with nans),
     #             (4D array: x, y, plateau number in shot, start & end significant frame in plateau)
 
     # Not in MATLAB code
@@ -343,7 +351,15 @@ def split_plateaus(bias, current, sig_quench_frames):
     #
 
     plateau_ranges = np.stack([ramp_start_frames, max_bias_indices], axis=-1)
+    # debug
     # print("Start and stop frames of plateaus:", plateau_ranges)
+    # plateau_lengths = plateau_ranges[..., 1] - plateau_ranges[..., 0]
+    # print("Minimum characteristic length indices should be", np.argmin(plateau_lengths))
+    # print("Length of plateaus:", plateau_lengths)
+    # print("View of minimum-containing row?? of plateau_lengths:",
+    #   plateau_lengths[0, 0])
+    #       plateau_lengths[np.unravel_index(np.argmin(plateau_lengths), plateau_lengths.shape)])
+    #
 
     # First corner plot
     # plt.plot(split_bias[30, 0, 7, :max_bias_indices[30, 0, 7]],
@@ -352,5 +368,31 @@ def split_plateaus(bias, current, sig_quench_frames):
 
     return split_bias, split_current, plateau_ranges
 
+
 # isolate_plateaus(get_isweep_vsweep('HDF5/8-3500A.hdf5'))
 # get_isweep_vsweep('HDF5/09_radial_line_25press_4kA_redo.hdf5')
+
+
+def get_characteristic_array(split_bias, split_current, plateau_ranges):
+    # Are split arrays needed? Use create_ranged_characteristic (original bias/current + start/stop indices for each?
+    # Use ragged arrays????? Then can create zeros_like or something to match
+    # Still need to do plateau filtering
+
+    # characteristic_array = np.empty((split_bias.shape[:3]))  # x, y, plateau
+    smooth_characteristic_array = np.empty((split_bias.shape[:3]), dtype=object)  # x, y, plateau; hard-coded in
+    # Address case where there are an irregular number of plateaus in a frame to begin with!
+
+    for i in range(split_bias.shape[0]):
+        for j in range(split_bias.shape[1]):
+            for p in range(split_bias.shape[2]):
+                # characteristic_array[i, j, p] = smooth_characteristic(create_ranged_characteristic(
+                smooth_characteristic_array[i, j, p] = (smooth_characteristic(create_ranged_characteristic(
+                    split_bias[i, j, p], split_current[i, j, p],
+                    plateau_ranges[i, j, p, 0], plateau_ranges[i, j, p, 1]), 10)
+                                                        if plateau_ranges[i, j, p, 1] - plateau_ranges[
+                    i, j, p, 0] > 2*10 else None)
+
+    return smooth_characteristic_array
+
+# def extract_diagnostic_array(characteristic_array)
+#

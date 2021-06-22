@@ -10,13 +10,17 @@ print("Imported helper files")
 filename = 'HDF5/8-3500A.hdf5'
 
 # Eliminate the hard-coded plateau range and the create_range_characteristic function; transfer unit conversion/etc.
-""" plateau = create_ranged_characteristic(filename, 25005, 25620)
+"""
+bias, current = get_isweep_vsweep(filename)
+plateau = create_ranged_characteristic(bias, current,  32000, 35000)
 print("Finished creating I-V plasma Characteristic object")
 smooth_plateau = smooth_characteristic(plateau, 7)
 """
 """
 # debug
 with visualization.quantity_support():
+    plt.plot(plateau.current)
+    plt.show()
     plt.plot(plateau.bias, plateau.current)
     plt.plot(smooth_plateau.bias, smooth_plateau.current)
     # plt.plot(smooth_plateau.bias)
@@ -27,7 +31,7 @@ with visualization.quantity_support():
 
 # Calculate the cylindrical probe surface area
 # probe_area = 1/(1000)**2 (From MATLAB code)
-probe_area = (1.*u.mm)**2
+probe_area = (1. * u.mm) ** 2
 
 # pprint(swept_probe_analysis(characteristic, probe_area, 'He-4+', visualize=True, plot_EEDF=True))
 # Make ion type customizable by user
@@ -36,15 +40,20 @@ probe_area = (1.*u.mm)**2
 
 bias, current = get_isweep_vsweep(filename)
 frames = isolate_plateaus(bias, current)
+
 # print(split_plateaus(bias, current, frames)[0])
 sample_indices = (30, 0, 7)  # x position, y position, plateau number within frame
 split_bias, split_current, plateau_range = split_plateaus(bias, current, frames)
-middle_bias = split_bias[sample_indices][plateau_range[sample_indices][0]:plateau_range[sample_indices][1]]
-middle_current = split_current[sample_indices][plateau_range[sample_indices][0]:plateau_range[sample_indices][1]]
-middle_plateau = Characteristic(middle_bias * 100 * u.V, middle_current * (-1. / 11) * u.A)
-middle_plateau_smooth = smooth_characteristic(middle_plateau, 9)
-# middle_plateau_smooth.plot()
-# plt.show()
+""""""
+characteristics = get_characteristic_array(split_bias, split_current, plateau_range)
+middle_plateau_smooth = characteristics[sample_indices]
+
+# middle_bias = split_bias[sample_indices][plateau_range[sample_indices][0]:plateau_range[sample_indices][1]]
+# middle_current = split_current[sample_indices][plateau_range[sample_indices][0]:plateau_range[sample_indices][1]]
+# middle_plateau = Characteristic(middle_bias * 100 * u.V, middle_current * (-1. / 11) * u.A)
+# middle_plateau_smooth = smooth_characteristic(middle_plateau, 12)
+middle_plateau_smooth.plot()
+plt.show()
 pprint(swept_probe_analysis(middle_plateau_smooth, probe_area, 'He-4+', bimaxwellian=False, visualize=True, plot_EEDF=True))
 plt.show()
 
