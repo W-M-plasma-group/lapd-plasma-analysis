@@ -4,7 +4,6 @@ from hdf5reader import *
 
 
 def get_xy(filename):
-
     file = open_HDF5(filename)
 
     motor_data = structures_at_path(file, '/Raw data + config/6K Compumotor')
@@ -13,18 +12,7 @@ def get_xy(filename):
     # print("Data type of probe_motion dataset: ", probe_motion.dtype)
 
     print("Rounding position data...")
-    """
-    # print("Raw x data summary: ", probe_motion['x'])
-    # print("Raw y data summary: ", probe_motion['y'])
 
-    rnd = 0.10  # Change the x rounding step value here
-    dec = 100  # Change number of decimal points to consider here
-    prod = int(rnd * dec)
-    x_round = tuple(round(dec * xin / prod) * prod / dec for xin in tuple(probe_motion['x']))
-    y_round = tuple(round(dec * yin / prod) * prod / dec for yin in tuple(probe_motion['y']))
-    x = sorted(tuple(set(x_round)))  # only the unique x position values
-    y = sorted(tuple(set(y_round)))  # only the unique y position values
-    """
     places = 1
     x_round = np.round(probe_motion['x'], decimals=places)
     y_round = np.round(probe_motion['y'], decimals=places)
@@ -69,7 +57,6 @@ def get_xy(filename):
 
 
 def get_isweep_vsweep(filename):
-
     xy_shot_ref = get_xy(filename)
     file = open_HDF5(filename)
 
@@ -95,7 +82,7 @@ def get_isweep_vsweep(filename):
 
     print("Reading in scales and offsets from headers...")
     # Define: scale is 2nd index, offset is 3rd index
-    # Note: Can this be made faster by making the headers_raw lists into arrays?
+    # Can I skip some of the lists and turn data directly into arrays?
     isweep_scales = [header[1] for header in isweep_headers_raw]
     vsweep_scales = [header[1] for header in vsweep_headers_raw]
     isweep_offsets = [header[2] for header in isweep_headers_raw]
@@ -141,7 +128,6 @@ def get_isweep_vsweep(filename):
     vsweep_means = np.mean(vsweep_xy_shots_array, 2)
 
     # Describe what vsweep and isweep values do within each shot for observers to understand
-    # (Make sure to note that a -1 factor is required to obtain upright Isweep-Vsweep curves)
 
     """
     # print("Padded limit for characteristic:", characteristic.get_padded_limit(0.5))
@@ -156,10 +142,14 @@ def get_isweep_vsweep(filename):
 
 def isolate_plateaus(bias, current=None):  # Current is optional for maximum compatibility
 
-    quench_slope = -1   # "Threshold for voltage quench slope": MATLAB code comment
-    quench_diff = 10    # Threshold for separating distinct voltage quench frames
+    quench_slope = -1  # "Threshold for voltage quench slope": MATLAB code comment
+    quench_diff = 10  # Threshold for separating distinct voltage quench frames
 
-    # Comments
+    # The bias has three types of regions: constant low, increase at constant rate (ramp), and rapid decrease
+    #    down to minimum value (quench). The ramp region is where useful Isweep-Vsweep data points are collected.
+    # Since the bias changes almost linearly within each of these three regions, by taking the slope (gradient)
+    #    of the bias (and normalizing it to be less than 1) the bias can be used to divide the frames up into regions.
+
     bias_gradient = np.gradient(bias, axis=-1)
     normalized_bias_gradient = bias_gradient / np.amax(bias_gradient, axis=-1, keepdims=True)
 
@@ -180,15 +170,25 @@ def isolate_plateaus(bias, current=None):  # Current is optional for maximum com
                                   for same_x in quench_frames])
     # print("This is the significant quench frame array:", sig_quench_frames)
 
-    # Sample for first position (0,0); not needed in final function
+    # Sample for first position (0,0), can be used for debugging; not needed in final function
     # plt.plot(bias[0, 0], 'b-', sig_quench_frames[0, 0], bias[0, 0, sig_quench_frames[0, 0]], 'ro')
     # plt.show()
 
     return sig_quench_frames
 
 
-def create_ranged_characteristic(bias, current, start, end):
+def to_real_units(bias, current):
+    # The conversion factors from abstract units to real bias (V) and current values (A) are hard-coded in here.
+    # Note that current is multiplied by -1 to get the "upright" traditional Isweep-Vsweep curve. Add to documentation?
 
+    # Conversion factors taken from MATLAB code: Current = isweep / 11 ohms; Voltage = vsweep * 100
+    gain = 100.  # voltage gain
+    resistance = 11.  # current values from input current; implied units of ohms per volt since measured as potential
+
+    return bias * gain * u.V, -1. * current / resistance * u.A
+
+
+def create_ranged_characteristic(bias, current, start, end):
     dimensions = len(bias.shape)
 
     # debug
@@ -203,28 +203,22 @@ def create_ranged_characteristic(bias, current, start, end):
     if dimensions == 1:
         if end > len(bias):
             raise ValueError("End index", end, "out of range of bias and current arrays of length", len(bias))
-        characteristic = Characteristic(u.Quantity(bias[start:end] * 100, u.V),
-                                        u.Quantity(current[start:end] * (-1. / 11.), u.A))
+        real_bias, real_current = to_real_units(bias[start:end], current[start:end])
+        characteristic = Characteristic(real_bias, real_current)
     else:
+        # Note: zero_indices is tuple of indices to access first position bias and current.
+        #    In the future, multidimensional bias and current inputs should raise an error.
+        print("Warning: multidimensional characteristic creation is unsupported. This function returns a characteristic"
+              "with bias and current values only for the first position. Pass 1D arrays in the future to avoid this.")
         zero_indices = (0,) * (dimensions - 1)
-        # zero_indices = (30, 0)
         if end > len(bias[zero_indices]):
             raise ValueError("End index", end, "out of range of bias and current arrays of last-dimension length",
                              len(bias[zero_indices]))
-        characteristic = Characteristic(u.Quantity(bias[zero_indices + (slice(start, end),)] * 100, u.V),
-                                        u.Quantity(current[zero_indices + (slice(start, end),)] * (-1. / 11.), u.A))
+        real_bias, real_current = to_real_units(bias[zero_indices + (slice(start, end),)],
+                                                current[zero_indices + (slice(start, end),)])
+        characteristic = Characteristic(real_bias, real_current)
 
-    # IMPORTANT: This function returns a characteristic with isweep values multiplied by a factor of -1. (As of 6/4/21)
-    # Furthermore, these values have been converted into real quantities (Volts, Amps) from their abstract former units.
-    #    (Conversion factors taken from MATLAB code: Current = isweep / 11 ohms; Voltage = vsweep * 100
-    # Note that these values are hard-coded in
-    # IMPORTANT: If there is more than one dimension to the bias and current arrays passed into the function,
-    #    the function will only consider the first element of all the other dimensions. This will have to be addressed
-    #    later, when the plateau function is added to separate shots into single plateaus. (Also see end-exception line)
-    #    (This is done by the zero_indices variable. It is a tuple coordinate just for accessing the position (0, 0).)
-    #    (In the future, having more than one dimension for bias or current arrays should raise error?)
     return characteristic
-    # The addition involves adding to the (0,0) position accessor a slice in the last dimension from start to end frame.
 
 
 def smooth_characteristic(characteristic, num_points_each_side):
@@ -267,6 +261,7 @@ def get_time_array(shape_of_frames, sample_sec):  # Is this strictly necessary? 
 
 
 def split_plateaus(bias, current, sig_quench_frames):
+
     # Old: Return 4D array x,y,plateau number in shot,frame in plateau
     # New: Return (4D array: x, y, plateau number in shot, frame number in plateau; padded with nans),
     #             (4D array: x, y, plateau number in shot, start & end significant frame in plateau)
@@ -360,6 +355,7 @@ def get_characteristic_array(split_bias, split_current, plateau_ranges):
     smooth_characteristic_array = np.empty((split_bias.shape[:3]), dtype=object)  # x, y, plateau; hard-coded in
     # Address case where there are an irregular number of plateaus in a frame to begin with!
 
+    print("Creating characteristic array... (May take about 30 seconds)")
     for i in range(split_bias.shape[0]):
         for j in range(split_bias.shape[1]):
             for p in range(split_bias.shape[2]):
@@ -368,7 +364,7 @@ def get_characteristic_array(split_bias, split_current, plateau_ranges):
                     split_bias[i, j, p], split_current[i, j, p],
                     plateau_ranges[i, j, p, 0], plateau_ranges[i, j, p, 1]), 10)
                                                         if plateau_ranges[i, j, p, 1] - plateau_ranges[
-                    i, j, p, 0] > 2*10 else None)
+                    i, j, p, 0] > 2 * 10 else None)
 
     return smooth_characteristic_array
 
