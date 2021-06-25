@@ -13,7 +13,7 @@ ion_type = 'He-4+'
 filename = 'HDF5/8-3500A.hdf5'
 
 bias, current = get_isweep_vsweep(filename)
-frames = isolate_plateaus(bias, current)
+plateau_ranges = isolate_plateaus(bias, current)
 sample_indices = (30, 0, 7)  # x position, y position, plateau number within frame
 
 """
@@ -30,8 +30,8 @@ with visualization.quantity_support():
 # pprint(swept_probe_analysis(smooth_plateau, probe_area, 'He-4+', bimaxwellian=True, visualize=True, plot_EEDF=True))
 # plt.show()
 
-split_bias, split_current, plateau_ranges = split_plateaus(bias, current, frames)
-characteristics = get_characteristic_array(split_bias, split_current, plateau_ranges)
+# split_bias, split_current, plateau_ranges = split_plateaus(bias, current, frames)
+characteristics = get_characteristic_array(bias, current, plateau_ranges, 10)
 middle_plateau_smooth = characteristics[sample_indices]
 
 middle_plateau_smooth.plot()

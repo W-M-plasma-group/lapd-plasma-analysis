@@ -154,26 +154,19 @@ def isolate_plateaus(bias, current=None):  # Current is optional for maximum com
 
     """
 
-    # The new goal of this function is to identify the start and stop frames of each ramp section.
-
     quench_slope = -1  # "Threshold for voltage quench slope": MATLAB code comment
     quench_diff = 10  # Threshold for separating distinct voltage quench frames
-
-    """Comments taken from split_plateaus function"""
-    # Old: Return 4D array x,y,plateau number in shot,frame in plateau
-    # New: Return (4D array: x, y, plateau number in shot, frame number in plateau; padded with nans),
-    #             (4D array: x, y, plateau number in shot, start & end significant frame in plateau)
-    # Possible: don't split into separate plateaus at all; just save start and stop indices to convert easily to time
-    #    coordinates, use create_range_characteristic to populate characteristic array
 
     # Not in MATLAB code
     rise_slope = 0.4  # Threshold for increases in slope
     rise_diff = 100  # Threshold for separating distinct voltage ramp frames
 
-    # The bias has three types of regions: constant low, increase at constant rate (ramp), and rapid decrease
-    #    down to minimum value (quench). The ramp region is where useful Isweep-Vsweep data points are collected.
+    # The bias has three types of regions: constant low, increase at constant rate ("ramp"), and rapid decrease
+    #    down to minimum value ("quench"). The ramp region is where useful Isweep-Vsweep data points are collected.
     # Since the bias changes almost linearly within each of these three regions, by taking the slope (gradient)
     #    of the bias (and normalizing it to be less than 1) the bias can be used to divide the frames up into regions.
+    # Note: Selecting ramps out of plateaus (the constant low bias and following ramp region) is not in the original
+    #    MATLAB code, but is determined to be necessary for PlasmaPy diagnostics functions to work correctly.
 
     bias_gradient = np.gradient(bias, axis=-1)
     normalized_bias_gradient = bias_gradient / np.amax(bias_gradient, axis=-1, keepdims=True)
@@ -208,26 +201,10 @@ def isolate_plateaus(bias, current=None):  # Current is optional for maximum com
                                  for same_xy in same_x]
                                 for same_x in ramp_frames])
     # print("This is the significant ramp frame array:", sig_ramp_frames)
-    print("This is the significant ramp frame array shape:", sig_ramp_frames.shape)
-    # debug
-    # print("This is the difference in the ramp frames:", [[np.diff(xy).tolist() for xy in x] for x in ramp_frames])
-    test_indices = (30, 0)
+
     # print("This is the average of the non-quench normalized gradient array at the test indices:",
     #       np.mean(normalized_bias_gradient[test_indices +
     #                                        (normalized_bias_gradient[test_indices] > quench_slope).nonzero()]))
-    plt.plot(bias[test_indices], 'b-',
-             sig_ramp_frames[test_indices], bias[test_indices + (sig_ramp_frames[test_indices],)], 'go')
-    plt.show()
-    plt.plot((normalized_bias_gradient[test_indices] > quench_slope).nonzero()[0],
-             normalized_bias_gradient[test_indices + (normalized_bias_gradient[test_indices] > quench_slope).nonzero()],
-             'b-',
-             sig_ramp_frames[test_indices], normalized_bias_gradient[test_indices + (sig_ramp_frames[test_indices],)],
-             'go')
-    plt.show()
-    #
-
-    # plateau_bounds = np.stack((sig_ramp_frames, sig_quench_frames), axis=-1)
-    # print("Plateau bounds:", plateau_bounds)
 
     # Is there a more efficient way to do this next code (such as with list comprehension)?
     # Using a for loop, these next lines identify the indices of the maximum bias within each plateau
@@ -239,19 +216,21 @@ def isolate_plateaus(bias, current=None):  # Current is optional for maximum com
             for p in range(sig_quench_frames.shape[2]):
                 start_ind = sig_ramp_frames[i, j, p]
                 max_bias_frames[i, j, p] = np.argmax(bias[i, j, start_ind:sig_quench_frames[i, j, p]]) + start_ind
+    # print("This is the max bias frame array:", max_bias_frames)
 
-    print("This is the max bias frame array:", max_bias_frames)
-
-    # Sample for first position (0,0), can be used for debugging; not needed in final function
-    # """
+    # Sample for first position (0,0), can be used for debugging; not needed in final function; allow any test indices?
+    """
+    # test_indices = (30, 0)
     plt.plot(bias[0, 0], 'b-',
              sig_quench_frames[0, 0], bias[0, 0, sig_quench_frames[0, 0]], 'ro',
              sig_ramp_frames[0, 0], bias[0, 0, sig_ramp_frames[0, 0]], 'go',
              max_bias_frames[0, 0], bias[0, 0, max_bias_frames[0, 0]], 'yo')
     plt.show()
-    # """
+    """
 
-    return sig_quench_frames
+    plateau_bounds = np.stack((sig_ramp_frames, max_bias_frames), axis=-1)
+
+    return plateau_bounds
 
 
 def to_real_units(bias, current):
@@ -319,109 +298,45 @@ def get_time_array(shape_of_frames, sample_sec):  # Is this strictly necessary? 
     return np.full(shape=shape_of_frames, fill_value=(np.arange(shape_of_frames[-1]) * sample_sec).to(u.ms))
 
 
-def split_plateaus(bias, current, sig_quench_frames):
-    max_number_plateaus = sig_quench_frames.shape[-1]
-    frames_per_plateau = np.diff(np.insert(sig_quench_frames, 0, 0, axis=-1), axis=-1)
-    # max_number_frames = np.amax(frames_per_plateau)
-    # print("Frames per each plateau:", frames_per_plateau)
-    # print("Max number of frames:", max_number_frames)
-
+"""
     x_length = bias.shape[0]
     y_length = bias.shape[1]
 
-    # split_bias = np.full((x_length, y_length, max_number_plateaus, max_number_frames), np.nan, dtype=float)
-    # split_current = np.full((x_length, y_length, max_number_plateaus, max_number_frames), np.nan, dtype=float)
-
-    plateau_ranges = np.full((x_length, y_length, max_number_plateaus, 2), np.nan, dtype=int)
-    plateau_ranges[..., 1] = np.nanargmax(1)
-
-    # Is there a better-performance way (for example, without a for loop) to do this? Note in documentation
     print("Splitting frames into plateaus...")
-    for i in range(x_length):
-        for j in range(y_length):
-            split_bias_list = np.split(bias[i, j], sig_quench_frames[i, j])
-            split_current_list = np.split(current[i, j], sig_quench_frames[i, j])
-            for f in range(max_number_plateaus):
-                pass
-        # print("x position", i, "done")
-
-    max_bias_indices = np.nanargmax(np.arange(1), axis=-1)
-
-    # Note: The selection of ramps (increasing bias section only) from plateaus (constant and increasing bias sections)
-    #    is not in the original MATLAB code, but is judged to be necessary based on the performance of PlasmaPy
-    #    diagnostic functions. The isolated rising section ("ramp") is needed for the diagnostics to complete correctly.
-    ramp_start_frames = np.zeros_like(max_bias_indices)
-
-    # Can normalized_plateau_gradient/plateau_before_max be calculated otherwise? (array functions/list comprehension?)
-    print("Isolating rising segments...")
-    for i in range(x_length):
-        for j in range(y_length):
-            for f in range(max_number_plateaus):
-                plateau_before_max = 1
-                normalized_plateau_gradient = np.gradient(plateau_before_max) / np.max(np.gradient(plateau_before_max))
-                ramp_start_frames[i, j, f] = np.amax((normalized_plateau_gradient < rise_slope).nonzero())
-
-    """
-    split_bias = np.array([[np.split(bias[i, j], sig_quench_frames[i, j], axis=-1)[:max_number_plateaus]
-                            for j in range(y_length)]
-                           for i in range(x_length)])
-    split_current = np.array([[np.split(current[i, j], sig_quench_frames[i, j], axis=-1)[:max_number_plateaus]
-                               for j in range(bias.shape[1])]
-                              for i in range(bias.shape[0])])
-    """
-
-    # print("Shape of bias plateau array:", split_bias.shape, "; shape of current plateau array:", split_current.shape)
-
-    # Can I move/combine this with the isolate_plateaus function? Or would that not help, since gradient renormalized?
-
-    plateau_ranges = np.stack([ramp_start_frames, max_bias_indices], axis=-1)
-
-    # Clean up comments/debug cases when this function no longer being edited
-    # debug
-    # print("Start and stop frames of plateaus:", plateau_ranges)
-    # plateau_lengths = plateau_ranges[..., 1] - plateau_ranges[..., 0]
-    # print("Minimum characteristic length indices should be", np.argmin(plateau_lengths))
-    # print("Length of plateaus:", plateau_lengths)
-    # print("View of minimum-containing row?? of plateau_lengths:",
-    #   plateau_lengths[0, 0])
-    #       plateau_lengths[np.unravel_index(np.argmin(plateau_lengths), plateau_lengths.shape)])
-    #
-
-    # First corner plot
-    # plt.plot(split_bias[30, 0, 7, :max_bias_indices[30, 0, 7]],
-    #          split_current[30, 0, 7, :max_bias_indices[30, 0, 7]], 'bo')
-    # plt.show()
-
-    return plateau_ranges
+    max_bias_indices = np.nanargmax(np.arange(1), axis=-1)  # Is splitting more efficient to calculate the max indices?
+"""
 
 
-# isolate_plateaus(get_isweep_vsweep('HDF5/8-3500A.hdf5'))
-# get_isweep_vsweep('HDF5/09_radial_line_25press_4kA_redo.hdf5')
-
-
-def get_characteristic_array(bias, current, plateau_ranges):
+def get_characteristic_array(bias, current, plateau_ranges, smooth=0):
     # Are split arrays needed? Use create_ranged_characteristic (original bias/current + start/stop indices for each?
     # Use ragged arrays????? Then can create zeros_like or something to match; no
     # Still need to do plateau filtering
+    # Make sure to store time information!
 
-    # characteristic_array = np.empty((split_bias.shape[:3]))  # x, y, plateau
-    smooth_characteristic_array = np.empty((bias.shape[:3]), dtype=object)  # x, y, plateau; hard-coded in
+    characteristic_array = np.empty((plateau_ranges.shape[:3]), dtype=object)  # x, y, plateau?
     # Address case where there are an irregular number of plateaus in a frame to begin with!
     #    This should be addressed by creating a secondary array (or list?) containing the indices of valid plateaus
     #    to analyze. Invalid ones should be skipped, but preserved in the array.
 
-    print("Creating characteristic array... (May take about 30 seconds)")
-    for i in range(bias.shape[0]):
-        for j in range(bias.shape[1]):
-            for p in range(bias.shape[2]):
-                # characteristic_array[i, j, p] = smooth_characteristic(create_ranged_characteristic(
-                smooth_characteristic_array[i, j, p] = (smooth_characteristic(create_ranged_characteristic(
-                    dbias[i, j, p], current[i, j, p],
-                    plateau_ranges[i, j, p, 0], plateau_ranges[i, j, p, 1]), 10)
-                                                        if plateau_ranges[i, j, p, 1] - plateau_ranges[
-                    i, j, p, 0] > 2 * 10 else None)
+    print("Creating characteristic array... (May take about 60 seconds)")  # Used to take more like 30?
+    for i in range(plateau_ranges.shape[0]):
+        for j in range(plateau_ranges.shape[1]):
+            for p in range(plateau_ranges.shape[2]):
+                start_ind, stop_ind = plateau_ranges[i, j, p]
+                characteristic = create_ranged_characteristic(bias[i, j], current[i, j], start_ind, stop_ind)
+                if smooth:
+                    characteristic_array[i, j, p] = smooth_characteristic(characteristic, smooth)
+                else:
+                    characteristic_array[i, j, p] = characteristic
 
-    return smooth_characteristic_array
+    # Make more robust; is mean time during shot okay?
+    time_array = np.mean(plateau_ranges, axis=-1) * (sample_sec := (100 / 16 * 10 ** 6) ** (-1) * u.s)
+    # print("Time array:", time_array)
+    return characteristic_array  # , time_array ?
 
-# def extract_diagnostic_array(characteristic_array)
-#
+
+def extract_diagnostic_array(characteristic_array):
+    pass
+
+# isolate_plateaus(get_isweep_vsweep('HDF5/8-3500A.hdf5'))
+# get_isweep_vsweep('HDF5/09_radial_line_25press_4kA_redo.hdf5')
