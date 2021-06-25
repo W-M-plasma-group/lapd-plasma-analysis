@@ -4,7 +4,6 @@ from hdf5reader import *
 
 
 def get_xy(filename):
-
     file = open_HDF5(filename)
 
     motor_data = structures_at_path(file, '/Raw data + config/6K Compumotor')
@@ -58,7 +57,6 @@ def get_xy(filename):
 
 
 def get_isweep_vsweep(filename):
-
     xy_shot_ref = get_xy(filename)
     file = open_HDF5(filename)
 
@@ -158,8 +156,8 @@ def isolate_plateaus(bias, current=None):  # Current is optional for maximum com
 
     # The new goal of this function is to identify the start and stop frames of each ramp section.
 
-    quench_slope = -1   # "Threshold for voltage quench slope": MATLAB code comment
-    quench_diff = 10    # Threshold for separating distinct voltage quench frames
+    quench_slope = -1  # "Threshold for voltage quench slope": MATLAB code comment
+    quench_diff = 10  # Threshold for separating distinct voltage quench frames
 
     """Comments taken from split_plateaus function"""
     # Old: Return 4D array x,y,plateau number in shot,frame in plateau
@@ -169,8 +167,8 @@ def isolate_plateaus(bias, current=None):  # Current is optional for maximum com
     #    coordinates, use create_range_characteristic to populate characteristic array
 
     # Not in MATLAB code
-    rise_slope = 0.4   # Threshold for increases in slope
-    rise_diff = 10     # Threshold for separating distinct voltage ramp frames
+    rise_slope = 0.4  # Threshold for increases in slope
+    rise_diff = 100  # Threshold for separating distinct voltage ramp frames
 
     # The bias has three types of regions: constant low, increase at constant rate (ramp), and rapid decrease
     #    down to minimum value (quench). The ramp region is where useful Isweep-Vsweep data points are collected.
@@ -210,23 +208,46 @@ def isolate_plateaus(bias, current=None):  # Current is optional for maximum com
                                  for same_xy in same_x]
                                 for same_x in ramp_frames])
     # print("This is the significant ramp frame array:", sig_ramp_frames)
+    print("This is the significant ramp frame array shape:", sig_ramp_frames.shape)
+    # debug
+    # print("This is the difference in the ramp frames:", [[np.diff(xy).tolist() for xy in x] for x in ramp_frames])
+    test_indices = (30, 0)
+    # print("This is the average of the non-quench normalized gradient array at the test indices:",
+    #       np.mean(normalized_bias_gradient[test_indices +
+    #                                        (normalized_bias_gradient[test_indices] > quench_slope).nonzero()]))
+    plt.plot(bias[test_indices], 'b-',
+             sig_ramp_frames[test_indices], bias[test_indices + (sig_ramp_frames[test_indices],)], 'go')
+    plt.show()
+    plt.plot((normalized_bias_gradient[test_indices] > quench_slope).nonzero()[0],
+             normalized_bias_gradient[test_indices + (normalized_bias_gradient[test_indices] > quench_slope).nonzero()],
+             'b-',
+             sig_ramp_frames[test_indices], normalized_bias_gradient[test_indices + (sig_ramp_frames[test_indices],)],
+             'go')
+    plt.show()
+    #
 
-    """
-    
-    plateau_bounds = np.stack((sig_ramp_frames, sig_quench_frames), axis=-1)
-    
-    # Using list comprehension, this line finds and stores the frame number of the maximum bias in each plateau
-    max_bias_frames = np.array([[[np.argmax(bias[bounds[0]:bounds[1]]) + bounds[0] for bounds in same_xy]
-                                for same_xy in same_x]
-                               for same_x in plateau_bounds])
+    # plateau_bounds = np.stack((sig_ramp_frames, sig_quench_frames), axis=-1)
+    # print("Plateau bounds:", plateau_bounds)
+
+    # Is there a more efficient way to do this next code (such as with list comprehension)?
+    # Using a for loop, these next lines identify the indices of the maximum bias within each plateau
+    # Does being a ragged array mess this up at all? What about with sig_ramp_frames?
+    max_bias_frames = np.full_like(sig_quench_frames, np.nan)
+
+    for i in range(sig_quench_frames.shape[0]):
+        for j in range(sig_quench_frames.shape[1]):
+            for p in range(sig_quench_frames.shape[2]):
+                start_ind = sig_ramp_frames[i, j, p]
+                max_bias_frames[i, j, p] = np.argmax(bias[i, j, start_ind:sig_quench_frames[i, j, p]]) + start_ind
+
     print("This is the max bias frame array:", max_bias_frames)
-
-    """
 
     # Sample for first position (0,0), can be used for debugging; not needed in final function
     # """
-    plt.plot(bias[0, 0], 'b-', sig_quench_frames[0, 0], bias[0, 0, sig_quench_frames[0, 0]], 'ro',
-             sig_ramp_frames[0, 0], bias[0, 0, sig_ramp_frames[0, 0]], 'go')
+    plt.plot(bias[0, 0], 'b-',
+             sig_quench_frames[0, 0], bias[0, 0, sig_quench_frames[0, 0]], 'ro',
+             sig_ramp_frames[0, 0], bias[0, 0, sig_ramp_frames[0, 0]], 'go',
+             max_bias_frames[0, 0], bias[0, 0, max_bias_frames[0, 0]], 'yo')
     plt.show()
     # """
 
@@ -234,7 +255,6 @@ def isolate_plateaus(bias, current=None):  # Current is optional for maximum com
 
 
 def to_real_units(bias, current):
-
     # The conversion factors from abstract units to real bias (V) and current values (A) are hard-coded in here.
     # Note that current is multiplied by -1 to get the "upright" traditional Isweep-Vsweep curve. Add to documentation?
 
@@ -246,7 +266,6 @@ def to_real_units(bias, current):
 
 
 def create_ranged_characteristic(bias, current, start, end):
-
     dimensions = len(bias.shape)
 
     if bias.shape != current.shape:
@@ -275,7 +294,6 @@ def create_ranged_characteristic(bias, current, start, end):
 
 
 def smooth_characteristic(characteristic, margin):
-
     # Note: smooth_characteristic changes (distorts) characteristic; use SLM-like fitting instead of smoothing later on?
 
     if len(characteristic.bias.shape) > 1:
@@ -302,7 +320,6 @@ def get_time_array(shape_of_frames, sample_sec):  # Is this strictly necessary? 
 
 
 def split_plateaus(bias, current, sig_quench_frames):
-
     max_number_plateaus = sig_quench_frames.shape[-1]
     frames_per_plateau = np.diff(np.insert(sig_quench_frames, 0, 0, axis=-1), axis=-1)
     # max_number_frames = np.amax(frames_per_plateau)
@@ -399,7 +416,7 @@ def get_characteristic_array(bias, current, plateau_ranges):
             for p in range(bias.shape[2]):
                 # characteristic_array[i, j, p] = smooth_characteristic(create_ranged_characteristic(
                 smooth_characteristic_array[i, j, p] = (smooth_characteristic(create_ranged_characteristic(
-                     dbias[i, j, p], current[i, j, p],
+                    dbias[i, j, p], current[i, j, p],
                     plateau_ranges[i, j, p, 0], plateau_ranges[i, j, p, 1]), 10)
                                                         if plateau_ranges[i, j, p, 1] - plateau_ranges[
                     i, j, p, 0] > 2 * 10 else None)
