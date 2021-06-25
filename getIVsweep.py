@@ -144,8 +144,33 @@ def get_isweep_vsweep(filename):
 
 def isolate_plateaus(bias, current=None):  # Current is optional for maximum compatibility
 
+    r"""
+    Function to identify start and stop frames of every ramp section within each plateau.
+    Returns array containing frame indices for each shot.
+
+    Parameters
+    ----------
+    :param bias: array
+    :param current: array, optional
+    :return: array of ramp start and stop indices
+
+    """
+
+    # The new goal of this function is to identify the start and stop frames of each ramp section.
+
     quench_slope = -1   # "Threshold for voltage quench slope": MATLAB code comment
     quench_diff = 10    # Threshold for separating distinct voltage quench frames
+
+    """Comments taken from split_plateaus function"""
+    # Old: Return 4D array x,y,plateau number in shot,frame in plateau
+    # New: Return (4D array: x, y, plateau number in shot, frame number in plateau; padded with nans),
+    #             (4D array: x, y, plateau number in shot, start & end significant frame in plateau)
+    # Possible: don't split into separate plateaus at all; just save start and stop indices to convert easily to time
+    #    coordinates, use create_range_characteristic to populate characteristic array
+
+    # Not in MATLAB code
+    rise_slope = 0.4   # Threshold for increases in slope
+    rise_diff = 10     # Threshold for separating distinct voltage ramp frames
 
     # The bias has three types of regions: constant low, increase at constant rate (ramp), and rapid decrease
     #    down to minimum value (quench). The ramp region is where useful Isweep-Vsweep data points are collected.
@@ -167,14 +192,43 @@ def isolate_plateaus(bias, current=None):  # Current is optional for maximum com
 
     # Using list comprehension, this line creates an array storing significant quench frames (plus the last one, which
     #    should also be significant) for each x,y position
+    # Define "significant"
     sig_quench_frames = np.array([[same_xy[(np.diff(same_xy) > quench_diff).tolist() + [True]]
                                    for same_xy in same_x]
                                   for same_x in quench_frames])
-    print("This is the significant quench frame array:", sig_quench_frames)
+    # print("This is the significant quench frame array:", sig_quench_frames)
+
+    # Using list comprehension, this line fills each x,y position in array with a list of pre-ramp frames
+    ramp_frames = np.array([[(same_xy > rise_slope).nonzero()[0]
+                             for same_xy in same_x]
+                            for same_x in normalized_bias_gradient], dtype=object)
+    # print("This is the ramp frame array:", ramp_frames)
+
+    # Using list comprehension, this line creates an array storing significant ramp start frames (plus the first one,
+    #    which should also be significant) for each x,y position
+    sig_ramp_frames = np.array([[same_xy[[True] + (np.diff(same_xy) > rise_diff).tolist()]
+                                 for same_xy in same_x]
+                                for same_x in ramp_frames])
+    # print("This is the significant ramp frame array:", sig_ramp_frames)
+
+    """
+    
+    plateau_bounds = np.stack((sig_ramp_frames, sig_quench_frames), axis=-1)
+    
+    # Using list comprehension, this line finds and stores the frame number of the maximum bias in each plateau
+    max_bias_frames = np.array([[[np.argmax(bias[bounds[0]:bounds[1]]) + bounds[0] for bounds in same_xy]
+                                for same_xy in same_x]
+                               for same_x in plateau_bounds])
+    print("This is the max bias frame array:", max_bias_frames)
+
+    """
 
     # Sample for first position (0,0), can be used for debugging; not needed in final function
-    # plt.plot(bias[0, 0], 'b-', sig_quench_frames[0, 0], bias[0, 0, sig_quench_frames[0, 0]], 'ro')
-    # plt.show()
+    # """
+    plt.plot(bias[0, 0], 'b-', sig_quench_frames[0, 0], bias[0, 0, sig_quench_frames[0, 0]], 'ro',
+             sig_ramp_frames[0, 0], bias[0, 0, sig_ramp_frames[0, 0]], 'go')
+    plt.show()
+    # """
 
     return sig_quench_frames
 
@@ -232,7 +286,7 @@ def smooth_characteristic(characteristic, margin):
     if length < 2 * margin + 1:
         raise ValueError("Characteristic of", length, "data points is too short to take", margin, "-point average over")
 
-    # Note: Bias is not smoothed
+    # Note: Bias is not smoothed (only current is)
     smooth_current = np.zeros(length - 2 * margin) * u.A
 
     for i in range(length - 2 * margin):
@@ -249,15 +303,6 @@ def get_time_array(shape_of_frames, sample_sec):  # Is this strictly necessary? 
 
 def split_plateaus(bias, current, sig_quench_frames):
 
-    # Old: Return 4D array x,y,plateau number in shot,frame in plateau
-    # New: Return (4D array: x, y, plateau number in shot, frame number in plateau; padded with nans),
-    #             (4D array: x, y, plateau number in shot, start & end significant frame in plateau)
-    # Possible: don't split into separate plateaus at all; just save start and stop indices to convert easily to time
-    #    coordinates, use create_range_characteristic to populate characteristic array
-
-    # Not in MATLAB code
-    rise_slope = 0.5  # Threshold for increases in slope
-
     max_number_plateaus = sig_quench_frames.shape[-1]
     frames_per_plateau = np.diff(np.insert(sig_quench_frames, 0, 0, axis=-1), axis=-1)
     # max_number_frames = np.amax(frames_per_plateau)
@@ -271,7 +316,7 @@ def split_plateaus(bias, current, sig_quench_frames):
     # split_current = np.full((x_length, y_length, max_number_plateaus, max_number_frames), np.nan, dtype=float)
 
     plateau_ranges = np.full((x_length, y_length, max_number_plateaus, 2), np.nan, dtype=int)
-    plateau_ranges[..., 1] = np.nanargmax()
+    plateau_ranges[..., 1] = np.nanargmax(1)
 
     # Is there a better-performance way (for example, without a for loop) to do this? Note in documentation
     print("Splitting frames into plateaus...")
