@@ -218,7 +218,7 @@ def isolate_plateaus(bias, current=None):  # Current is optional for maximum com
                 max_bias_frames[i, j, p] = np.argmax(bias[i, j, start_ind:sig_quench_frames[i, j, p]]) + start_ind
     # print("This is the max bias frame array:", max_bias_frames)
 
-    # Sample for first position (0,0), can be used for debugging; not needed in final function; allow any test indices?
+    # Illustrative example plot of significant points for first position (0,0); can be used for debugging
     """
     # test_indices = (30, 0)
     plt.plot(bias[0, 0], 'b-',
@@ -292,10 +292,15 @@ def smooth_characteristic(characteristic, margin):
     return Characteristic(characteristic.bias[margin:length - margin], smooth_current)
 
 
-def get_time_array(shape_of_frames, sample_sec):  # Is this strictly necessary? All piles (pages) are identical anyways
+# def get_time_array(shape_of_frames, sample_sec):  # Is this strictly necessary? All piles (pages) are identical anyway
+def get_time_array(plateau_ranges, sample_sec=(100 / 16 * 10 ** 6) ** (-1) * u.s):
+    # Make more robust; is mean time during shot okay? Clean up, decide final form
+    # x, y, time in milliseconds since start of that [average] shot using sample_sec in milliseconds
+    # return np.full(shape=shape_of_frames, fill_value=(np.arange(shape_of_frames[-1]) * sample_sec).to(u.ms))
 
-    # x, y, time in milliseconds since start of that average shot using sample_sec in milliseconds
-    return np.full(shape=shape_of_frames, fill_value=(np.arange(shape_of_frames[-1]) * sample_sec).to(u.ms))
+    # returns the time at the center of the ramp since the beginning of the shot
+    return np.mean(plateau_ranges, axis=-1) * sample_sec
+
 
 
 """
@@ -308,8 +313,7 @@ def get_time_array(shape_of_frames, sample_sec):  # Is this strictly necessary? 
 
 
 def get_characteristic_array(bias, current, plateau_ranges, smooth=0):
-    # Are split arrays needed? Use create_ranged_characteristic (original bias/current + start/stop indices for each?
-    # Use ragged arrays????? Then can create zeros_like or something to match; no
+
     # Still need to do plateau filtering
     # Make sure to store time information!
 
@@ -329,10 +333,7 @@ def get_characteristic_array(bias, current, plateau_ranges, smooth=0):
                 else:
                     characteristic_array[i, j, p] = characteristic
 
-    # Make more robust; is mean time during shot okay?
-    time_array = np.mean(plateau_ranges, axis=-1) * (sample_sec := (100 / 16 * 10 ** 6) ** (-1) * u.s)
-    # print("Time array:", time_array)
-    return characteristic_array  # , time_array ?
+    return characteristic_array
 
 
 def extract_diagnostic_array(characteristic_array):
@@ -340,3 +341,6 @@ def extract_diagnostic_array(characteristic_array):
 
 # isolate_plateaus(get_isweep_vsweep('HDF5/8-3500A.hdf5'))
 # get_isweep_vsweep('HDF5/09_radial_line_25press_4kA_redo.hdf5')
+
+# Instead of having several separate methods "trade off", can have one overarching method that organizes things and
+#    smaller helper functions that are called within overall method?
