@@ -302,7 +302,6 @@ def get_time_array(plateau_ranges, sample_sec=(100 / 16 * 10 ** 6) ** (-1) * u.s
     return np.mean(plateau_ranges, axis=-1) * sample_sec
 
 
-
 """
     x_length = bias.shape[0]
     y_length = bias.shape[1]
