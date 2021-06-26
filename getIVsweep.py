@@ -234,6 +234,7 @@ def isolate_plateaus(bias, current=None):  # Current is optional for maximum com
 
 
 def to_real_units(bias, current):
+
     # The conversion factors from abstract units to real bias (V) and current values (A) are hard-coded in here.
     # Note that current is multiplied by -1 to get the "upright" traditional Isweep-Vsweep curve. Add to documentation?
 
@@ -245,8 +246,9 @@ def to_real_units(bias, current):
 
 
 def create_ranged_characteristic(bias, current, start, end):
+    # Returns a Characteristic object
+    
     dimensions = len(bias.shape)
-
     if bias.shape != current.shape:
         raise ValueError("Bias and current must be of the same dimensions and shape")
     if start < 0:
@@ -284,6 +286,7 @@ def smooth_characteristic(characteristic, margin):
         raise ValueError("Characteristic of", length, "data points is too short to take", margin, "-point average over")
 
     # Note: Bias is not smoothed (only current is)
+
     smooth_current = np.zeros(length - 2 * margin) * u.A
 
     for i in range(length - 2 * margin):
