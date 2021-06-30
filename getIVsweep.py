@@ -1,4 +1,5 @@
 # Make sure to add code comments!
+import warnings
 
 from hdf5reader import *
 
@@ -140,7 +141,7 @@ def get_isweep_vsweep(filename):
     return vsweep_means, isweep_means
 
 
-def isolate_plateaus(bias, current=None):  # Current is optional for maximum compatibility
+def isolate_plateaus(bias, current=None, margin=0):  # Current is optional for maximum compatibility
 
     r"""
     Function to identify start and stop frames of every ramp section within each plateau.
@@ -150,8 +151,8 @@ def isolate_plateaus(bias, current=None):  # Current is optional for maximum com
     ----------
     :param bias: array
     :param current: array, optional
+    :param margin: int, optional
     :return: array of ramp start and stop indices
-
     """
 
     quench_slope = -1  # "Threshold for voltage quench slope": MATLAB code comment
@@ -228,7 +229,9 @@ def isolate_plateaus(bias, current=None):  # Current is optional for maximum com
     plt.show()
     """
 
-    plateau_bounds = np.stack((sig_ramp_frames, max_bias_frames), axis=-1)
+    pad = (margin - 1) // 2
+
+    plateau_bounds = np.stack((sig_ramp_frames + pad, max_bias_frames - pad), axis=-1)
 
     return plateau_bounds
 
@@ -274,38 +277,24 @@ def create_ranged_characteristic(bias, current, start, end):
     return characteristic
 
 
-"""
-def smooth_characteristic(characteristic, margin):
-    # Note: smooth_characteristic changes (distorts) characteristic; use SLM-like fitting instead of smoothing later on?
+def smooth_current_array(bias, current, margin):
+    # This may still distort the shape of the current (especially at the ends of each plateau), but is much faster
 
-    if len(characteristic.bias.shape) > 1:
-        raise ValueError("Characteristic bias should be 1D; has", len(characteristic.bias.shape), "dimensions instead")
-    length = len(characteristic.bias)
     if margin < 0:
         raise ValueError("Cannot smooth over negative number", margin, "of points")
-    if length < 2 * margin + 1:
-        raise ValueError("Characteristic of", length, "data points is too short to take", margin, "-point average over")
+    if margin == 0:
+        warnings.warn("Zero-point smoothing is redundant")
+    if current.shape[-1] <= margin:
+        raise ValueError("Last dimension length", current.shape[-1], "is too short to take", margin, "-point mean over")
 
     # Note: Bias is not smoothed (only current is)
-    if margin == 0:
-        print("Zero-margin smoothing is redundant")
-        return characteristic
-    else:
-        current_sum = np.cumsum(np.insert(characteristic.current, 0, 0))
-        smooth_current_full = (current_sum[margin:] - current_sum[:-margin])/margin
-
-    return Characteristic(characteristic.bias[margin:length - margin], smooth_current_full[margin:length-margin])
-"""
-
-
-def smooth_current_array(current, margin):
-    # Does this mess up the current array indices?
-    # Add error checks
-
     current_sum = np.cumsum(np.insert(current, 0, 0, axis=-1), axis=-1)
     smooth_current_full = (current_sum[..., margin:] - current_sum[..., :-margin])/margin
 
-    return smooth_current_full
+    adjusted_bias = bias[..., (margin-1)//2:-(margin-1)//2]
+    # print("Shapes:", adjusted_bias.shape, smooth_current_full.shape)
+
+    return adjusted_bias, smooth_current_full
 
 
 # def get_time_array(shape_of_frames, sample_sec):  # Is this strictly necessary? All piles (pages) are identical anyway
