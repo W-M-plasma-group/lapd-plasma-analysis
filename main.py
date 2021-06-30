@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import scipy.signal
 
 from getIVsweep import *
 from astropy import visualization
@@ -13,7 +14,19 @@ ion_type = 'He-4+'
 filename = 'HDF5/8-3500A.hdf5'
 
 bias, current = get_isweep_vsweep(filename)
-plateau_ranges = isolate_plateaus(bias, current)
+
+smooth_current = smooth_current_array(current, margin=10)                                         # 0.02 s
+# smoothed_current = scipy.signal.savgol_filter(current, window_length=25, polyorder=2, axis=-1)  # 0.04 s; both short!
+
+# debug
+plt.plot(-1*current[0, 0, 3500:3750], '.')
+plt.plot(-1*smooth_current[0, 0, 3495:3745], 'r')
+# plt.plot(-1*smoothed_current[0, 0, 3500:3700], 'y')
+plt.show()
+#
+
+# plateau_ranges = isolate_plateaus(bias, current)
+plateau_ranges = isolate_plateaus(bias, smooth_current)
 sample_indices = (30, 0, 7)  # x position, y position, plateau number within frame
 
 # pprint(swept_probe_analysis(smooth_plateau, probe_area, 'He-4+', bimaxwellian=True, visualize=True, plot_EEDF=True))
@@ -21,7 +34,7 @@ sample_indices = (30, 0, 7)  # x position, y position, plateau number within fra
 
 time_array = get_time_array(plateau_ranges, sample_sec)
 # characteristics = get_characteristic_array(bias, current, plateau_ranges, 10)
-characteristics = get_characteristic_array(bias, current, plateau_ranges, smooth=7)
+characteristics = get_characteristic_array(bias, current, plateau_ranges)
 sample_plateau_smooth = characteristics[sample_indices]
 
 # Analysis of single sample Isweep-Vsweep curve

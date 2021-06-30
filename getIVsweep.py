@@ -4,7 +4,7 @@ from hdf5reader import *
 
 
 def get_xy(filename):
-    file = open_HDF5(filename)
+    file = open_hdf5(filename)
 
     motor_data = structures_at_path(file, '/Raw data + config/6K Compumotor')
     motion_path = (motor_data["Datasets"])[0]
@@ -58,7 +58,7 @@ def get_xy(filename):
 
 def get_isweep_vsweep(filename):
     xy_shot_ref = get_xy(filename)
-    file = open_HDF5(filename)
+    file = open_hdf5(filename)
 
     # SIS crate data
     sis_group = structures_at_path(file, '/Raw data + config/SIS crate/')
@@ -274,6 +274,7 @@ def create_ranged_characteristic(bias, current, start, end):
     return characteristic
 
 
+"""
 def smooth_characteristic(characteristic, margin):
     # Note: smooth_characteristic changes (distorts) characteristic; use SLM-like fitting instead of smoothing later on?
 
@@ -294,6 +295,17 @@ def smooth_characteristic(characteristic, margin):
         smooth_current_full = (current_sum[margin:] - current_sum[:-margin])/margin
 
     return Characteristic(characteristic.bias[margin:length - margin], smooth_current_full[margin:length-margin])
+"""
+
+
+def smooth_current_array(current, margin):
+    # Does this mess up the current array indices?
+    # Add error checks
+
+    current_sum = np.cumsum(np.insert(current, 0, 0, axis=-1), axis=-1)
+    smooth_current_full = (current_sum[..., margin:] - current_sum[..., :-margin])/margin
+
+    return smooth_current_full
 
 
 # def get_time_array(shape_of_frames, sample_sec):  # Is this strictly necessary? All piles (pages) are identical anyway
@@ -315,7 +327,7 @@ def get_time_array(plateau_ranges, sample_sec=(100 / 16 * 10 ** 6) ** (-1) * u.s
 """
 
 
-def get_characteristic_array(bias, current, plateau_ranges, smooth=0):
+def get_characteristic_array(bias, current, plateau_ranges):
 
     # Still need to do plateau filtering
     # Make sure to store time information!
@@ -325,16 +337,14 @@ def get_characteristic_array(bias, current, plateau_ranges, smooth=0):
     #    This should be addressed by creating a secondary array (or list?) containing the indices of valid plateaus
     #    to analyze. Invalid ones should be skipped, but preserved in the array.
 
-    print("Creating characteristic array... (May take about 60 seconds)")  # Used to take more like 30?
+    print("Creating characteristic array... (May take up to 60 seconds)")
     for i in range(plateau_ranges.shape[0]):
         for j in range(plateau_ranges.shape[1]):
             for p in range(plateau_ranges.shape[2]):
                 start_ind, stop_ind = plateau_ranges[i, j, p]
-                characteristic = create_ranged_characteristic(bias[i, j], current[i, j], start_ind, stop_ind)
-                if smooth:
-                    characteristic_array[i, j, p] = smooth_characteristic(characteristic, smooth)
-                else:
-                    characteristic_array[i, j, p] = characteristic
+                characteristic_array[i, j, p] = create_ranged_characteristic(
+                    bias[i, j], current[i, j], start_ind, stop_ind)
+
         print("Finished x position", i + 1, "/", plateau_ranges.shape[0])
 
     return characteristic_array

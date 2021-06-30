@@ -2,6 +2,7 @@ import astropy.units as u
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+import scipy
 import h5py
 
 # from pprint import pprint
@@ -14,7 +15,7 @@ from plasmapy.diagnostics.langmuir import Characteristic, swept_probe_analysis
 # Make sure to add code comments!
 
 
-def open_HDF5(filename):
+def open_hdf5(filename):
     return h5py.File(filename, 'r')
 
 
@@ -41,13 +42,13 @@ def structures_at_path(file, subpath):
         else:
             other.append(subpath + '/' + item)
             # itemType = "Other"
-    categs = {"Name": subpath, "Groups": groups, "Datasets": datasets, "Other": other}
-    return categs
+    categories = {"Name": subpath, "Groups": groups, "Datasets": datasets, "Other": other}
+    return categories
 
 
-test = open_HDF5('HDF5/8-3500A.hdf5')
+# test = open_hdf5('HDF5/8-3500A.hdf5')
 # print(list(test.keys()))
-msi = test['MSI']
+# msi = test['MSI']
 # print(list(msi.keys()))
 # print(structuresAtPath(test, '/Raw data + config/6K Compumotor'))
 
