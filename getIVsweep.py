@@ -285,10 +285,6 @@ def smooth_characteristic(characteristic, margin):
     if length < 2 * margin + 1:
         raise ValueError("Characteristic of", length, "data points is too short to take", margin, "-point average over")
 
-    # smooth_current = np.zeros(length - 2 * margin) * u.A
-    # for i in range(length - 2 * margin):
-        # smooth_current[i] = np.mean(characteristic.current[i:i + 2 * margin])
-
     # Note: Bias is not smoothed (only current is)
     if margin == 0:
         print("Zero-margin smoothing is redundant")
@@ -297,7 +293,6 @@ def smooth_characteristic(characteristic, margin):
         current_sum = np.cumsum(np.insert(characteristic.current, 0, 0))
         smooth_current_full = (current_sum[margin:] - current_sum[:-margin])/margin
 
-    # return Characteristic(characteristic.bias[margin:length - margin], smooth_current)
     return Characteristic(characteristic.bias[margin:length - margin], smooth_current_full[margin:length-margin])
 
 
