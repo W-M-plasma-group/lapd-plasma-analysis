@@ -285,14 +285,20 @@ def smooth_characteristic(characteristic, margin):
     if length < 2 * margin + 1:
         raise ValueError("Characteristic of", length, "data points is too short to take", margin, "-point average over")
 
+    # smooth_current = np.zeros(length - 2 * margin) * u.A
+    # for i in range(length - 2 * margin):
+        # smooth_current[i] = np.mean(characteristic.current[i:i + 2 * margin])
+
     # Note: Bias is not smoothed (only current is)
+    if margin == 0:
+        print("Zero-margin smoothing is redundant")
+        return characteristic
+    else:
+        current_sum = np.cumsum(np.insert(characteristic.current, 0, 0))
+        smooth_current_full = (current_sum[margin:] - current_sum[:-margin])/margin
 
-    smooth_current = np.zeros(length - 2 * margin) * u.A
-
-    for i in range(length - 2 * margin):
-        smooth_current[i] = np.mean(characteristic.current[i:i + 2 * margin])
-
-    return Characteristic(characteristic.bias[margin:length - margin], smooth_current)
+    # return Characteristic(characteristic.bias[margin:length - margin], smooth_current)
+    return Characteristic(characteristic.bias[margin:length - margin], smooth_current_full[margin:length-margin])
 
 
 # def get_time_array(shape_of_frames, sample_sec):  # Is this strictly necessary? All piles (pages) are identical anyway
@@ -334,12 +340,9 @@ def get_characteristic_array(bias, current, plateau_ranges, smooth=0):
                     characteristic_array[i, j, p] = smooth_characteristic(characteristic, smooth)
                 else:
                     characteristic_array[i, j, p] = characteristic
+        print("Finished x position", i + 1, "/", plateau_ranges.shape[0])
 
     return characteristic_array
-
-
-def extract_diagnostic_array(characteristic_array):
-    pass
 
 # isolate_plateaus(get_isweep_vsweep('HDF5/8-3500A.hdf5'))
 # get_isweep_vsweep('HDF5/09_radial_line_25press_4kA_redo.hdf5')

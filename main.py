@@ -21,7 +21,7 @@ sample_indices = (30, 0, 7)  # x position, y position, plateau number within fra
 
 time_array = get_time_array(plateau_ranges, sample_sec)
 # characteristics = get_characteristic_array(bias, current, plateau_ranges, 10)
-characteristics = get_characteristic_array(bias, current, plateau_ranges, smooth=0)
+characteristics = get_characteristic_array(bias, current, plateau_ranges, smooth=7)
 sample_plateau_smooth = characteristics[sample_indices]
 
 # Analysis of single sample Isweep-Vsweep curve
