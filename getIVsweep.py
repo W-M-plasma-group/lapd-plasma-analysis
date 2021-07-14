@@ -292,7 +292,6 @@ def smooth_current_array(bias, current, margin):
     smooth_current_full = (current_sum[..., margin:] - current_sum[..., :-margin])/margin
 
     adjusted_bias = bias[..., (margin-1)//2:-(margin-1)//2]
-    # print("Shapes:", adjusted_bias.shape, smooth_current_full.shape)
 
     return adjusted_bias, smooth_current_full
 

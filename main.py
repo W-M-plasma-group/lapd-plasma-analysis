@@ -1,9 +1,9 @@
 import matplotlib.pyplot as plt
 import scipy.signal
-
-from getIVsweep import *
+# from getIVsweep import *
 from astropy import visualization
 from pprint import pprint
+from diagnostics import *
 
 print("Imported helper files")
 
@@ -13,6 +13,8 @@ probe_area = (1. * u.mm) ** 2  # From MATLAB code
 ion_type = 'He-4+'
 filename = 'HDF5/8-3500A.hdf5'
 smoothing_margin = 10
+
+# End of
 
 unadjusted_bias, current = get_isweep_vsweep(filename)
 
@@ -42,7 +44,12 @@ sample_plateau_smooth = characteristics[sample_indices]
 # sample_plateau_smooth.plot()
 # plt.show()
 pprint(swept_probe_analysis(sample_plateau_smooth, probe_area, ion_type, visualize=True, plot_EEDF=True))
-plt.show()
+# for characteristic in characteristics:
+#     pprint(swept_probe_analysis(characteristic, probe_area, ion_type, visualize=False, plot_EEDF=False))
+    # plt.show()
+
+pprint(plasma_diagnostics(characteristics, probe_area, ion_type))
+
 
 # Note: The (non-bimaxwellian) plasmapy electron temperature seems almost to be the *reciprocal* of the correct value?
 # Attempt to make a (basic) contour or surface plot of electron temperature across positions to investigate further
