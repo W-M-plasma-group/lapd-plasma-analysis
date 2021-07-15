@@ -43,13 +43,20 @@ sample_plateau_smooth = characteristics[sample_indices]
 # Analysis of single sample Isweep-Vsweep curve
 # sample_plateau_smooth.plot()
 # plt.show()
-pprint(swept_probe_analysis(sample_plateau_smooth, probe_area, ion_type, visualize=True, plot_EEDF=True))
+# pprint(swept_probe_analysis(sample_plateau_smooth, probe_area, ion_type, visualize=True, plot_EEDF=True))
 # for characteristic in characteristics:
 #     pprint(swept_probe_analysis(characteristic, probe_area, ion_type, visualize=False, plot_EEDF=False))
     # plt.show()
 
-pprint(plasma_diagnostics(characteristics, probe_area, ion_type))
-
+diagnostics_xarray = plasma_diagnostics(characteristics, probe_area, ion_type)
+plt.show()
+with visualization.quantity_support():
+    # print(diagnostics_xarray)
+    x_time_var_xarray = diagnostics_xarray.squeeze("y")
+    # print(x_time_var_xarray)
+    # x_time_var_xarray.sel(diagnostic='T_e').plot(robust=True)
+    x_time_var_xarray.sel(diagnostic='T_e').plot.contourf(robust=True)
+    plt.show()
 
 # Note: The (non-bimaxwellian) plasmapy electron temperature seems almost to be the *reciprocal* of the correct value?
 # Attempt to make a (basic) contour or surface plot of electron temperature across positions to investigate further
