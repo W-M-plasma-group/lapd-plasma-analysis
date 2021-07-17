@@ -1,7 +1,21 @@
 # Make sure to add code comments!
 import warnings
 
+import numpy as np
+import astropy.units as u
+
+from plasmapy.diagnostics.langmuir import Characteristic
+
 from hdf5reader import *
+
+
+# def isweep_vsweep_array
+
+
+# def decompress_sweep_array
+
+
+# def categorize_shots_xy
 
 
 def get_xy(filename):

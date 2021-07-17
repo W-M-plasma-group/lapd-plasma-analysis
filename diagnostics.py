@@ -1,5 +1,6 @@
-from getIVsweep import *
+import numpy as np
 import xarray as xr
+from plasmapy.diagnostics.langmuir import swept_probe_analysis
 
 
 def plasma_diagnostics(characteristic_array, probe_area, ion_type):
@@ -31,7 +32,6 @@ def plasma_diagnostics(characteristic_array, probe_area, ion_type):
 
 
 def verify_plateau(characteristic, probe_area, ion_type):
-    # Elaborate: this does no filtering, only a bare minimum non-defective check
 
     try:
         diagnostics = swept_probe_analysis(characteristic, probe_area, ion_type)
@@ -40,11 +40,3 @@ def verify_plateau(characteristic, probe_area, ion_type):
     except (TypeError, RuntimeError):
         return 2
     return diagnostics
-
-
-def extract_diagnostics(characteristic):
-    return swept_probe_analysis(characteristic)
-
-
-def get_diagnostic_names():
-    pass

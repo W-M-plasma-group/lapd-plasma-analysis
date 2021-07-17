@@ -1,9 +1,8 @@
 import matplotlib.pyplot as plt
-import scipy.signal
-# from getIVsweep import *
-from astropy import visualization
+from getIVsweep import *
 from pprint import pprint
 from diagnostics import *
+from plots import *
 
 print("Imported helper files")
 
@@ -50,13 +49,8 @@ sample_plateau_smooth = characteristics[sample_indices]
 
 diagnostics_xarray = plasma_diagnostics(characteristics, probe_area, ion_type)
 plt.show()
-with visualization.quantity_support():
-    # print(diagnostics_xarray)
-    x_time_var_xarray = diagnostics_xarray.squeeze("y")
-    # print(x_time_var_xarray)
-    # x_time_var_xarray.sel(diagnostic='T_e').plot(robust=True)
-    x_time_var_xarray.sel(diagnostic='T_e').plot.contourf(robust=True)
-    plt.show()
+
+plot_ne_te(diagnostics_xarray)
 
 # Note: The (non-bimaxwellian) plasmapy electron temperature seems almost to be the *reciprocal* of the correct value?
 # Attempt to make a (basic) contour or surface plot of electron temperature across positions to investigate further
