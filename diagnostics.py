@@ -27,12 +27,11 @@ def plasma_diagnostics(characteristic_array, probe_area, ion_type):
                         diagnostic_names_assigned = True
                     # Make diff diagnostic info different dataArrays in one dataset?
 
-    # print(diagnostic_array)
     return diagnostic_xarray
 
 
 def verify_plateau(characteristic, probe_area, ion_type):
-    # MUST elaborate: this does no filtering, only a bare minimum non-defective check
+    # Elaborate: this does no filtering, only a bare minimum non-defective check
 
     try:
         diagnostics = swept_probe_analysis(characteristic, probe_area, ion_type)

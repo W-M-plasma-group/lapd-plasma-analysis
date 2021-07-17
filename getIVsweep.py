@@ -180,7 +180,6 @@ def isolate_plateaus(bias, current=None, margin=0):  # Current is optional for m
     quench_frames = np.array([[(same_xy < quench_slope).nonzero()[0]
                                for same_xy in same_x]
                               for same_x in normalized_bias_gradient], dtype=object)
-    # print("This is the quench frame array:", quench_frames)
 
     # Using list comprehension, this line creates an array storing significant quench frames (plus the last one, which
     #    should also be significant) for each x,y position
@@ -188,20 +187,17 @@ def isolate_plateaus(bias, current=None, margin=0):  # Current is optional for m
     sig_quench_frames = np.array([[same_xy[(np.diff(same_xy) > quench_diff).tolist() + [True]]
                                    for same_xy in same_x]
                                   for same_x in quench_frames])
-    # print("This is the significant quench frame array:", sig_quench_frames)
 
     # Using list comprehension, this line fills each x,y position in array with a list of pre-ramp frames
     ramp_frames = np.array([[(same_xy > rise_slope).nonzero()[0]
                              for same_xy in same_x]
                             for same_x in normalized_bias_gradient], dtype=object)
-    # print("This is the ramp frame array:", ramp_frames)
 
     # Using list comprehension, this line creates an array storing significant ramp start frames (plus the first one,
     #    which should also be significant) for each x,y position
     sig_ramp_frames = np.array([[same_xy[[True] + (np.diff(same_xy) > rise_diff).tolist()]
                                  for same_xy in same_x]
                                 for same_x in ramp_frames])
-    # print("This is the significant ramp frame array:", sig_ramp_frames)
 
     # print("This is the average of the non-quench normalized gradient array at the test indices:",
     #       np.mean(normalized_bias_gradient[test_indices +
@@ -217,20 +213,8 @@ def isolate_plateaus(bias, current=None, margin=0):  # Current is optional for m
             for p in range(sig_quench_frames.shape[2]):
                 start_ind = sig_ramp_frames[i, j, p]
                 max_bias_frames[i, j, p] = np.argmax(bias[i, j, start_ind:sig_quench_frames[i, j, p]]) + start_ind
-    # print("This is the max bias frame array:", max_bias_frames)
-
-    # Illustrative example plot of significant points for first position (0,0); can be used for debugging
-    """
-    # test_indices = (30, 0)
-    plt.plot(bias[0, 0], 'b-',
-             sig_quench_frames[0, 0], bias[0, 0, sig_quench_frames[0, 0]], 'ro',
-             sig_ramp_frames[0, 0], bias[0, 0, sig_ramp_frames[0, 0]], 'go',
-             max_bias_frames[0, 0], bias[0, 0, max_bias_frames[0, 0]], 'yo')
-    plt.show()
-    """
 
     pad = (margin - 1) // 2
-
     plateau_bounds = np.stack((sig_ramp_frames + pad, max_bias_frames - pad), axis=-1)
 
     return plateau_bounds
