@@ -9,17 +9,68 @@ from plasmapy.diagnostics.langmuir import Characteristic
 from hdf5reader import *
 
 
-# def isweep_vsweep_array
+def get_isweep_vsweep(filename):
 
-
-# def decompress_sweep_array
-
-
-# def categorize_shots_xy
-
-
-def get_xy(filename):
     file = open_hdf5(filename)
+    xy_shot_ref = get_xy(file)
+
+    isweep_data_raw, vsweep_data_raw, isweep_headers_raw, vsweep_headers_raw = get_sweep_data_headers(file)
+
+    print("Reading in scales and offsets from headers...")
+    # Define: scale is 2nd index, offset is 3rd index
+    # Can I skip some of the lists and turn data directly into arrays?
+    isweep_scales = [header[1] for header in isweep_headers_raw]
+    vsweep_scales = [header[1] for header in vsweep_headers_raw]
+    isweep_offsets = [header[2] for header in isweep_headers_raw]
+    vsweep_offsets = [header[2] for header in vsweep_headers_raw]
+
+    isweep_scales_array = np.array(isweep_scales)
+    isweep_offsets_array = np.array(isweep_offsets)
+    vsweep_scales_array = np.array(vsweep_scales)
+    vsweep_offsets_array = np.array(vsweep_offsets)
+
+    # (SKIP AREAL PLOT CODE; GO TO RADIAL PLOT CODE)
+
+    # Process (decompress) isweep, vsweep data; raw_size[0] should be number of shots, raw_size[1] should be number
+    #   of measurements per shot ("frames")
+
+    print("Decompressing raw data...")
+
+    isweep_processed = isweep_scales_array[:, np.newaxis] * isweep_data_raw + isweep_offsets_array[:, np.newaxis]
+    vsweep_processed = vsweep_scales_array[:, np.newaxis] * vsweep_data_raw + vsweep_offsets_array[:, np.newaxis]
+
+    # Is the below necessary? Check the MATLAB code
+    # To reflect MATLAB code, should I take (pointwise?) standard deviation for each across these shots too? (For error)
+    # isweep_sumsq = np.ndarray((1065,), float)
+
+    print("Finished decompressing compressed isweep and vsweep data")
+
+    # Create 4D array: the first two dimensions correspond to all combinations of unique x and y positions,
+    #    the third dimension represents the nth shot taken at that unique positions
+    #    and the fourth dimensions lists all the frames in that nth shot.
+
+    isweep_xy_shots_array = isweep_processed[xy_shot_ref]
+    vsweep_xy_shots_array = vsweep_processed[xy_shot_ref]
+    print("Shape of isweep_xy_shots_array:", isweep_xy_shots_array.shape)
+
+    # Note: Further clean up comments, add other comments/documentation
+    # Find the mean value of the current and voltage across all the shots taken at same position
+    #    for each time (frame) in the shot, preserving the time axis
+    # This creates an array of averages at each time, unique x pos, and unique y pos
+
+    # Calculate means: "horizontally" average all shots taken at same position
+    #    (average all corresponding frames into a single "average shot" with same number of frames)
+    isweep_means = np.mean(isweep_xy_shots_array, 2)
+    vsweep_means = np.mean(vsweep_xy_shots_array, 2)
+
+    # Describe what vsweep and isweep values do within each shot for observers to understand
+
+    # Note: This function returns the bias values first, then the current
+    file.close()
+    return vsweep_means, isweep_means
+
+
+def get_xy(file):
 
     motor_data = structures_at_path(file, '/Raw data + config/6K Compumotor')
     motion_path = (motor_data["Datasets"])[0]
@@ -62,7 +113,6 @@ def get_xy(filename):
         # noinspection PyTypeChecker
         xy_shot_ref[x_loc[i]][y_loc[i]].append(i)  # full of references to nth shot taken
 
-    file.close()
     return xy_shot_ref
 
     # st_data = []
@@ -71,9 +121,17 @@ def get_xy(filename):
     # SKIP REMAINING X, Y POSITION DATA PROCESSING
 
 
-def get_isweep_vsweep(filename):
-    xy_shot_ref = get_xy(filename)
-    file = open_hdf5(filename)
+def get_sweep_data_headers(file):
+    r"""
+
+    Function to read raw isweep and vsweep data and headers from a file.
+    Returns four arrays arrays containing isweep and vsweep data and sweep headers in compressed format.
+
+    Parameters
+    ----------
+    :param file: file object
+    :return: arrays of raw isweep and vsweep data and headers
+    """
 
     # SIS crate data
     sis_group = structures_at_path(file, '/Raw data + config/SIS crate/')
@@ -82,71 +140,28 @@ def get_isweep_vsweep(filename):
     # Add more code comments in general. In addition, keep a more detailed documentation outside of the code
     isweep_data_path = (sis_group['Datasets'])[2]
     isweep_headers_path = (sis_group['Datasets'])[3]
-    isweep_data_raw = file[isweep_data_path]
-    isweep_headers_raw = file[isweep_headers_path]
-
     vsweep_data_path = (sis_group['Datasets'])[4]
     vsweep_headers_path = (sis_group['Datasets'])[5]
-    vsweep_data_raw = file[vsweep_data_path]
-    vsweep_headers_raw = file[vsweep_headers_path]
+
+    isweep_data_raw = np.array(file[isweep_data_path])
+    isweep_headers_raw = np.array(file[isweep_headers_path])
+    vsweep_data_raw = np.array(file[vsweep_data_path])
+    vsweep_headers_raw = np.array(file[vsweep_headers_path])
 
     print("Shape of isweep data array:", isweep_data_raw.shape)
 
-    isweep_raw_array = np.array(isweep_data_raw)
-    vsweep_raw_array = np.array(vsweep_data_raw)
+    # isweep_raw_array = np.array(isweep_data_raw)
+    # vsweep_raw_array = np.array(vsweep_data_raw)
 
-    print("Reading in scales and offsets from headers...")
-    # Define: scale is 2nd index, offset is 3rd index
-    # Can I skip some of the lists and turn data directly into arrays?
-    isweep_scales = [header[1] for header in isweep_headers_raw]
-    vsweep_scales = [header[1] for header in vsweep_headers_raw]
-    isweep_offsets = [header[2] for header in isweep_headers_raw]
-    vsweep_offsets = [header[2] for header in vsweep_headers_raw]
+    return isweep_data_raw, vsweep_data_raw, isweep_headers_raw, vsweep_headers_raw
 
-    isweep_scales_array = np.array(isweep_scales)
-    isweep_offsets_array = np.array(isweep_offsets)
-    vsweep_scales_array = np.array(vsweep_scales)
-    vsweep_offsets_array = np.array(vsweep_offsets)
+# def isweep_vsweep_array
 
-    # (SKIP AREAL PLOT CODE; GO TO RADIAL PLOT CODE)
 
-    # Process (decompress) isweep, vsweep data; raw_size[0] should be number of shots, raw_size[1] should be number
-    #   of measurements per shot ("frames")
+# def decompress_sweep_array
 
-    print("Decompressing raw data...")
 
-    isweep_processed = isweep_scales_array[:, np.newaxis] * isweep_raw_array + isweep_offsets_array[:, np.newaxis]
-    vsweep_processed = vsweep_scales_array[:, np.newaxis] * vsweep_raw_array + vsweep_offsets_array[:, np.newaxis]
-
-    # Is the below necessary? Check the MATLAB code
-    # To reflect MATLAB code, should I take (pointwise?) standard deviation for each across these shots too? (For error)
-    # isweep_sumsq = np.ndarray((1065,), float)
-
-    print("Finished decompressing compressed isweep and vsweep data")
-
-    # Create 4D array: the first two dimensions correspond to all combinations of unique x and y positions,
-    #    the third dimension represents the nth shot taken at that unique positions
-    #    and the fourth dimensions lists all the frames in that nth shot.
-
-    isweep_xy_shots_array = isweep_processed[xy_shot_ref]
-    vsweep_xy_shots_array = vsweep_processed[xy_shot_ref]
-    print("Shape of isweep_xy_shots_array:", isweep_xy_shots_array.shape)
-
-    # Note: Further clean up comments, add other comments/documentation
-    # Find the mean value of the current and voltage across all the shots taken at same position
-    #    for each time (frame) in the shot, preserving the time axis
-    # This creates an array of averages at each time, unique x pos, and unique y pos
-
-    # Calculate means: "horizontally" average all shots taken at same position
-    #    (average all corresponding frames into a single "average shot" with same number of frames)
-    isweep_means = np.mean(isweep_xy_shots_array, 2)
-    vsweep_means = np.mean(vsweep_xy_shots_array, 2)
-
-    # Describe what vsweep and isweep values do within each shot for observers to understand
-
-    # Note: This function returns the bias values first, then the current
-    file.close()
-    return vsweep_means, isweep_means
+# def categorize_shots_xy
 
 
 def isolate_plateaus(bias, current=None, margin=0):  # Current is optional for maximum compatibility
