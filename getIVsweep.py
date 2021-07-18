@@ -144,12 +144,6 @@ def get_isweep_vsweep(filename):
 
     # Describe what vsweep and isweep values do within each shot for observers to understand
 
-    """
-    # print("Padded limit for characteristic:", characteristic.get_padded_limit(0.5))
-    print("Characteristic V data:", characteristic.bias)
-    print("Characteristic I data:", characteristic.current)
-    """
-
     # Note: This function returns the bias values first, then the current
     file.close()
     return vsweep_means, isweep_means
@@ -178,8 +172,8 @@ def isolate_plateaus(bias, current=None, margin=0):  # Current is optional for m
 
     # The bias has three types of regions: constant low, increase at constant rate ("ramp"), and rapid decrease
     #    down to minimum value ("quench"). The ramp region is where useful Isweep-Vsweep data points are collected.
-    # Since the bias changes almost linearly within each of these three regions, by taking the slope (gradient)
-    #    of the bias (and normalizing it to be less than 1) the bias can be used to divide the frames up into regions.
+    # Since the bias changes almost linearly within each of these three regions, the slope (gradient) of the bias
+    #    (normalized to be less than 1) can be used to divide the frames up into regions.
     # Note: Selecting ramps out of plateaus (the constant low bias and following ramp region) is not in the original
     #    MATLAB code, but is determined to be necessary for PlasmaPy diagnostics functions to work correctly.
 
@@ -276,7 +270,7 @@ def create_ranged_characteristic(bias, current, start, end):
 
 
 def smooth_current_array(bias, current, margin):
-    # This may still distort the shape of the current (especially at the ends of each plateau), but is much faster
+    # This still distorts the shape of the current, especially at the ends of each plateau, but is much faster
 
     if margin < 0:
         raise ValueError("Cannot smooth over negative number", margin, "of points")
@@ -285,20 +279,17 @@ def smooth_current_array(bias, current, margin):
     if current.shape[-1] <= margin:
         raise ValueError("Last dimension length", current.shape[-1], "is too short to take", margin, "-point mean over")
 
-    # Note: Bias is not smoothed (only current is)
     current_sum = np.cumsum(np.insert(current, 0, 0, axis=-1), axis=-1)
     smooth_current_full = (current_sum[..., margin:] - current_sum[..., :-margin])/margin
 
-    adjusted_bias = bias[..., (margin-1)//2:-(margin-1)//2]
+    adjusted_bias = bias[..., (margin-1)//2:-(margin-1)//2]  # Shifts bias to align with new, shorter current array
 
     return adjusted_bias, smooth_current_full
 
 
-# def get_time_array(shape_of_frames, sample_sec):  # Is this strictly necessary? All piles (pages) are identical anyway
 def get_time_array(plateau_ranges, sample_sec=(100 / 16 * 10 ** 6) ** (-1) * u.s):
     # Make more robust; is mean time during shot okay? Clean up, decide final form
     # x, y, time in milliseconds since start of that [average] shot using sample_sec in milliseconds
-    # return np.full(shape=shape_of_frames, fill_value=(np.arange(shape_of_frames[-1]) * sample_sec).to(u.ms))
 
     # returns the time at the center of the ramp since the beginning of the shot
     return np.mean(plateau_ranges, axis=-1) * sample_sec
@@ -334,9 +325,6 @@ def get_characteristic_array(bias, current, plateau_ranges):
         print("Finished x position", i + 1, "/", plateau_ranges.shape[0])
 
     return characteristic_array
-
-# isolate_plateaus(get_isweep_vsweep('HDF5/8-3500A.hdf5'))
-# get_isweep_vsweep('HDF5/09_radial_line_25press_4kA_redo.hdf5')
 
 # Instead of having several separate methods "trade off", can have one overarching method that organizes things and
 #    smaller helper functions that are called within overall method?
