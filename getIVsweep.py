@@ -10,7 +10,6 @@ from hdf5reader import *
 
 
 def get_isweep_vsweep(filename):
-
     file = open_hdf5(filename)
     xy_shot_ref = get_xy(file)
 
@@ -18,16 +17,10 @@ def get_isweep_vsweep(filename):
 
     print("Reading in scales and offsets from headers...")
     # Define: scale is 2nd index, offset is 3rd index
-    # Can I skip some of the lists and turn data directly into arrays?
-    isweep_scales = [header[1] for header in isweep_headers_raw]
-    vsweep_scales = [header[1] for header in vsweep_headers_raw]
-    isweep_offsets = [header[2] for header in isweep_headers_raw]
-    vsweep_offsets = [header[2] for header in vsweep_headers_raw]
-
-    isweep_scales_array = np.array(isweep_scales)
-    isweep_offsets_array = np.array(isweep_offsets)
-    vsweep_scales_array = np.array(vsweep_scales)
-    vsweep_offsets_array = np.array(vsweep_offsets)
+    isweep_scales = np.array([header[1] for header in isweep_headers_raw])
+    vsweep_scales = np.array([header[1] for header in vsweep_headers_raw])
+    isweep_offsets = np.array([header[2] for header in isweep_headers_raw])
+    vsweep_offsets = np.array([header[2] for header in vsweep_headers_raw])
 
     # (SKIP AREAL PLOT CODE; GO TO RADIAL PLOT CODE)
 
@@ -36,8 +29,10 @@ def get_isweep_vsweep(filename):
 
     print("Decompressing raw data...")
 
-    isweep_processed = isweep_scales_array[:, np.newaxis] * isweep_data_raw + isweep_offsets_array[:, np.newaxis]
-    vsweep_processed = vsweep_scales_array[:, np.newaxis] * vsweep_data_raw + vsweep_offsets_array[:, np.newaxis]
+    isweep_processed = scale_offset_decompress(isweep_data_raw, isweep_scales, isweep_offsets)
+    vsweep_processed = scale_offset_decompress(vsweep_data_raw, vsweep_scales, vsweep_offsets)
+
+    # vsweep_processed = vsweep_scales[:, np.newaxis] * vsweep_data_raw + vsweep_offsets[:, np.newaxis]
 
     # Is the below necessary? Check the MATLAB code
     # To reflect MATLAB code, should I take (pointwise?) standard deviation for each across these shots too? (For error)
@@ -71,7 +66,6 @@ def get_isweep_vsweep(filename):
 
 
 def get_xy(file):
-
     motor_data = structures_at_path(file, '/Raw data + config/6K Compumotor')
     motion_path = (motor_data["Datasets"])[0]
     probe_motion = file[motion_path]
@@ -144,9 +138,9 @@ def get_sweep_data_headers(file):
     vsweep_headers_path = (sis_group['Datasets'])[5]
 
     isweep_data_raw = np.array(file[isweep_data_path])
-    isweep_headers_raw = np.array(file[isweep_headers_path])
+    isweep_headers_raw = file[isweep_headers_path]
     vsweep_data_raw = np.array(file[vsweep_data_path])
-    vsweep_headers_raw = np.array(file[vsweep_headers_path])
+    vsweep_headers_raw = file[vsweep_headers_path]
 
     print("Shape of isweep data array:", isweep_data_raw.shape)
 
@@ -155,10 +149,16 @@ def get_sweep_data_headers(file):
 
     return isweep_data_raw, vsweep_data_raw, isweep_headers_raw, vsweep_headers_raw
 
-# def isweep_vsweep_array
 
-
-# def decompress_sweep_array
+def scale_offset_decompress(data_raw, scales, offsets):
+    r"""
+    :param data_raw: array
+    :param scales: 1D array
+    :param offsets: 1D array
+    :return: decompressed data array
+    """
+    # Add error checks (decompress function)
+    return data_raw * scales.reshape(len(data_raw), 1) + offsets.reshape(len(data_raw), 1)
 
 
 # def categorize_shots_xy
@@ -244,7 +244,6 @@ def isolate_plateaus(bias, current=None, margin=0):  # Current is optional for m
 
 
 def to_real_units(bias, current):
-
     # The conversion factors from abstract units to real bias (V) and current values (A) are hard-coded in here.
     # Note that current is multiplied by -1 to get the "upright" traditional Isweep-Vsweep curve. Add to documentation?
 
@@ -257,7 +256,7 @@ def to_real_units(bias, current):
 
 def create_ranged_characteristic(bias, current, start, end):
     # Returns a Characteristic object
-    
+
     dimensions = len(bias.shape)
     if bias.shape != current.shape:
         raise ValueError("Bias and current must be of the same dimensions and shape")
@@ -295,9 +294,10 @@ def smooth_current_array(bias, current, margin):
         raise ValueError("Last dimension length", current.shape[-1], "is too short to take", margin, "-point mean over")
 
     current_sum = np.cumsum(np.insert(current, 0, 0, axis=-1), axis=-1)
-    smooth_current_full = (current_sum[..., margin:] - current_sum[..., :-margin])/margin
+    smooth_current_full = (current_sum[..., margin:] - current_sum[..., :-margin]) / margin
 
-    adjusted_bias = bias[..., (margin-1)//2:-(margin-1)//2]  # Shifts bias to align with new, shorter current array
+    adjusted_bias = bias[...,
+                    (margin - 1) // 2:-(margin - 1) // 2]  # Shifts bias to align with new, shorter current array
 
     return adjusted_bias, smooth_current_full
 
@@ -320,7 +320,6 @@ def get_time_array(plateau_ranges, sample_sec=(100 / 16 * 10 ** 6) ** (-1) * u.s
 
 
 def get_characteristic_array(bias, current, plateau_ranges):
-
     # Still need to do plateau filtering
     # Make sure to store time information!
 

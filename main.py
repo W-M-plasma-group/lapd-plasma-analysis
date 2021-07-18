@@ -39,6 +39,7 @@ sample_plateau_smooth = characteristics[sample_indices]
 # sample_plateau_smooth.plot()
 pprint(swept_probe_analysis(sample_plateau_smooth, probe_area, ion_type, visualize=True, plot_EEDF=True))
 plt.show()
+print("Done analyzing sample characteristic")
 # for characteristic in characteristics:
 #     pprint(swept_probe_analysis(characteristic, probe_area, ion_type, visualize=False, plot_EEDF=False))
     # plt.show()
