@@ -10,6 +10,12 @@ from hdf5reader import *
 
 
 def get_isweep_vsweep(filename):
+    r"""
+
+    :param filename:
+    :return:
+    """
+
     file = open_hdf5(filename)
     xy_shot_ref = get_xy(file)
 
@@ -17,10 +23,15 @@ def get_isweep_vsweep(filename):
 
     print("Reading in scales and offsets from headers...")
     # Define: scale is 2nd index, offset is 3rd index
+    isweep_scales, isweep_offsets = get_scales_offsets(isweep_headers_raw, 1, 2)
+    vsweep_scales, vsweep_offsets = get_scales_offsets(vsweep_headers_raw, 1, 2)
+
+    """
     isweep_scales = np.array([header[1] for header in isweep_headers_raw])
     vsweep_scales = np.array([header[1] for header in vsweep_headers_raw])
     isweep_offsets = np.array([header[2] for header in isweep_headers_raw])
     vsweep_offsets = np.array([header[2] for header in vsweep_headers_raw])
+    """
 
     # (SKIP AREAL PLOT CODE; GO TO RADIAL PLOT CODE)
 
@@ -28,17 +39,16 @@ def get_isweep_vsweep(filename):
     #   of measurements per shot ("frames")
 
     print("Decompressing raw data...")
-
     isweep_processed = scale_offset_decompress(isweep_data_raw, isweep_scales, isweep_offsets)
     vsweep_processed = scale_offset_decompress(vsweep_data_raw, vsweep_scales, vsweep_offsets)
 
-    # vsweep_processed = vsweep_scales[:, np.newaxis] * vsweep_data_raw + vsweep_offsets[:, np.newaxis]
+    # Can I convert isweep and vsweep arrays to real units here? Should do as long as numpy can handle astropy units
 
     # Is the below necessary? Check the MATLAB code
     # To reflect MATLAB code, should I take (pointwise?) standard deviation for each across these shots too? (For error)
     # isweep_sumsq = np.ndarray((1065,), float)
 
-    print("Finished decompressing compressed isweep and vsweep data")
+
 
     # Create 4D array: the first two dimensions correspond to all combinations of unique x and y positions,
     #    the third dimension represents the nth shot taken at that unique positions
@@ -144,10 +154,23 @@ def get_sweep_data_headers(file):
 
     print("Shape of isweep data array:", isweep_data_raw.shape)
 
-    # isweep_raw_array = np.array(isweep_data_raw)
-    # vsweep_raw_array = np.array(vsweep_data_raw)
-
     return isweep_data_raw, vsweep_data_raw, isweep_headers_raw, vsweep_headers_raw
+
+
+def get_scales_offsets(headers, scale_index, offset_index):
+    r"""
+    Unpack scales and offsets from headers to use in scale-offset decompression.
+    Parameters
+    ----------
+    :param headers:
+    :param scale_index:
+    :param offset_index:
+    :return:
+    """
+
+    scales = np.array([header[scale_index] for header in headers])
+    offsets = np.array([header[offset_index] for header in headers])
+    return scales, offsets
 
 
 def scale_offset_decompress(data_raw, scales, offsets):
