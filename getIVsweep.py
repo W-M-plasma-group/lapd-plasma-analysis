@@ -157,6 +157,7 @@ def get_sweep_data_headers(file):
 def get_scales_offsets(headers, scale_index, offset_index):
     r"""
     Unpack scales and offsets from headers to use in scale-offset decompression.
+
     Parameters
     ----------
     :param headers:
@@ -172,11 +173,16 @@ def get_scales_offsets(headers, scale_index, offset_index):
 
 def scale_offset_decompress(data_raw, scales, offsets):
     r"""
+    Decompress raw data using the specified arrays of scales and offsets.
+    Scale and offset arrays must have dimensions corresponding to the first two dimensions (x and y) of the input data.
+
+    Parameters
+    ----------
     :param data_raw: array
-    :param scales: 1D array
-    :param offsets: 1D array
+    :param scales: array
+    :param offsets: array
     :return: decompressed data array
     """
-    # Add error checks (decompress function)
-    # NO!!!!!!! THIS SHOULD BE XLENGTH BY YLENGTH, NOT XLENGTH BY 1!
-    return data_raw * scales.reshape(len(data_raw), 1) + offsets.reshape(len(data_raw), 1)
+
+    x_length, y_length = data_raw.shape[:2]
+    return data_raw * scales.reshape(x_length, y_length) + offsets.reshape(x_length, y_length)
