@@ -1,4 +1,5 @@
 # Make sure to add code comments and write documentation!
+import warnings
 
 import numpy as np
 
@@ -157,6 +158,7 @@ def get_sweep_data_headers(file):
 def get_scales_offsets(headers, scale_index, offset_index):
     r"""
     Unpack scales and offsets from headers to use in scale-offset decompression.
+
     Parameters
     ----------
     :param headers:
@@ -172,11 +174,19 @@ def get_scales_offsets(headers, scale_index, offset_index):
 
 def scale_offset_decompress(data_raw, scales, offsets):
     r"""
+    Decompress raw data using the specified arrays of scales and offsets.
+    Scale and offset arrays must have dimensions corresponding to the first two dimensions (x and y) of the input data.
+
+    Parameters
+    ----------
     :param data_raw: array
-    :param scales: 1D array
-    :param offsets: 1D array
+    :param scales: array
+    :param offsets: array
     :return: decompressed data array
     """
-    # Add error checks (decompress function)
-    # NO!!!!!!! THIS SHOULD BE XLENGTH BY YLENGTH, NOT XLENGTH BY 1!
-    return data_raw * scales.reshape(len(data_raw), 1) + offsets.reshape(len(data_raw), 1)
+
+    if len(data_raw.shape) > 2:
+        raise ValueError("Only 2D arrays are currently supported for data decompression.")
+    num_shots = data_raw.shape[0]
+
+    return data_raw * scales.reshape(num_shots, 1) + offsets.reshape(num_shots, 1)

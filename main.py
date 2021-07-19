@@ -23,9 +23,8 @@ sample_indices = (30, 0, 7)  # x position, y position, plateau number within fra
 characteristics = characterize_sweep_array(bias, current, margin=smoothing_margin, sample_sec=sample_sec)
 
 # Analysis of single sample Isweep-Vsweep curve
-sample_plateau_smooth = characteristics[sample_indices]
-# sample_plateau_smooth.plot()
-pprint(swept_probe_analysis(sample_plateau_smooth, probe_area, ion_type, visualize=True, plot_EEDF=True))
+sample_plateau = characteristics[sample_indices]
+pprint(swept_probe_analysis(sample_plateau, probe_area, ion_type, visualize=True, plot_EEDF=True))
 plt.show()
 print("Done analyzing sample characteristic")
 
