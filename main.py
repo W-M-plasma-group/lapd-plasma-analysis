@@ -1,6 +1,8 @@
 import matplotlib.pyplot as plt
-from getIVsweep import *
 from pprint import pprint
+
+from getIVsweep import *
+from characterization import *
 from diagnostics import *
 from plots import *
 
