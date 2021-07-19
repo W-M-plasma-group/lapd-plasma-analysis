@@ -6,6 +6,25 @@ from plasmapy.diagnostics.langmuir import Characteristic
 # def characterize_sweep_array(bias, current)
 
 
+def smooth_current_array(bias, current, margin):
+    # This still distorts the shape of the current, especially at the ends of each plateau, but is much faster
+
+    if margin < 0:
+        raise ValueError("Cannot smooth over negative number", margin, "of points")
+    if margin == 0:
+        warnings.warn("Zero-point smoothing is redundant")
+    if current.shape[-1] <= margin:
+        raise ValueError("Last dimension length", current.shape[-1], "is too short to take", margin, "-point mean over")
+
+    current_sum = np.cumsum(np.insert(current, 0, 0, axis=-1), axis=-1)
+    smooth_current_full = (current_sum[..., margin:] - current_sum[..., :-margin]) / margin
+
+    adjusted_bias = bias[...,
+                    (margin - 1) // 2:-(margin - 1) // 2]  # Shifts bias to align with new, shorter current array
+
+    return adjusted_bias, smooth_current_full
+
+
 def isolate_plateaus(bias, current=None, margin=0):  # Current is optional for maximum compatibility
 
     r"""
@@ -130,25 +149,6 @@ def create_ranged_characteristic(bias, current, start, end):
         characteristic = Characteristic(real_bias, real_current)
 
     return characteristic
-
-
-def smooth_current_array(bias, current, margin):
-    # This still distorts the shape of the current, especially at the ends of each plateau, but is much faster
-
-    if margin < 0:
-        raise ValueError("Cannot smooth over negative number", margin, "of points")
-    if margin == 0:
-        warnings.warn("Zero-point smoothing is redundant")
-    if current.shape[-1] <= margin:
-        raise ValueError("Last dimension length", current.shape[-1], "is too short to take", margin, "-point mean over")
-
-    current_sum = np.cumsum(np.insert(current, 0, 0, axis=-1), axis=-1)
-    smooth_current_full = (current_sum[..., margin:] - current_sum[..., :-margin]) / margin
-
-    adjusted_bias = bias[...,
-                    (margin - 1) // 2:-(margin - 1) // 2]  # Shifts bias to align with new, shorter current array
-
-    return adjusted_bias, smooth_current_full
 
 
 def get_time_array(plateau_ranges, sample_sec=(100 / 16 * 10 ** 6) ** (-1) * u.s):

@@ -47,9 +47,9 @@ print("Done analyzing sample characteristic")
     # plt.show()
 
 diagnostics_xarray = plasma_diagnostics(characteristics, probe_area, ion_type)
-plt.show()
+# plt.show()
 
-plot_ne_te(diagnostics_xarray)
+radial_plot(diagnostics_xarray, diagnostic='T_e', plot='contour')
 
-# Note: The (non-bimaxwellian) plasmapy electron temperature seems almost to be the *reciprocal* of the correct value?
-# Attempt to make a (basic) contour or surface plot of electron temperature across positions to investigate further
+# Note: The non-bimaxwellian plasmapy electron temperature seems to be the *reciprocal* of the correct value.
+
