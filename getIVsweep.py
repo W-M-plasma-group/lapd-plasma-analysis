@@ -1,4 +1,4 @@
-# Make sure to add code comments!
+# Make sure to add code comments and write documentation!
 import warnings
 
 import numpy as np
@@ -17,26 +17,15 @@ def get_isweep_vsweep(filename):
     """
 
     file = open_hdf5(filename)
-    xy_shot_ref = get_xy(file)
+    x_round, y_round, shot_list = get_xy(file)
+    xy_shot_ref = categorize_shots_xy(x_round, y_round, shot_list)
 
     isweep_data_raw, vsweep_data_raw, isweep_headers_raw, vsweep_headers_raw = get_sweep_data_headers(file)
 
     print("Reading in scales and offsets from headers...")
     # Define: scale is 2nd index, offset is 3rd index
-    isweep_scales, isweep_offsets = get_scales_offsets(isweep_headers_raw, 1, 2)
-    vsweep_scales, vsweep_offsets = get_scales_offsets(vsweep_headers_raw, 1, 2)
-
-    """
-    isweep_scales = np.array([header[1] for header in isweep_headers_raw])
-    vsweep_scales = np.array([header[1] for header in vsweep_headers_raw])
-    isweep_offsets = np.array([header[2] for header in isweep_headers_raw])
-    vsweep_offsets = np.array([header[2] for header in vsweep_headers_raw])
-    """
-
-    # (SKIP AREAL PLOT CODE; GO TO RADIAL PLOT CODE)
-
-    # Process (decompress) isweep, vsweep data; raw_size[0] should be number of shots, raw_size[1] should be number
-    #   of measurements per shot ("frames")
+    isweep_scales, isweep_offsets = get_scales_offsets(isweep_headers_raw, scale_index=1, offset_index=2)
+    vsweep_scales, vsweep_offsets = get_scales_offsets(vsweep_headers_raw, scale_index=1, offset_index=2)
 
     print("Decompressing raw data...")
     isweep_processed = scale_offset_decompress(isweep_data_raw, isweep_scales, isweep_offsets)
@@ -48,27 +37,18 @@ def get_isweep_vsweep(filename):
     # To reflect MATLAB code, should I take (pointwise?) standard deviation for each across these shots too? (For error)
     # isweep_sumsq = np.ndarray((1065,), float)
 
-
-
     # Create 4D array: the first two dimensions correspond to all combinations of unique x and y positions,
     #    the third dimension represents the nth shot taken at that unique positions
     #    and the fourth dimensions lists all the frames in that nth shot.
-
     isweep_xy_shots_array = isweep_processed[xy_shot_ref]
     vsweep_xy_shots_array = vsweep_processed[xy_shot_ref]
-    print("Shape of isweep_xy_shots_array:", isweep_xy_shots_array.shape)
+    print("Shape of isweep_xy_shots_array:", isweep_xy_shots_array.shape)  # Verify shape: (x, y, shot, frame)
 
-    # Note: Further clean up comments, add other comments/documentation
-    # Find the mean value of the current and voltage across all the shots taken at same position
-    #    for each time (frame) in the shot, preserving the time axis
-    # This creates an array of averages at each time, unique x pos, and unique y pos
-
-    # Calculate means: "horizontally" average all shots taken at same position
-    #    (average all corresponding frames into a single "average shot" with same number of frames)
+    # Average all shots taken at same position into one shot. The vsweep and isweep values for each individual frame in
+    #    the new "average shot" are the mean values for the corresponding frame in all other shots at the same position.
+    # Creates a 3D array of sweep values for each unique x position, unique y position, and frame number.
     isweep_means = np.mean(isweep_xy_shots_array, 2)
     vsweep_means = np.mean(vsweep_xy_shots_array, 2)
-
-    # Describe what vsweep and isweep values do within each shot for observers to understand
 
     # Note: This function returns the bias values first, then the current
     file.close()
@@ -76,6 +56,11 @@ def get_isweep_vsweep(filename):
 
 
 def get_xy(file):
+    r"""
+    Reads the x, y, and shot data from a file. Returns rounded x and y data for each shot and a list of shots.
+    :param file: file object
+    :return: tuple of three lists
+    """
     motor_data = structures_at_path(file, '/Raw data + config/6K Compumotor')
     motion_path = (motor_data["Datasets"])[0]
     probe_motion = file[motion_path]
@@ -86,6 +71,24 @@ def get_xy(file):
     places = 1
     x_round = np.round(probe_motion['x'], decimals=places)
     y_round = np.round(probe_motion['y'], decimals=places)
+
+    shot_list = tuple(probe_motion['Shot number'])
+
+    return x_round, y_round, shot_list
+
+
+def categorize_shots_xy(x_round, y_round, shot_list):
+    r"""
+    Categorize shots by their x,y position. Returns a 3D list of shot numbers at each combination of unique x and y pos.
+
+    Parameters
+    ----------
+    :param x_round: list
+    :param y_round: list
+    :param shot_list: list
+    :return: list
+    """
+
     x, x_loc = np.unique(x_round, return_inverse=True)
     y, y_loc = np.unique(y_round, return_inverse=True)
     x_length = len(x)
@@ -101,19 +104,15 @@ def get_xy(file):
 
     # Can these be rewritten as NumPy arrays?
 
-    shot_list = tuple(probe_motion['Shot number'])
-    num_shots = len(shot_list)
-    print("Number of shots taken:", num_shots)
-
     # Creates an empty 2D array with a cell for each unique x,y position combination,
     #    then fills each cell with a list of indexes to the nth shot number such that
     #    each shot number is stored at the cell representing the x,y position where it was taken
     #    (for example, a shot might have been taken at the combination of the 10th unique
     #       x position and the 15th unique y position in the lists x and y)
-    # For every shot index i, x_round[i] and y_round[i] give the position of the shot taken at that index
+    # For every shot index i, x_round[i] and y_round[i] give the x,y position of the shot taken at that index
     print("Categorizing shots by x,y position...")
     xy_shot_ref = [[[] for _ in range(y_length)] for _ in range(x_length)]
-    for i in range(num_shots):
+    for i in range(len(shot_list)):
         # noinspection PyTypeChecker
         xy_shot_ref[x_loc[i]][y_loc[i]].append(i)  # full of references to nth shot taken
 
@@ -141,7 +140,6 @@ def get_sweep_data_headers(file):
     sis_group = structures_at_path(file, '/Raw data + config/SIS crate/')
     # print("Datasets in sis_data structure: " + str(sis_group["Datasets"]))
 
-    # Add more code comments in general. In addition, keep a more detailed documentation outside of the code
     isweep_data_path = (sis_group['Datasets'])[2]
     isweep_headers_path = (sis_group['Datasets'])[3]
     vsweep_data_path = (sis_group['Datasets'])[4]
@@ -181,10 +179,8 @@ def scale_offset_decompress(data_raw, scales, offsets):
     :return: decompressed data array
     """
     # Add error checks (decompress function)
+    # NO!!!!!!! THIS SHOULD BE XLENGTH BY YLENGTH, NOT XLENGTH BY 1!
     return data_raw * scales.reshape(len(data_raw), 1) + offsets.reshape(len(data_raw), 1)
-
-
-# def categorize_shots_xy
 
 
 def isolate_plateaus(bias, current=None, margin=0):  # Current is optional for maximum compatibility
@@ -267,6 +263,13 @@ def isolate_plateaus(bias, current=None, margin=0):  # Current is optional for m
 
 
 def to_real_units(bias, current):
+    r"""
+    Parameters
+    ----------
+    :param bias: array
+    :param current: array
+    :return: bias and current array in real units
+    """
     # The conversion factors from abstract units to real bias (V) and current values (A) are hard-coded in here.
     # Note that current is multiplied by -1 to get the "upright" traditional Isweep-Vsweep curve. Add to documentation?
 
