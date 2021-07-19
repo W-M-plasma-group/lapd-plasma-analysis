@@ -4,12 +4,34 @@ import astropy.units as u
 from plasmapy.diagnostics.langmuir import Characteristic
 
 
-def characterize_sweep_array(unsmooth_bias, unsmooth_current, margin, sample_sec):
-    # Function to create array of characteristics for bias and current data; make sure to put in real units!
+def characterize_sweep_array(unadjusted_bias, unadjusted_current, margin, sample_sec):
+    r"""
+    Function that processes bias and current data into an array of distinct Characteristics. 
+    Takes in bias and current arrays, smooths them, divides them into separate ramp sections, 
+    and creates a Characteristic object for each ramp at each unique x,y position.
 
-    bias, current = smooth_current_array(unsmooth_bias, unsmooth_current, margin=margin)
-    plateau_ranges = isolate_plateaus(bias, current, margin=margin)
+    Parameters
+    ----------
+    :param unadjusted_bias: array
+    :param unadjusted_current: array
+    :param margin: int, positive
+    :param sample_sec: float, units of time
+    :return: 3D array of Characteristic objects
+    """
+
+    bias, current = smooth_current_array(unadjusted_bias, unadjusted_current, margin=margin)
+    plateau_ranges = isolate_plateaus(bias, margin=margin)
     time_array = get_time_array(plateau_ranges, sample_sec)
+
+    # debug
+    """
+    # pprint(swept_probe_analysis(smooth_plateau, probe_area, 'He-4+', bimaxwellian=True, visualize=True, plot_EEDF=True))
+    plt.plot(adjusted_bias[sample_indices[:2]], 'b-',
+             plateau_ranges[sample_indices[0], sample_indices[1], :, 0], adjusted_bias[sample_indices[0], sample_indices[1], plateau_ranges[sample_indices[0], sample_indices[1], :, 0]], 'go',
+             plateau_ranges[sample_indices[0], sample_indices[1], :, 1], adjusted_bias[sample_indices[0], sample_indices[1], plateau_ranges[sample_indices[0], sample_indices[1], :, 1]], 'yo')
+    plt.show()
+    # """
+
     return get_characteristic_array(bias, current, plateau_ranges)
 
 
@@ -26,13 +48,12 @@ def smooth_current_array(bias, current, margin):
     current_sum = np.cumsum(np.insert(current, 0, 0, axis=-1), axis=-1)
     smooth_current_full = (current_sum[..., margin:] - current_sum[..., :-margin]) / margin
 
-    adjusted_bias = bias[...,
-                    (margin - 1) // 2:-(margin - 1) // 2]  # Shifts bias to align with new, shorter current array
+    adjusted_bias = bias[..., (margin - 1) // 2:-(margin - 1) // 2]  # Aligns bias with new, shorter current array
 
     return adjusted_bias, smooth_current_full
 
 
-def isolate_plateaus(bias, current=None, margin=0):  # Current is optional for maximum compatibility
+def isolate_plateaus(bias, margin=0):
 
     r"""
     Function to identify start and stop frames of every ramp section within each plateau.
