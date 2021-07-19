@@ -3,7 +3,14 @@ import numpy as np
 import astropy.units as u
 from plasmapy.diagnostics.langmuir import Characteristic
 
-# def characterize_sweep_array(bias, current)
+
+def characterize_sweep_array(unsmooth_bias, unsmooth_current, margin, sample_sec):
+    # Function to create array of characteristics for bias and current data; make sure to put in real units!
+
+    bias, current = smooth_current_array(unsmooth_bias, unsmooth_current, margin=margin)
+    plateau_ranges = isolate_plateaus(bias, current, margin=margin)
+    time_array = get_time_array(plateau_ranges, sample_sec)
+    return get_characteristic_array(bias, current, plateau_ranges)
 
 
 def smooth_current_array(bias, current, margin):

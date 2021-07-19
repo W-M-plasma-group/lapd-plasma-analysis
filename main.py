@@ -17,8 +17,7 @@ smoothing_margin = 10
 # End of global parameters
 
 bias, current = get_isweep_vsweep(filename)  # get isweep and vsweep arrays
-adjusted_bias, smooth_current = smooth_current_array(bias, current, margin=smoothing_margin)  # 0.02 s
-plateau_ranges = isolate_plateaus(adjusted_bias, smooth_current, margin=smoothing_margin)
+# adjusted_bias, smooth_current = smooth_current_array(bias, current, margin=smoothing_margin)  # 0.02 s
 
 sample_indices = (30, 0, 7)  # x position, y position, plateau number within frame
 
@@ -32,9 +31,10 @@ plt.show()
 # """
 
 
-time_array = get_time_array(plateau_ranges, sample_sec)
+
 # characteristics = get_characteristic_array(bias, current, plateau_ranges, 10)
-characteristics = get_characteristic_array(adjusted_bias, smooth_current, plateau_ranges)
+# Put bias and current arrays in real units!
+characteristics = characterize_sweep_array(bias, current, margin=smoothing_margin, sample_sec=sample_sec)
 sample_plateau_smooth = characteristics[sample_indices]
 
 # Analysis of single sample Isweep-Vsweep curve
