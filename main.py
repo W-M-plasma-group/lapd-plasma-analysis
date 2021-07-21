@@ -1,8 +1,10 @@
 import matplotlib.pyplot as plt
+from pprint import pprint
 
 from getIVsweep import *
-from astropy import visualization
-from pprint import pprint
+from characterization import *
+from diagnostics import *
+from plots import *
 
 print("Imported helper files")
 
@@ -11,25 +13,27 @@ sample_sec = (100 / 16 * 10 ** 6) ** (-1) * u.s  # Note that this is a small num
 probe_area = (1. * u.mm) ** 2  # From MATLAB code
 ion_type = 'He-4+'
 filename = 'HDF5/8-3500A.hdf5'
+smoothing_margin = 10
+# End of global parameters
 
-bias, current = get_isweep_vsweep(filename)
-plateau_ranges = isolate_plateaus(bias, current)
-sample_indices = (30, 0, 7)  # x position, y position, plateau number within frame
+bias, current = get_isweep_vsweep(filename)  # get isweep and vsweep arrays
 
-# pprint(swept_probe_analysis(smooth_plateau, probe_area, 'He-4+', bimaxwellian=True, visualize=True, plot_EEDF=True))
-# plt.show()
-
-time_array = get_time_array(plateau_ranges, sample_sec)
-# characteristics = get_characteristic_array(bias, current, plateau_ranges, 10)
-characteristics = get_characteristic_array(bias, current, plateau_ranges, smooth=0)
-sample_plateau_smooth = characteristics[sample_indices]
+# Put bias and current arrays in real units!
+characteristics = characterize_sweep_array(bias, current, margin=smoothing_margin, sample_sec=sample_sec)
 
 # Analysis of single sample Isweep-Vsweep curve
-# middle_plateau_smooth.plot()
-# plt.show()
-# pprint(swept_probe_analysis(middle_plateau_smooth, probe_area, ion_type, visualize=True, plot_EEDF=True))
-# plt.show()
+"""
+sample_indices = (30, 0, 7)  # x position, y position, plateau number within frame
+sample_plateau = characteristics[sample_indices]
+pprint(swept_probe_analysis(sample_plateau, probe_area, ion_type, visualize=True, plot_EEDF=True, bimaxwellian=True))
+plt.show()
+print("Done analyzing sample characteristic")
+"""
 
-# Note: The (non-bimaxwellian) plasmapy electron temperature seems almost to be the *reciprocal* of the correct value?
-# Attempt to make a (basic) contour or surface plot of electron temperature across positions to investigate further
+diagnostics_xarray = plasma_diagnostics(characteristics, probe_area, ion_type, bimaxwellian=False)
+# Debug
+# print(diagnostics_xarray)
+#
+radial_plot(diagnostics_xarray, diagnostic='T_e', plot='contour')
 
+# Note: The non-bimaxwellian plasmapy electron temperature seems to be the *reciprocal* of the correct value.
