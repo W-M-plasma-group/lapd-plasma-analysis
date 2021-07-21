@@ -22,21 +22,19 @@ def radial_plot(diagnostics_xarray, diagnostic='T_e', plot='contour'):
         warnings.warn("The type of plot '" + str(plot) + "' is not supported. Defaulting to contour plot.")
         plot = 'contour'
 
-    # debug
-    # print(pos_time_diagnostic_xarray)
-    #
-
+    # Determine if chosen diagnostic has one or multiple values in the quantity
     dimensions = len(pos_time_diagnostic_xarray.shape)
-    if dimensions < 2:
-        raise ValueError("Too few dimensions in xarray of chosen diagnostic")
-    elif dimensions == 2:  # a diagnostic has a single value; for example, a non-bimaxwellian electron temperature
-        slices = [...]
-    else:                  # a diagnostic has multiple values; for example, a bimaxwellian electron temperature
-        diagnostic_length = pos_time_diagnostic_xarray.shape[-1]
-        slices = [(..., i) for i in range(diagnostic_length)]
-
-    for cut in slices:
-        pos_time_var_xarray = pos_time_diagnostic_xarray[cut]
+    if dimensions == 2:  # a diagnostic has a single value; for example, a non-bimaxwellian electron temperature
+        # add a dummy dimension to make iterable
+        pos_time_diagnostic_xarray = pos_time_diagnostic_xarray.expand_dims(dim={'last': 1}, axis=-1)
+    elif dimensions == 3:  # a diagnostic has multiple values; for example, a bimaxwellian electron temperature
+        pass
+    else:
+        raise ValueError("The xarray of the chosen diagnostic has a number of dimensions", dimensions,
+                         "that is invalid for surface plotting (must be two or three-dimensional)")
+    # Plot the variable, creating separate plots for multi-variable diagnostics
+    for var in range(pos_time_diagnostic_xarray.shape[-1]):
+        pos_time_var_xarray = pos_time_diagnostic_xarray[..., var]
         # print(pos_time_var_xarray)
         with visualization.quantity_support():
             if plot == "contour":

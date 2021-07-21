@@ -37,4 +37,3 @@ diagnostics_xarray = plasma_diagnostics(characteristics, probe_area, ion_type, b
 radial_plot(diagnostics_xarray, diagnostic='T_e', plot='contour')
 
 # Note: The non-bimaxwellian plasmapy electron temperature seems to be the *reciprocal* of the correct value.
-
