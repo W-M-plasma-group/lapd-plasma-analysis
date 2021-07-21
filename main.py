@@ -17,13 +17,13 @@ smoothing_margin = 10
 # End of global parameters
 
 bias, current = get_isweep_vsweep(filename)  # get isweep and vsweep arrays
-sample_indices = (30, 0, 7)  # x position, y position, plateau number within frame
 
 # Put bias and current arrays in real units!
 characteristics = characterize_sweep_array(bias, current, margin=smoothing_margin, sample_sec=sample_sec)
 
 # Analysis of single sample Isweep-Vsweep curve
 """
+sample_indices = (30, 0, 7)  # x position, y position, plateau number within frame
 sample_plateau = characteristics[sample_indices]
 pprint(swept_probe_analysis(sample_plateau, probe_area, ion_type, visualize=True, plot_EEDF=True, bimaxwellian=True))
 plt.show()
@@ -32,7 +32,7 @@ print("Done analyzing sample characteristic")
 
 diagnostics_xarray = plasma_diagnostics(characteristics, probe_area, ion_type, bimaxwellian=False)
 # Debug
-print(diagnostics_xarray)
+# print(diagnostics_xarray)
 #
 radial_plot(diagnostics_xarray, diagnostic='T_e', plot='contour')
 

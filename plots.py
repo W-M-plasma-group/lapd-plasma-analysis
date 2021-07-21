@@ -23,18 +23,9 @@ def radial_plot(diagnostics_xarray, diagnostic='T_e', plot='contour'):
         plot = 'contour'
 
     # debug
-    print(pos_time_diagnostic_xarray)
+    # print(pos_time_diagnostic_xarray)
     #
 
-    """
-    # Needed to detect bimaxwellian T_e?
-    is_scalar_xarray = xr.apply_ufunc(lambda q: q.isscalar, pos_time_diagnostic_xarray, vectorize=True).any()
-    if is_scalar_xarray:
-        list_of_vars = [0]
-    else:
-        # list_of_vars = range(np.nanmin(np.vectorize(len)(pos_time_diagnostic_xarray)))
-        list_of_vars = range(xr.apply_ufunc(len, pos_time_diagnostic_xarray, vectorize=True).min(skipna=True))
-    """
     dimensions = len(pos_time_diagnostic_xarray.shape)
     if dimensions < 2:
         raise ValueError("Too few dimensions in xarray of chosen diagnostic")
@@ -46,7 +37,7 @@ def radial_plot(diagnostics_xarray, diagnostic='T_e', plot='contour'):
 
     for cut in slices:
         pos_time_var_xarray = pos_time_diagnostic_xarray[cut]
-        print(pos_time_var_xarray)
+        # print(pos_time_var_xarray)
         with visualization.quantity_support():
             if plot == "contour":
                 pos_time_var_xarray.plot.contourf(robust=True)

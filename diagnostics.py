@@ -17,6 +17,11 @@ def plasma_diagnostics(characteristic_array, probe_area, ion_type, bimaxwellian=
     xarray_list = [xr.DataArray(array, dims=['x', 'y', 'plateau']) for array in ndarray_list]
     xarray_dict = {str(i): xarray_list[i] for i in range(number_of_diagnostics)}
     diagnostic_dataset = xr.Dataset(xarray_dict)
+
+    # Hard-coding in coordinates. Add time from get_time_array later
+    diagnostic_dataset = diagnostic_dataset.assign_coords({'x': np.arange(-30, 41)})
+    diagnostic_dataset['x'].attrs['unit'] = str(u.cm)
+
     diagnostic_names_assigned = False
     for i in range(diagnostic_dataset.sizes['x']):
         for j in range(diagnostic_dataset.sizes['y']):
@@ -33,13 +38,29 @@ def plasma_diagnostics(characteristic_array, probe_area, ion_type, bimaxwellian=
                         diagnostic_dataset = diagnostic_dataset.rename(
                             {str(i): list(diagnostics.keys())[i] for i in range(len(diagnostics.keys()))})
                         for unit_key in diagnostics.keys():  # set units of results as attribute of each variable
-                            diagnostic_dataset[unit_key].attrs['unit'] = str(diagnostics[unit_key].unit)
+                            try:
+                                unit_string = str(diagnostics[unit_key].unit)
+                            except AttributeError:
+                                unit_string = None  # the data is dimensionless
+                            diagnostic_dataset[unit_key].attrs['unit'] = unit_string
+                        if bimaxwellian:  # the electron temperature value will be a two-element array
+                            diagnostic_dataset['T_e'] = diagnostic_dataset['T_e'].expand_dims(
+                                dim={"population": 2}, axis=-1).copy()
                         diagnostic_names_assigned = True
-                        # print("Diagnostic dataset right after setting variable names:", diagnostic_dataset)
-                    for key in diagnostics.keys():
-                        diagnostic_dataset[key][i, j, p] = diagnostics[key].value
 
-                    # Assign coordinates to array! Especially x, hopefully time
+                    for key in diagnostics.keys():
+                        try:
+                            diagnostic_value = diagnostics[key].value
+                            if key == 'T_e':
+                                if bimaxwellian and (diagnostic_value > 10).any() or (not bimaxwellian) \
+                                        and diagnostic_value > 10:  # discard T_e values above 100 eV
+                                    diagnostic_value = np.nan
+                                    print("Plateau at position (", i, ",", j, ",", p,
+                                          ") produces an invalid electron temperature")
+                            diagnostic_dataset[key][i, j, p] = diagnostic_value
+                        except AttributeError:
+                            diagnostic_dataset[key][i, j, p] = diagnostics[key]  # the data is dimensionless
+
     return diagnostic_dataset
 
 
