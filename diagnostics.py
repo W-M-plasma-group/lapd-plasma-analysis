@@ -49,17 +49,11 @@ def plasma_diagnostics(characteristic_array, probe_area, ion_type, bimaxwellian=
                         diagnostic_names_assigned = True
 
                     for key in diagnostics.keys():
-                        try:
-                            diagnostic_value = diagnostics[key].value
-                            if key == 'T_e':
-                                if bimaxwellian and (diagnostic_value > 10).any() or (not bimaxwellian) \
-                                        and diagnostic_value > 10:  # discard T_e values above 100 eV
-                                    diagnostic_value = np.nan
-                                    print("Plateau at position (", i, ",", j, ",", p,
-                                          ") produces an invalid electron temperature")
+                        diagnostic_value = value_safe(diagnostics[key])
+                        if key == 'T_e':
+                            if flag_electron_temperature(diagnostic_value, minimum=0, maximum=10):  # hard-coded range
+                                diagnostic_value = np.nan
                             diagnostic_dataset[key][i, j, p] = diagnostic_value
-                        except AttributeError:
-                            diagnostic_dataset[key][i, j, p] = diagnostics[key]  # the data is dimensionless
 
     return diagnostic_dataset
 
@@ -73,3 +67,18 @@ def verify_plateau(characteristic, probe_area, ion_type, bimaxwellian):
     except (TypeError, RuntimeError):
         return 2
     return diagnostics
+
+
+def flag_electron_temperature(temp, minimum, maximum):  # discard T_e values outside of specified range
+
+    temp_1d = np.atleast_1d(temp)
+    return (temp_1d < minimum).any() or (temp_1d > maximum).any()
+
+
+def value_safe(quantity_or_scalar):
+
+    try:
+        val = quantity_or_scalar.value  # input is a quantity with dimension and value
+    except AttributeError:
+        val = quantity_or_scalar        # input is a dimensionless scalar with no value
+    return val
