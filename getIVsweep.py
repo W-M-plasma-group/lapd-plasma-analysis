@@ -175,7 +175,8 @@ def get_scales_offsets(headers, scale_index, offset_index):
 def scale_offset_decompress(data_raw, scales, offsets):
     r"""
     Decompress raw data using the specified arrays of scales and offsets.
-    Scale and offset arrays must have dimensions corresponding to the first two dimensions (x and y) of the input data.
+    Scale and offset arrays must have first dimension corresponding to the length of the input data
+    (for example, the number of shots taken).
 
     Parameters
     ----------

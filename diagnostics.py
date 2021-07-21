@@ -1,20 +1,27 @@
+import astropy.units as u
 import numpy as np
 import xarray as xr
 from plasmapy.diagnostics.langmuir import swept_probe_analysis
 
+# Write function in characterization.py to take in array of characteristics and output xarray !!! !!! !!! !!!
+# Add time coordinates using get_time_array
 
-def plasma_diagnostics(characteristic_array, probe_area, ion_type):
-    # take in array of characteristics, output nd xarray
 
-    diagnostic_xarray = xr.DataArray(np.full(characteristic_array.shape + (8,), np.nan, dtype=float),
-                                     dims=['x', 'y', 'plateau', 'diagnostic'],
-                                     coords={'x': np.arange(-30, 41)})
-    # add xarray coordinates to x position at least
+def plasma_diagnostics(characteristic_array, probe_area, ion_type, bimaxwellian=False):
+
+    # take in (x?)array of characteristics, output xarray Dataset object
+
+    number_of_diagnostics = 9 if bimaxwellian else 8
+
+    ndarray_list = [np.full_like(characteristic_array, np.nan) for _ in range(number_of_diagnostics)]
+    xarray_list = [xr.DataArray(array, dims=['x', 'y', 'plateau']) for array in ndarray_list]
+    xarray_dict = {str(i): xarray_list[i] for i in range(number_of_diagnostics)}
+    diagnostic_dataset = xr.Dataset(xarray_dict)
     diagnostic_names_assigned = False
-    for i in range(characteristic_array.shape[0]):
-        for j in range(characteristic_array.shape[1]):
-            for p in range(characteristic_array.shape[2]):
-                diagnostics = verify_plateau(characteristic_array[i, j, p], probe_area, ion_type)
+    for i in range(diagnostic_dataset.sizes['x']):
+        for j in range(diagnostic_dataset.sizes['y']):
+            for p in range(diagnostic_dataset.sizes['plateau']):
+                diagnostics = verify_plateau(characteristic_array[i, j, p], probe_area, ion_type, bimaxwellian)
                 if diagnostics == 1:
                     print("Plateau at position (", i, ",", j, ",", p, ") is unusable")
                     # characteristic_array[i, j, p].plot()
@@ -22,19 +29,23 @@ def plasma_diagnostics(characteristic_array, probe_area, ion_type):
                     print("Unknown error at position (", i, ",", j, ",", p, ")")
                     # characteristic_array[i, j, p].plot()
                 else:
-                    diagnostic_xarray[i, j, p] = [var.value for var in diagnostics.values()]
                     if not diagnostic_names_assigned:
-                        diagnostic_xarray = diagnostic_xarray.assign_coords(diagnostic=list(diagnostics.keys()))
+                        diagnostic_dataset = diagnostic_dataset.rename(
+                            {str(i): list(diagnostics.keys())[i] for i in range(len(diagnostics.keys()))})
                         diagnostic_names_assigned = True
+                        # print("Diagnostic dataset right after setting variable names:", diagnostic_dataset)
+                    for key in diagnostics.keys():
+                        diagnostic_dataset[key][i, j, p] = diagnostics[key]
+
                     # Make different diagnostic information into different DataArrays in one dataset?
+                    # Assign coordinates to array! Especially x, hopefully time
+    return diagnostic_dataset
 
-    return diagnostic_xarray
 
-
-def verify_plateau(characteristic, probe_area, ion_type):
+def verify_plateau(characteristic, probe_area, ion_type, bimaxwellian):
 
     try:
-        diagnostics = swept_probe_analysis(characteristic, probe_area, ion_type)
+        diagnostics = swept_probe_analysis(characteristic, probe_area, ion_type, bimaxwellian=bimaxwellian)
     except ValueError:
         return 1
     except (TypeError, RuntimeError):

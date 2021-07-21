@@ -200,7 +200,7 @@ def get_characteristic_array(bias, current, plateau_ranges):
     # Still need to do plateau filtering
     # Make sure to store time information!
 
-    characteristic_array = np.empty((plateau_ranges.shape[:3]), dtype=object)  # x, y, plateau?
+    characteristic_array = np.empty((plateau_ranges.shape[:3]), dtype=object)  # x, y, plateau
     # Address case where there are an irregular number of plateaus in a frame to begin with!
     #    This should be addressed by creating a secondary array (or list?) containing the indices of valid plateaus
     #    to analyze. Invalid ones should be skipped, but preserved in the array.
