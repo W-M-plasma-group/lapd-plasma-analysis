@@ -13,7 +13,7 @@ def plasma_diagnostics(characteristic_array, probe_area, ion_type, bimaxwellian=
 
     number_of_diagnostics = 9 if bimaxwellian else 8
 
-    ndarray_list = [np.full_like(characteristic_array, np.nan) for _ in range(number_of_diagnostics)]
+    ndarray_list = [np.full_like(characteristic_array, np.nan, dtype=float) for _ in range(number_of_diagnostics)]
     xarray_list = [xr.DataArray(array, dims=['x', 'y', 'plateau']) for array in ndarray_list]
     xarray_dict = {str(i): xarray_list[i] for i in range(number_of_diagnostics)}
     diagnostic_dataset = xr.Dataset(xarray_dict)
@@ -32,12 +32,13 @@ def plasma_diagnostics(characteristic_array, probe_area, ion_type, bimaxwellian=
                     if not diagnostic_names_assigned:
                         diagnostic_dataset = diagnostic_dataset.rename(
                             {str(i): list(diagnostics.keys())[i] for i in range(len(diagnostics.keys()))})
+                        for unit_key in diagnostics.keys():  # set units of results as attribute of each variable
+                            diagnostic_dataset[unit_key].attrs['unit'] = str(diagnostics[unit_key].unit)
                         diagnostic_names_assigned = True
                         # print("Diagnostic dataset right after setting variable names:", diagnostic_dataset)
                     for key in diagnostics.keys():
-                        diagnostic_dataset[key][i, j, p] = diagnostics[key]
+                        diagnostic_dataset[key][i, j, p] = diagnostics[key].value
 
-                    # Make different diagnostic information into different DataArrays in one dataset?
                     # Assign coordinates to array! Especially x, hopefully time
     return diagnostic_dataset
 

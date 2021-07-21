@@ -12,15 +12,19 @@ def radial_plot(diagnostics_xarray, diagnostic='T_e', plot='contour'):
                          "both greater than 1. A radial plot cannot be made. Areal plots are not yet supported.")
     radial_diagnostics_xarray = diagnostics_xarray.squeeze()
 
-    if diagnostic not in diagnostics_xarray.coords['diagnostic']:
+    if diagnostic not in diagnostics_xarray:
         raise ValueError("The input choice of diagnostic", diagnostic,
-                         "is not a valid diagnostic. Valid diagnostics are:", diagnostics_xarray.coords['diagnostic'])
-    pos_time_diagnostic_xarray = radial_diagnostics_xarray.sel(diagnostic=diagnostic)
+                         "is not a valid diagnostic. Valid diagnostics are:", diagnostics_xarray.keys())
+    pos_time_diagnostic_xarray = radial_diagnostics_xarray[diagnostic]
 
     allowed_plot_types = ('contour', 'surface')
     if plot not in allowed_plot_types:
         warnings.warn("The type of plot '" + str(plot) + "' is not supported. Defaulting to contour plot.")
         plot = 'contour'
+
+    # debug
+    print(pos_time_diagnostic_xarray)
+    #
 
     """
     # Needed to detect bimaxwellian T_e?
