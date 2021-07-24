@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 
 def radial_plot(diagnostics_xarray, diagnostic='T_e', plot='contour'):
-    # Return plots of ne and te; make plot and diagnostic customizable
+    # Return a plot of the specified type for the specified diagnostic.
 
     if diagnostics_xarray.sizes['x'] > 1 and diagnostics_xarray.sizes['y'] > 1:
         raise ValueError("x and y dimensions have lengths", diagnostics_xarray.shape[:2],
@@ -25,13 +25,14 @@ def radial_plot(diagnostics_xarray, diagnostic='T_e', plot='contour'):
     # Determine if chosen diagnostic has one or multiple values in the quantity
     dimensions = len(pos_time_diagnostic_xarray.shape)
     if dimensions == 2:  # a diagnostic has a single value; for example, a non-bimaxwellian electron temperature
-        # add a dummy dimension to make iterable
+        # add a dummy dimension to allow iteration over the one variable for the diagnostic
         pos_time_diagnostic_xarray = pos_time_diagnostic_xarray.expand_dims(dim={'last': 1}, axis=-1)
     elif dimensions == 3:  # a diagnostic has multiple values; for example, a bimaxwellian electron temperature
         pass
     else:
         raise ValueError("The xarray of the chosen diagnostic has a number of dimensions", dimensions,
                          "that is invalid for surface plotting (must be two or three-dimensional)")
+
     # Plot the variable, creating separate plots for multi-variable diagnostics
     for var in range(pos_time_diagnostic_xarray.shape[-1]):
         pos_time_var_xarray = pos_time_diagnostic_xarray[..., var]

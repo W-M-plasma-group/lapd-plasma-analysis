@@ -1,5 +1,6 @@
 import warnings
 import numpy as np
+import xarray as xr
 import astropy.units as u
 from plasmapy.diagnostics.langmuir import Characteristic
 
@@ -32,7 +33,10 @@ def characterize_sweep_array(unadjusted_bias, unadjusted_current, margin, sample
     plt.show()
     # """
 
-    return get_characteristic_array(bias, current, plateau_ranges)
+    characteristic_array = get_characteristic_array(bias, current, plateau_ranges)
+    characteristic_xarray = to_characteristic_xarray(characteristic_array, time_array)
+    print(characteristic_xarray)
+    return characteristic_array
 
 
 def smooth_current_array(bias, current, margin):
@@ -62,7 +66,6 @@ def isolate_plateaus(bias, margin=0):
     Parameters
     ----------
     :param bias: array
-    :param current: array, optional
     :param margin: int, optional
     :return: array of ramp start and stop indices
     """
@@ -197,7 +200,6 @@ def get_time_array(plateau_ranges, sample_sec=(100 / 16 * 10 ** 6) ** (-1) * u.s
 
 
 def get_characteristic_array(bias, current, plateau_ranges):
-    # Still need to do plateau filtering
     # Make sure to store time information!
 
     characteristic_array = np.empty((plateau_ranges.shape[:3]), dtype=object)  # x, y, plateau
@@ -219,3 +221,26 @@ def get_characteristic_array(bias, current, plateau_ranges):
 
 # Instead of having several separate methods "trade off", can have one overarching method that organizes things and
 #    smaller helper functions that are called within overall method?
+
+
+def to_characteristic_xarray(characteristic_array, time_array):
+    # Use hard-coded and calculated inputs to add coordinate and variable information to characteristic array
+
+    characteristic_xarray = xr.DataArray(characteristic_array, dims=['x', 'y', 'plateau'])
+
+    if characteristic_xarray.sizes['x'] == 71:
+        characteristic_xarray = characteristic_xarray.assign_coords({'x': np.arange(-30, 41)})
+        characteristic_xarray.x.attrs['units'] = str(u.cm)
+    characteristic_xarray = characteristic_xarray.assign_coords({'time': (('x', 'y', 'plateau'),
+                                                                          time_array.to(u.ms).value)})
+    characteristic_xarray.time.attrs['units'] = str(u.ms)
+
+    """
+    coords=[('x', np.arange(-30, 41), {'units': str(u.cm)})  # LAPD length
+        if characteristic_array.shape[0] == 71
+        else ('x', np.arange(characteristic_array.shape[0])),  # other length
+        ('y', np.arange(characteristic_array.shape[1])),          # generic y
+        ('time', time_array.to(u.ms).value, {'units': str(u.ms)})],  # in ms
+    """
+
+    return characteristic_xarray

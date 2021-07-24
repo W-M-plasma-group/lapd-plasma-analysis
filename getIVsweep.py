@@ -1,5 +1,4 @@
 # Make sure to add code comments and write documentation!
-import warnings
 
 import numpy as np
 
