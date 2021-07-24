@@ -7,7 +7,7 @@ from plasmapy.diagnostics.langmuir import Characteristic
 
 def characterize_sweep_array(unadjusted_bias, unadjusted_current, margin, sample_sec):
     r"""
-    Function that processes bias and current data into an array of distinct Characteristics. 
+    Function that processes bias and current data into a DataArray of distinct Characteristics.
     Takes in bias and current arrays, smooths them, divides them into separate ramp sections, 
     and creates a Characteristic object for each ramp at each unique x,y position.
 
@@ -17,7 +17,7 @@ def characterize_sweep_array(unadjusted_bias, unadjusted_current, margin, sample
     :param unadjusted_current: array
     :param margin: int, positive
     :param sample_sec: float, units of time
-    :return: 3D array of Characteristic objects
+    :return: 3D xarray DataArray of Characteristic objects
     """
 
     bias, current = smooth_current_array(unadjusted_bias, unadjusted_current, margin=margin)
@@ -35,8 +35,8 @@ def characterize_sweep_array(unadjusted_bias, unadjusted_current, margin, sample
 
     characteristic_array = get_characteristic_array(bias, current, plateau_ranges)
     characteristic_xarray = to_characteristic_xarray(characteristic_array, time_array)
-    print(characteristic_xarray)
-    return characteristic_array
+    # (debug) print(characteristic_xarray)
+    return characteristic_xarray
 
 
 def smooth_current_array(bias, current, margin):
