@@ -22,5 +22,5 @@ def interferometry_calibration(density_xarray, temperature_xarray, interferometr
 
 
 def to_real_units_interferometry(interferometry_data_array):
-    scale_factor = 8. * 10**13
-    return interferometry_data_array * scale_factor * (u.cm ** 2)
+    scale_factor = 8. * 10 ** 13 / (u.cm ** 2)
+    return interferometry_data_array * scale_factor
