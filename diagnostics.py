@@ -32,7 +32,7 @@ def plasma_diagnostics(characteristic_xarray, probe_area, ion_type, bimaxwellian
                         for unit_key in diagnostics.keys():
                             diagnostic_dataset[unit_key].attrs['unit'] = str(unit_safe(diagnostics[unit_key]))
                         if bimaxwellian:
-                            # electron temperature values stored in array dimension of size two
+                            # electron temperature values broadcasted into array dimension of size two
                             diagnostic_dataset['T_e'] = diagnostic_dataset['T_e'].expand_dims(
                                 dim={"population": 2}, axis=-1).copy()
                         diagnostic_names_assigned = True
@@ -76,7 +76,7 @@ def value_safe(quantity_or_scalar):  # Get value of quantity or scalar, dependin
 def unit_safe(quantity_or_scalar):  # Get unit of quantity or scalar, if possible
 
     try:
-        unit_str = quantity_or_scalar.unit
+        unit = quantity_or_scalar.unit
     except AttributeError:
-        unit_str = None  # The input data is dimensionless
-    return unit_str
+        unit = None  # The input data is dimensionless
+    return unit
