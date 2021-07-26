@@ -29,23 +29,20 @@ def plasma_diagnostics(characteristic_xarray, probe_area, ion_type, bimaxwellian
                     if not diagnostic_names_assigned:
                         diagnostic_dataset = diagnostic_dataset.rename(
                             {str(i): list(diagnostics.keys())[i] for i in range(len(diagnostics.keys()))})
-                        for unit_key in diagnostics.keys():  # set units of results as attribute of each variable
-                            try:
-                                unit_string = str(diagnostics[unit_key].unit)
-                            except AttributeError:
-                                unit_string = None  # the data is dimensionless
-                            diagnostic_dataset[unit_key].attrs['unit'] = unit_string
-                        if bimaxwellian:  # the electron temperature value will be a two-element array
+                        for unit_key in diagnostics.keys():
+                            diagnostic_dataset[unit_key].attrs['unit'] = str(unit_safe(diagnostics[unit_key]))
+                        if bimaxwellian:
+                            # electron temperature values stored in array dimension of size two
                             diagnostic_dataset['T_e'] = diagnostic_dataset['T_e'].expand_dims(
                                 dim={"population": 2}, axis=-1).copy()
                         diagnostic_names_assigned = True
 
                     for key in diagnostics.keys():
                         diagnostic_value = value_safe(diagnostics[key])
-                        if key == 'T_e':
-                            if flag_electron_temperature(diagnostic_value, minimum=0, maximum=15):  # hard-coded range
-                                diagnostic_value = np.nan
-                            diagnostic_dataset[key][i, j, p] = diagnostic_value
+                        if key == 'T_e' and flag_electron_temperature(diagnostic_value, minimum=0, maximum=15):
+                            # remove unrealistic electron temperature values; hard-coded acceptable temperature range
+                            diagnostic_value = np.nan
+                        diagnostic_dataset[key][i, j, p] = diagnostic_value
 
     return diagnostic_dataset
 
@@ -74,3 +71,12 @@ def value_safe(quantity_or_scalar):  # Get value of quantity or scalar, dependin
     except AttributeError:
         val = quantity_or_scalar        # input is a dimensionless scalar with no value
     return val
+
+
+def unit_safe(quantity_or_scalar):  # Get unit of quantity or scalar, if possible
+
+    try:
+        unit_str = quantity_or_scalar.unit
+    except AttributeError:
+        unit_str = None  # The input data is dimensionless
+    return unit_str
