@@ -11,6 +11,7 @@ print("Imported helper files")
 # Global parameters
 sample_sec = (100 / 16 * 10 ** 6) ** (-1) * u.s  # Note that this is a small number. 10^6 is in the denominator
 probe_area = (1. * u.mm) ** 2  # From MATLAB code
+core_region = 26. * u.cm
 ion_type = 'He-4+'
 filename = 'HDF5/8-3500A.hdf5'
 smoothing_margin = 10
@@ -31,9 +32,6 @@ print("Done analyzing sample characteristic")
 """
 
 diagnostics_xarray = plasma_diagnostics(characteristics, probe_area, ion_type, bimaxwellian=False)
-# Debug
-# print(diagnostics_xarray)
-#
 radial_plot(diagnostics_xarray, diagnostic='T_e', plot='contour')
 
 # Note: The non-bimaxwellian plasmapy electron temperature seems to be the *reciprocal* of the correct value.
