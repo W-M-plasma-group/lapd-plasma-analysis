@@ -29,7 +29,11 @@ save_diagnostics = True
 
 if use_existing:
     diagnostics_dataset = read_netcdf(open_filename)
+    if not diagnostics_dataset:
+        use_existing = False
 else:
+    diagnostics_dataset = None
+if not use_existing:
     bias, current = get_isweep_vsweep(hdf5_filename)  # get isweep and vsweep arrays
     # Put bias and current arrays in real units!
     characteristics = characterize_sweep_array(bias, current, margin=smoothing_margin, sample_sec=sample_sec)
@@ -37,7 +41,8 @@ else:
     """
     sample_indices = (30, 0, 7)  # x position, y position, plateau number within frame
     sample_plateau = characteristics[sample_indices]
-    pprint(swept_probe_analysis(sample_plateau, probe_area, ion_type, visualize=True, plot_EEDF=True, bimaxwellian=True))
+    pprint(swept_probe_analysis(sample_plateau, probe_area, ion_type, 
+                                visualize=True, plot_EEDF=True, bimaxwellian=True))
     plt.show()
     print("Done analyzing sample characteristic")
     """
