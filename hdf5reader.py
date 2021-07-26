@@ -7,7 +7,7 @@ def open_hdf5(filename):
     return h5py.File(filename, 'r')
 
 
-def group_at_path(file, subpath):
+def item_at_path(file, subpath):
     return file[subpath]
 
 
