@@ -67,6 +67,6 @@ print("Done analyzing sample characteristic")
 
 electron_density, density_scaling = interferometry_calibration(
     diagnostics_dataset['n_e'], diagnostics_dataset['T_e'], interferometry_filename,
-    bias, current, steady_state_start_plateau, steady_state_end_plateau)
+    bias, current, steady_state_start_plateau, steady_state_end_plateau, core_region=core_region)
 
 # Note: The non-bimaxwellian plasmapy electron temperature seems to be the *reciprocal* of the correct value.

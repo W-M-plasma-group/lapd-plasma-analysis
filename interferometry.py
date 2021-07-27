@@ -5,8 +5,9 @@ from hdf5reader import *
 
 
 def interferometry_calibration(density_xarray, temperature_xarray, interferometry_filename, bias, current,
-                               steady_state_start_plateau, steady_state_end_plateau):
+                               steady_state_start_plateau, steady_state_end_plateau, core_region=26. * u.cm):
 
+    # Read in interferometry data
     interferometry_file = open_hdf5(interferometry_filename)
     interferometry_data_raw = item_at_path(interferometry_file,
                                            '/MSI/Interferometer array/Interferometer [0]/Interferometer trace/')
@@ -19,10 +20,15 @@ def interferometry_calibration(density_xarray, temperature_xarray, interferometr
 
     interferometry_data, interferometry_time = to_real_units_interferometry(interferometry_means_abstract,
                                                                             interferometry_time_abstract)
-
     # debug
     # print(interferometry_data, "\n", interferometry_time)
     #
+
+    # Calculate density line integrals
+    x_length, y_length, plateaus = density_xarray.sizes['x'], density_xarray.sizes['y'], density_xarray.sizes['plateau']
+    density_xarray_cm = density_xarray * (1 / u.m ** 3).to(1 / u.cm ** 3).value
+
+    x_integral = density_xarray_cm.integrate('x')
 
     return None, None
 
