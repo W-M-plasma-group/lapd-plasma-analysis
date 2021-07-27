@@ -11,16 +11,23 @@ def interferometry_calibration(density_xarray, temperature_xarray, interferometr
     interferometry_data_raw = item_at_path(interferometry_file,
                                            '/MSI/Interferometer array/Interferometer [0]/Interferometer trace/')
     interferometry_data_array = np.array(interferometry_data_raw)
-    interferometry_data = to_real_units_interferometry(interferometry_data_array)
+
+    print("Interferometry data shape:", interferometry_data_array.shape)
+
+    interferometry_means_abstract = np.mean(interferometry_data_array, axis=0)
+    interferometry_time_abstract = np.arange(len(interferometry_means_abstract))
+
+    interferometry_data, interferometry_time = to_real_units_interferometry(interferometry_means_abstract,
+                                                                            interferometry_time_abstract)
 
     # debug
-    print("Interferometry data shape:", interferometry_data.shape)
-    print(interferometry_data)
+    # print(interferometry_data, "\n", interferometry_time)
     #
 
     return None, None
 
 
-def to_real_units_interferometry(interferometry_data_array):
-    scale_factor = 8. * 10 ** 13 / (u.cm ** 2)
-    return interferometry_data_array * scale_factor
+def to_real_units_interferometry(interferometry_data_array, interferometry_time_array):
+    area_factor = 8. * 10 ** 13 / (u.cm ** 2)           # from MATLAB code
+    time_factor = ((4.88 * 10 ** -5) * u.s).to(u.ms)    # from MATLAB code
+    return interferometry_data_array * area_factor, interferometry_time_array * time_factor
