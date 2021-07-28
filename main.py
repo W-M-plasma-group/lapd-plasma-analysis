@@ -30,7 +30,7 @@ interferometry_filename = hdf5_filename  # interferometry data stored in same HD
 # File options
 """ Set the below variable to True to open an existing diagnostic dataset from a NetCDF file
     or False to create a new diagnostic dataset from the given HDF5 file. """
-use_existing = True
+use_existing = False
 """ Set the below variable to True when creating a new diagnostic dataset to save the dataset to a NetCDF file. """
 save_diagnostics = True
 # End of file options

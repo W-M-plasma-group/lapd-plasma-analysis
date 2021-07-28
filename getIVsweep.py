@@ -1,6 +1,7 @@
 # Make sure to add code comments and write documentation!
 
 import numpy as np
+import astropy.units as u
 
 from hdf5reader import *
 
@@ -46,7 +47,7 @@ def get_isweep_vsweep(filename):
 
     # Note: This function returns the bias values first, then the current
     file.close()
-    return vsweep_means, isweep_means
+    return to_real_sweep_units(vsweep_means, isweep_means)
 
 
 def get_xy(file):
@@ -188,3 +189,22 @@ def scale_offset_decompress(data_raw, scales, offsets):
     num_shots = data_raw.shape[0]
 
     return data_raw * scales.reshape(num_shots, 1) + offsets.reshape(num_shots, 1)
+
+
+def to_real_sweep_units(bias, current):
+    r"""
+    Parameters
+    ----------
+    :param bias: array
+    :param current: array
+    :return: bias and current array in real units
+    """
+
+    # The conversion factors from abstract units to real bias (V) and current values (A) are hard-coded in here.
+    # Note that current is multiplied by -1 to get the "upright" traditional Isweep-Vsweep curve. Add to documentation?
+
+    # Conversion factors taken from MATLAB code: Current = isweep / 11 ohms; Voltage = vsweep * 100
+    gain = 100.  # voltage gain
+    resistance = 11.  # current values from input current; implied units of ohms per volt since measured as potential
+
+    return bias * gain * u.V, -1. * current / resistance * u.A

@@ -135,27 +135,10 @@ def isolate_plateaus(bias, margin=0):
     return plateau_bounds
 
 
-def to_real_units(bias, current):
-    r"""
-    Parameters
-    ----------
-    :param bias: array
-    :param current: array
-    :return: bias and current array in real units
-    """
-    # The conversion factors from abstract units to real bias (V) and current values (A) are hard-coded in here.
-    # Note that current is multiplied by -1 to get the "upright" traditional Isweep-Vsweep curve. Add to documentation?
-
-    # Conversion factors taken from MATLAB code: Current = isweep / 11 ohms; Voltage = vsweep * 100
-    gain = 100.  # voltage gain
-    resistance = 11.  # current values from input current; implied units of ohms per volt since measured as potential
-
-    return bias * gain * u.V, -1. * current / resistance * u.A
-
-
 def create_ranged_characteristic(bias, current, start, end):
     # Takes in a one-dimensional bias and current list; returns a Characteristic object for specified index range
 
+    # Error checks for input shapes and indices
     if len(bias.shape) > 1:
         raise ValueError("Multidimensional characteristic creation is no longer supported. Pass 1D sweep arrays.")
     if bias.shape != current.shape:
@@ -164,8 +147,20 @@ def create_ranged_characteristic(bias, current, start, end):
         raise ValueError("Start index must be non-negative")
     if end > len(bias):
         raise ValueError("End index", end, "out of range of bias and current arrays of length", len(bias))
-    real_bias, real_current = to_real_units(bias[start:end], current[start:end])
-    return Characteristic(real_bias, real_current)
+
+    # Check units on input arrays
+    try:
+        assert(bias.unit == u.V)
+    except (AttributeError, AssertionError):
+        warnings.warn("Input bias array does not have units of Volts. Ensure that bias values are in real units.")
+    try:
+        assert(current.unit == u.A)
+    except (AttributeError, AssertionError):
+        warnings.warn("Input bias array does not have units of Amps. Ensure that current values are in real units.")
+
+    # real_bias, real_current = to_real_units(bias[start:end], current[start:end])
+    # return Characteristic(real_bias, real_current)
+    return Characteristic(bias[start:end], current[start:end])
 
 
 def get_time_array(plateau_ranges, sample_sec=(100 / 16 * 10 ** 6) ** (-1) * u.s):
