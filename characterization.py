@@ -154,32 +154,18 @@ def to_real_units(bias, current):
 
 
 def create_ranged_characteristic(bias, current, start, end):
-    # Returns a Characteristic object
+    # Takes in a one-dimensional bias and current list; returns a Characteristic object for specified index range
 
-    dimensions = len(bias.shape)
+    if len(bias.shape) > 1:
+        raise ValueError("Multidimensional characteristic creation is no longer supported. Pass 1D sweep arrays.")
     if bias.shape != current.shape:
         raise ValueError("Bias and current must be of the same dimensions and shape")
     if start < 0:
         raise ValueError("Start index must be non-negative")
-    if dimensions == 1:
-        if end > len(bias):
-            raise ValueError("End index", end, "out of range of bias and current arrays of length", len(bias))
-        real_bias, real_current = to_real_units(bias[start:end], current[start:end])
-        characteristic = Characteristic(real_bias, real_current)
-    else:
-        # Note: zero_indices is tuple of indices to access first position bias and current.
-        #    In the future, multidimensional bias and current inputs should raise an error.
-        print("Warning: multidimensional characteristic creation is unsupported. This function returns a characteristic"
-              "with bias and current values only for the first position. Pass 1D arrays in the future to avoid this.")
-        zero_indices = (0,) * (dimensions - 1)
-        if end > len(bias[zero_indices]):
-            raise ValueError("End index", end, "out of range of bias and current arrays of last-dimension length",
-                             len(bias[zero_indices]))
-        real_bias, real_current = to_real_units(bias[zero_indices + (slice(start, end),)],
-                                                current[zero_indices + (slice(start, end),)])
-        characteristic = Characteristic(real_bias, real_current)
-
-    return characteristic
+    if end > len(bias):
+        raise ValueError("End index", end, "out of range of bias and current arrays of length", len(bias))
+    real_bias, real_current = to_real_units(bias[start:end], current[start:end])
+    return Characteristic(real_bias, real_current)
 
 
 def get_time_array(plateau_ranges, sample_sec=(100 / 16 * 10 ** 6) ** (-1) * u.s):

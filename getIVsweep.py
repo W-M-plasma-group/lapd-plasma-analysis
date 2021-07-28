@@ -29,9 +29,7 @@ def get_isweep_vsweep(filename):
 
     # Can I convert isweep and vsweep arrays to real units here? Should do as long as numpy can handle astropy units
 
-    # Is the below necessary? Check the MATLAB code
     # To reflect MATLAB code, should I take (pointwise?) standard deviation for each across these shots too? (For error)
-    # isweep_sumsq = np.ndarray((1065,), float)
 
     # Create 4D array: the first two dimensions correspond to all combinations of unique x and y positions,
     #    the third dimension represents the nth shot taken at that unique positions
