@@ -30,7 +30,7 @@ interferometry_filename = hdf5_filename  # interferometry data stored in same HD
 # File options
 """ Set the below variable to True to open an existing diagnostic dataset from a NetCDF file
     or False to create a new diagnostic dataset from the given HDF5 file. """
-use_existing = False
+use_existing = True
 """ Set the below variable to True when creating a new diagnostic dataset to save the dataset to a NetCDF file. """
 save_diagnostics = True
 # End of file options
@@ -43,12 +43,13 @@ if use_existing:
     if not verified_path:
         create_diagnostics = True
 
-bias, current = get_isweep_vsweep(hdf5_filename)  # Needed for interferometry data; only need if interferometry wanted?
+# Needed for interferometry data; only require if interferometry wanted?
+bias, current, x, y = get_isweep_vsweep(hdf5_filename)
 if not create_diagnostics:
     diagnostics_dataset = open_netcdf(open_filename)
 else:
     # Put bias and current arrays in real units!
-    characteristics = characterize_sweep_array(bias, current, margin=smoothing_margin, sample_sec=sample_sec)
+    characteristics = characterize_sweep_array(bias, current, x, y, margin=smoothing_margin, sample_sec=sample_sec)
     diagnostics_dataset = plasma_diagnostics(characteristics, probe_area, ion_type, bimaxwellian=False)
     if save_diagnostics:
         write_netcdf(diagnostics_dataset, save_filename)

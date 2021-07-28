@@ -5,7 +5,7 @@ import astropy.units as u
 from plasmapy.diagnostics.langmuir import Characteristic
 
 
-def characterize_sweep_array(unadjusted_bias, unadjusted_current, margin, sample_sec):
+def characterize_sweep_array(unadjusted_bias, unadjusted_current, x_round, y_round, margin, sample_sec):
     r"""
     Function that processes bias and current data into a DataArray of distinct Characteristics.
     Takes in bias and current arrays, smooths them, divides them into separate ramp sections, 
@@ -13,6 +13,8 @@ def characterize_sweep_array(unadjusted_bias, unadjusted_current, margin, sample
 
     Parameters
     ----------
+    :param y_round:
+    :param x_round:
     :param unadjusted_bias: array
     :param unadjusted_current: array
     :param margin: int, positive
@@ -34,7 +36,7 @@ def characterize_sweep_array(unadjusted_bias, unadjusted_current, margin, sample
     # """
 
     characteristic_array = get_characteristic_array(bias, current, plateau_ranges)
-    characteristic_xarray = to_characteristic_xarray(characteristic_array, time_array)
+    characteristic_xarray = to_characteristic_xarray(characteristic_array, time_array, x_round, y_round)
     # (debug) print(characteristic_xarray)
     return characteristic_xarray
 
@@ -58,7 +60,6 @@ def smooth_current_array(bias, current, margin):
 
 
 def isolate_plateaus(bias, margin=0):
-
     r"""
     Function to identify start and stop frames of every ramp section within each plateau.
     Returns array containing frame indices for each shot.
@@ -150,11 +151,11 @@ def create_ranged_characteristic(bias, current, start, end):
 
     # Check units on input arrays
     try:
-        assert(bias.unit == u.V)
+        assert (bias.unit == u.V)
     except (AttributeError, AssertionError):
         warnings.warn("Input bias array does not have units of Volts. Ensure that bias values are in real units.")
     try:
-        assert(current.unit == u.A)
+        assert (current.unit == u.A)
     except (AttributeError, AssertionError):
         warnings.warn("Input bias array does not have units of Amps. Ensure that current values are in real units.")
 
@@ -200,28 +201,20 @@ def get_characteristic_array(bias, current, plateau_ranges):
 
     return characteristic_array
 
+
 # Instead of having several separate methods "trade off", can have one overarching method that organizes things and
 #    smaller helper functions that are called within overall method?
 
 
-def to_characteristic_xarray(characteristic_array, time_array):
+def to_characteristic_xarray(characteristic_array, time_array, x, y):
     # Use hard-coded and calculated inputs to add coordinate and variable information to characteristic array
 
-    characteristic_xarray = xr.DataArray(characteristic_array, dims=['x', 'y', 'plateau'])
-
-    if characteristic_xarray.sizes['x'] == 71:
-        characteristic_xarray = characteristic_xarray.assign_coords({'x': np.arange(-30, 41)})
-        characteristic_xarray.x.attrs['units'] = str(u.cm)
-    characteristic_xarray = characteristic_xarray.assign_coords({'time': (('x', 'y', 'plateau'),
-                                                                          time_array.to(u.ms).value)})
-    characteristic_xarray.time.attrs['units'] = str(u.ms)
-
-    """
-    coords=[('x', np.arange(-30, 41), {'units': str(u.cm)})  # LAPD length
-        if characteristic_array.shape[0] == 71
-        else ('x', np.arange(characteristic_array.shape[0])),  # other length
-        ('y', np.arange(characteristic_array.shape[1])),          # generic y
-        ('time', time_array.to(u.ms).value, {'units': str(u.ms)})],  # in ms
-    """
+    time_array_ms = time_array.to(u.ms).value
+    characteristic_xarray = xr.DataArray(characteristic_array, dims=['x', 'y', 'plateau'],
+                                         coords=(('x', x, {'units': str(u.cm)}),
+                                                 ('y', y, {'units': str(u.cm)}),
+                                                 # ('time', time_array_ms, {'units': str(u.ms)}),
+                                                 ('plateau', time_array_ms.mean(axis=(0, 1)), {'units': str(u.ms)})))
+    # Average the plateau time coordinate for all x,y positions, keeping plateau dimension
 
     return characteristic_xarray

@@ -15,7 +15,7 @@ def get_isweep_vsweep(filename):
 
     file = open_hdf5(filename)
     x_round, y_round, shot_list = get_xy(file)
-    xy_shot_ref = categorize_shots_xy(x_round, y_round, shot_list)
+    xy_shot_ref, x, y = categorize_shots_xy(x_round, y_round, shot_list)
 
     isweep_data_raw, vsweep_data_raw, isweep_headers_raw, vsweep_headers_raw = get_sweep_data_headers(file)
 
@@ -47,7 +47,8 @@ def get_isweep_vsweep(filename):
 
     # Note: This function returns the bias values first, then the current
     file.close()
-    return to_real_sweep_units(vsweep_means, isweep_means)
+    bias, current = to_real_sweep_units(vsweep_means, isweep_means)
+    return bias, current, x, y
 
 
 def get_xy(file):
@@ -114,7 +115,7 @@ def categorize_shots_xy(x_round, y_round, shot_list):
         # noinspection PyTypeChecker
         xy_shot_ref[x_loc[i]][y_loc[i]].append(i)  # full of references to nth shot taken
 
-    return xy_shot_ref
+    return xy_shot_ref, x, y
 
     # st_data = []
     # This part: list of links to nth smallest shot numbers (inside larger shot number array)
