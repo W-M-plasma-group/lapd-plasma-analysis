@@ -28,9 +28,8 @@ def interferometry_calibration(density_xarray, temperature_xarray, interferometr
     inter_data = xr.DataArray(inter_values, coords=(('time', inter_time, {'units': str(u.ms)}),))
 
     # print(inter_data)
-
-    # DENSITY #
-    # _______ #
+    # DENSITY LINE INTEGRALS #
+    # ______________________ #
 
     # Calculate density line integrals
     x_length, y_length, plateaus = density_xarray.sizes['x'], density_xarray.sizes['y'], density_xarray.sizes['plateau']
@@ -65,38 +64,52 @@ def interferometry_calibration(density_xarray, temperature_xarray, interferometr
     # print("Density collapse times:", density_collapse_times)
     #
 
-    aligned_inter_times = {'x_time': ('time', inter_data.coords['time'] - inter_collapse_time + density_collapse_times['x']),
-                           'y_time': ('time', inter_data.coords['time'] - inter_collapse_time + density_collapse_times['y'])}
+    aligned_inter_times = {
+        'x_time': ('time', inter_data.coords['time'] - inter_collapse_time + density_collapse_times['x']),
+        'y_time': ('time', inter_data.coords['time'] - inter_collapse_time + density_collapse_times['y'])}
 
     inter_data = inter_data.assign_coords(aligned_inter_times)
 
     # Find average step in density (n_e) time coordinate by dividing total time elapsed by number of time measurements
     density_time_coord = density_xarray_cm.coords['plateau']
-    dt = (density_time_coord[-1] - density_time_coord[0])/len(density_time_coord)  # time step for density time coord.
+    dt = (density_time_coord[-1] - density_time_coord[0]) / len(density_time_coord)  # time step for density time coord.
 
     # SCALING FACTOR CALCULATION #
     # __________________________ #
 
     # Find average interferometry value at each time (for each x-adjusted time and each y-adjusted time)
     # x_time_interferometry = for t in inter_data.coords['time']:
-    inter_avg_x_time = xr.DataArray([inter_data.where(both(inter_data.coords['x_time'] > t - dt/2,
-                                                           inter_data.coords['x_time'] < t + dt/2)
+    inter_avg_x_time = xr.DataArray([inter_data.where(both(inter_data.coords['x_time'] > t - dt / 2,
+                                                           inter_data.coords['x_time'] < t + dt / 2)
                                                       ).mean() for t in density_xarray_cm.coords['plateau']],
                                     dims=['plateau'],
                                     coords={'plateau': density_xarray_cm.coords['plateau']})
-    # inter_avg_x_time = inter_avg_x_time.assign_coords({'plateau': density_xarray_cm.coords['plateau']})
-    inter_avg_y_time = [inter_data.where(both(inter_data.coords['y_time'] > t - dt/2,
-                                              inter_data.coords['y_time'] < t + dt/2)
-                                         ).mean() for t in density_xarray_cm.coords['plateau']]
+    inter_avg_y_time = xr.DataArray([inter_data.where(both(inter_data.coords['y_time'] > t - dt / 2,
+                                                           inter_data.coords['y_time'] < t + dt / 2)
+                                                      ).mean() for t in density_xarray_cm.coords['plateau']],
+                                    dims=['plateau'],
+                                    coords={'plateau': density_xarray_cm.coords['plateau']})
 
     # debug
-    print("\nInter x time data:", inter_avg_x_time, "\nInter y time data:", inter_avg_y_time, sep="\n")
+    # print("\nInter x time data:", inter_avg_x_time, "\nInter y time data:", inter_avg_y_time, sep="\n")
     inter_data.plot()
     # inter_collapse_index.
     plt.show()
     #
 
-    return None, None
+    density_scale_x = inter_avg_x_time/x_integral
+    density_scale_y = inter_avg_y_time/y_integral
+
+    has_x_dimension = True
+    has_y_dimension = False
+
+    density_scale_factor = (density_scale_x if has_x_dimension else 0
+                            + density_scale_y if has_y_dimension else 0) / (has_x_dimension + has_y_dimension)
+    print("Density scale factor:", density_scale_factor)
+    calibrated_density_xarray = density_xarray * density_scale_factor
+
+    return (density_scale_x if has_x_dimension else None,
+            density_scale_y if has_y_dimension else None), (has_x_dimension, has_y_dimension), calibrated_density_xarray
 
 
 def to_real_units_interferometry(interferometry_data_array, interferometry_time_array):

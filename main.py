@@ -54,7 +54,7 @@ else:
     if save_diagnostics:
         write_netcdf(diagnostics_dataset, save_filename)
 
-radial_plot(diagnostics_dataset, diagnostic='T_e', plot='contour')
+radial_plot(diagnostics_dataset, diagnostic='n_e', plot='contour')
 
 # Analysis of single sample Isweep-Vsweep curve
 """
@@ -66,8 +66,12 @@ plt.show()
 print("Done analyzing sample characteristic")
 """
 
-electron_density, density_scaling = interferometry_calibration(
+density_scaling, dimensions_booleans, electron_density = interferometry_calibration(
     diagnostics_dataset['n_e'], diagnostics_dataset['T_e'], interferometry_filename,
     bias, current, steady_state_start_plateau, steady_state_end_plateau, core_region=core_region)
+
+# print(density_scaling, dimensions_booleans, electron_density, sep="\n\n")
+electron_density.squeeze().plot.contourf(robust=True)
+plt.show()
 
 # Note: The non-bimaxwellian plasmapy electron temperature seems to be the *reciprocal* of the correct value.
