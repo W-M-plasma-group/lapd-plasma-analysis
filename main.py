@@ -66,12 +66,12 @@ plt.show()
 print("Done analyzing sample characteristic")
 """
 
-density_scaling, dimensions_booleans, electron_density = interferometry_calibration(
+density_scaling, has_xy, electron_density = interferometry_calibration(
     diagnostics_dataset['n_e'], interferometry_filename,
-    bias, current, steady_state_start_plateau, steady_state_end_plateau, core_region=core_region)
+    steady_state_start_plateau, steady_state_end_plateau, core_region=core_region)
 
 # debug
-# print(density_scaling, dimensions_booleans, electron_density, sep="\n\n")
+# print(density_scaling, has_xy, electron_density, sep="\n")
 electron_density.squeeze().plot.contourf(robust=True)
 plt.show()
 

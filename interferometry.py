@@ -7,25 +7,24 @@ import xarray as xr
 from hdf5reader import *
 
 
-def interferometry_calibration(density_xarray, interferometry_filename, bias, current,
+def interferometry_calibration(density_xarray, interferometry_filename,
                                steady_state_start, steady_state_end, core_region=26. * u.cm):
     r"""
     Calibrates density data from sweep probe to measurements from interferometry probe.
 
     Parameters
     ----------
-    :param density_xarray:
-    :param interferometry_filename:
-    :param bias:
-    :param current:
-    :param steady_state_start:
-    :param steady_state_end:
-    :param core_region:
-    :return:
+    :param density_xarray: DataArray of n_e diagnostic
+    :param interferometry_filename: string, path to interferometry data file
+    :param steady_state_start: number of first steady-state plateau, 1-based index
+    :param steady_state_end: number of last steady-state plateau, 1-based index
+    :param core_region: extent of core region, units of distance
+    :return: tuple of (dictionary, tuple of (boolean, boolean), DataArray): x and y scaling constants,
+        whether x and y dimensions exist, and calibrated electron density
     """
-    #
-    # INTERFEROMETRY #
-    # ______________ #
+
+    # INTERFEROMETRY DATA #
+    # ___________________ #
 
     # Read in interferometry data ("interferometry" abbreviated as "inter" in variable names)
     inter_file = open_hdf5(interferometry_filename)
@@ -72,7 +71,7 @@ def interferometry_calibration(density_xarray, interferometry_filename, bias, cu
     # Interpolate nan values linearly to allow trapezoidal integration over incomplete dimensions
     core_density_array = core_density_array.interpolate_na(dim='x', use_coordinate=True, max_gap=10.)  # 10 cm max gap
 
-    density_scaling = dict()
+    density_scaling = dict()  # create empty dictionary to hold x and y scaling factors where necessary
 
     if has_x:
         # Line integral along x dimension
@@ -121,20 +120,15 @@ def interferometry_calibration(density_xarray, interferometry_filename, bias, cu
     # SCALING FACTOR CALCULATION #
     # __________________________ #
 
+    # Average together x and y scaling factors, if they exist, to get scaling factor array in right number of dimensions
     density_scale_factor = (density_scaling['x'] if has_x else 0
                             + density_scaling['y'] if has_y else 0) / (has_x + has_y)  # average x and y scale factors
-    # print("Density scale factor:", density_scale_factor)
-    """
-    scaled_density_xarray = density_xarray * (density_scaling['x'] if has_x else 0 +
-                                              + density_scaling['y'] if has_y else 0) / (has_x + has_y)
-    calibrated_density_xarray = scaled_density_xarray.where(both(scaled_density_xarray.plateau >= steady_state_start,
-                                                                 scaled_density_xarray.plateau <= steady_state_end))
-    """
+
+    # Return the calibrated electron temperature data only in the steady state region (given by plateau indices)
     calibrated_density_xarray = (density_xarray * density_scale_factor).where(
         both(density_xarray.plateau >= steady_state_start, density_xarray.plateau <= steady_state_end))
 
-    return (density_scaling['x'] if has_x else None,
-            density_scaling['y'] if has_y else None), (has_x, has_y), calibrated_density_xarray
+    return density_scaling, (has_x, has_y), calibrated_density_xarray
 
 
 def to_real_units_interferometry(interferometry_data_array, interferometry_time_array):

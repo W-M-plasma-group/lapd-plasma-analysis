@@ -213,7 +213,7 @@ def to_characteristic_xarray(characteristic_array, time_array, x, y):
     characteristic_xarray = xr.DataArray(characteristic_array, dims=['x', 'y', 'plateau'],
                                          coords=(('x', x, {'units': str(u.cm)}),
                                                  ('y', y, {'units': str(u.cm)}),
-                                                 ('plateau', np.arange(characteristic_array.shape[2]))))
+                                                 ('plateau', np.arange(characteristic_array.shape[2] + 1))))
     characteristic_xarray = characteristic_xarray.assign_coords(
         {'time': ('plateau', time_array_ms.mean(axis=(0, 1)), {'units': str(u.ms)})})
     # Average the plateau time coordinate for all x,y positions to make 1D coordinate, keeping plateau dimension
