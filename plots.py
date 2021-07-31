@@ -1,7 +1,6 @@
 # Add comments
 import warnings
 from astropy import visualization
-import matplotlib.pyplot as plt
 
 
 def radial_plot(diagnostics_xarray, diagnostic='T_e', plot='contour'):
@@ -42,4 +41,3 @@ def radial_plot(diagnostics_xarray, diagnostic='T_e', plot='contour'):
                 pos_time_var_xarray.plot.contourf(x='time', y='x', robust=True)
             elif plot == "surface":
                 pos_time_var_xarray.plot.surface(x='time', y='x', robust=True)
-            plt.show()

@@ -1,3 +1,5 @@
+import matplotlib.pyplot as plt
+
 from getIVsweep import *
 from characterization import *
 from diagnostics import *
@@ -42,6 +44,7 @@ if not diagnostics_dataset:  # diagnostic dataset not loaded; create new from HD
         write_netcdf(diagnostics_dataset, save_filename)
 
 radial_plot(diagnostics_dataset, diagnostic='n_e', plot='contour')
+plt.show()
 
 # Analysis of single sample Isweep-Vsweep curve
 """

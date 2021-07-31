@@ -39,8 +39,8 @@ def interferometry_calibration(density_xarray, interferometry_filename,
     inter_values, inter_time = to_real_units_interferometry(inter_means_abstract, inter_time_abstract)
     inter_data = xr.DataArray(inter_values, coords=(('time', inter_time, {'units': str(u.ms)}),))
 
-    # DENSITY LINE INTEGRALS #
-    # ______________________ #
+    # DENSITY DATA #
+    # ____________ #
 
     # Calculate density line integrals
     density_data = density_xarray * (1 / u.m ** 3).to(1 / u.cm ** 3).value  # density data in units of 1 / cm^3; rename?
@@ -94,7 +94,7 @@ def interferometry_calibration(density_xarray, interferometry_filename,
                                                           ).mean() for t in density_data.coords['time']],
                                         dims=['plateau'],
                                         coords={'plateau': density_data.coords['plateau'],
-                                                'time': ('plateau', density_data.coords['plateau'])})
+                                                'time': ('plateau', density_data.coords['time'])})
         density_scaling['x'] = inter_avg_x_time / x_integral
 
     if has_y:
@@ -114,7 +114,7 @@ def interferometry_calibration(density_xarray, interferometry_filename,
                                                           ).mean() for t in density_data.coords['time']],
                                         dims=['plateau'],
                                         coords={'plateau': density_data.coords['plateau'],
-                                                'time': ('plateau', density_data.coords['plateau'])})
+                                                'time': ('plateau', density_data.coords['time'])})
         density_scaling['y'] = inter_avg_y_time / y_integral
 
     # SCALING FACTOR CALCULATION #
