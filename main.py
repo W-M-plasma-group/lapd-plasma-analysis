@@ -1,6 +1,3 @@
-import matplotlib.pyplot as plt
-from pprint import pprint
-
 from getIVsweep import *
 from characterization import *
 from diagnostics import *
@@ -35,20 +32,10 @@ use_existing = True
 save_diagnostics = True
 # End of file options
 
-
-create_diagnostics = not use_existing
-# Check if user path valid; if invalid, allow user to choose path to use or to create a new dataset
-if use_existing:
-    verified_path = verify_path(open_filename)
-    if not verified_path:
-        create_diagnostics = True
-
-# Needed for interferometry data; only require if interferometry wanted?
 bias, current, x, y = get_isweep_vsweep(hdf5_filename)
-if not create_diagnostics:
-    diagnostics_dataset = open_netcdf(open_filename)
-else:
-    # Put bias and current arrays in real units!
+
+diagnostics_dataset = read_netcdf(open_filename) if use_existing else False  # the desired dataset, or False to use HDF5
+if not diagnostics_dataset:  # diagnostic dataset not loaded; create new from HDF5 file
     characteristics = characterize_sweep_array(bias, current, x, y, margin=smoothing_margin, sample_sec=sample_sec)
     diagnostics_dataset = plasma_diagnostics(characteristics, probe_area, ion_type, bimaxwellian=False)
     if save_diagnostics:

@@ -45,8 +45,9 @@ def get_isweep_vsweep(filename):
     isweep_means = np.mean(isweep_xy_shots_array, 2)
     vsweep_means = np.mean(vsweep_xy_shots_array, 2)
 
-    # Note: This function returns the bias values first, then the current
     file.close()
+
+    # Note: This function returns the bias values first, then the current
     bias, current = to_real_sweep_units(vsweep_means, isweep_means)
     return bias, current, x, y
 
