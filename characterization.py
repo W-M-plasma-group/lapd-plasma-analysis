@@ -5,7 +5,7 @@ import astropy.units as u
 from plasmapy.diagnostics.langmuir import Characteristic
 
 
-def characterize_sweep_array(unadjusted_bias, unadjusted_current, margin, sample_sec):
+def characterize_sweep_array(unadjusted_bias, unadjusted_current, x_round, y_round, margin, sample_sec):
     r"""
     Function that processes bias and current data into a DataArray of distinct Characteristics.
     Takes in bias and current arrays, smooths them, divides them into separate ramp sections, 
@@ -13,6 +13,8 @@ def characterize_sweep_array(unadjusted_bias, unadjusted_current, margin, sample
 
     Parameters
     ----------
+    :param y_round:
+    :param x_round:
     :param unadjusted_bias: array
     :param unadjusted_current: array
     :param margin: int, positive
@@ -34,7 +36,7 @@ def characterize_sweep_array(unadjusted_bias, unadjusted_current, margin, sample
     # """
 
     characteristic_array = get_characteristic_array(bias, current, plateau_ranges)
-    characteristic_xarray = to_characteristic_xarray(characteristic_array, time_array)
+    characteristic_xarray = to_characteristic_xarray(characteristic_array, time_array, x_round, y_round)
     # (debug) print(characteristic_xarray)
     return characteristic_xarray
 
@@ -58,7 +60,6 @@ def smooth_current_array(bias, current, margin):
 
 
 def isolate_plateaus(bias, margin=0):
-
     r"""
     Function to identify start and stop frames of every ramp section within each plateau.
     Returns array containing frame indices for each shot.
@@ -135,51 +136,32 @@ def isolate_plateaus(bias, margin=0):
     return plateau_bounds
 
 
-def to_real_units(bias, current):
-    r"""
-    Parameters
-    ----------
-    :param bias: array
-    :param current: array
-    :return: bias and current array in real units
-    """
-    # The conversion factors from abstract units to real bias (V) and current values (A) are hard-coded in here.
-    # Note that current is multiplied by -1 to get the "upright" traditional Isweep-Vsweep curve. Add to documentation?
-
-    # Conversion factors taken from MATLAB code: Current = isweep / 11 ohms; Voltage = vsweep * 100
-    gain = 100.  # voltage gain
-    resistance = 11.  # current values from input current; implied units of ohms per volt since measured as potential
-
-    return bias * gain * u.V, -1. * current / resistance * u.A
-
-
 def create_ranged_characteristic(bias, current, start, end):
-    # Returns a Characteristic object
+    # Takes in a one-dimensional bias and current list; returns a Characteristic object for specified index range
 
-    dimensions = len(bias.shape)
+    # Error checks for input shapes and indices
+    if len(bias.shape) > 1:
+        raise ValueError("Multidimensional characteristic creation is no longer supported. Pass 1D sweep arrays.")
     if bias.shape != current.shape:
         raise ValueError("Bias and current must be of the same dimensions and shape")
     if start < 0:
         raise ValueError("Start index must be non-negative")
-    if dimensions == 1:
-        if end > len(bias):
-            raise ValueError("End index", end, "out of range of bias and current arrays of length", len(bias))
-        real_bias, real_current = to_real_units(bias[start:end], current[start:end])
-        characteristic = Characteristic(real_bias, real_current)
-    else:
-        # Note: zero_indices is tuple of indices to access first position bias and current.
-        #    In the future, multidimensional bias and current inputs should raise an error.
-        print("Warning: multidimensional characteristic creation is unsupported. This function returns a characteristic"
-              "with bias and current values only for the first position. Pass 1D arrays in the future to avoid this.")
-        zero_indices = (0,) * (dimensions - 1)
-        if end > len(bias[zero_indices]):
-            raise ValueError("End index", end, "out of range of bias and current arrays of last-dimension length",
-                             len(bias[zero_indices]))
-        real_bias, real_current = to_real_units(bias[zero_indices + (slice(start, end),)],
-                                                current[zero_indices + (slice(start, end),)])
-        characteristic = Characteristic(real_bias, real_current)
+    if end > len(bias):
+        raise ValueError("End index", end, "out of range of bias and current arrays of length", len(bias))
 
-    return characteristic
+    # Check units on input arrays
+    try:
+        assert (bias.unit == u.V)
+    except (AttributeError, AssertionError):
+        warnings.warn("Input bias array does not have units of Volts. Ensure that bias values are in real units.")
+    try:
+        assert (current.unit == u.A)
+    except (AttributeError, AssertionError):
+        warnings.warn("Input bias array does not have units of Amps. Ensure that current values are in real units.")
+
+    # real_bias, real_current = to_real_units(bias[start:end], current[start:end])
+    # return Characteristic(real_bias, real_current)
+    return Characteristic(bias[start:end], current[start:end])
 
 
 def get_time_array(plateau_ranges, sample_sec=(100 / 16 * 10 ** 6) ** (-1) * u.s):
@@ -219,28 +201,21 @@ def get_characteristic_array(bias, current, plateau_ranges):
 
     return characteristic_array
 
+
 # Instead of having several separate methods "trade off", can have one overarching method that organizes things and
 #    smaller helper functions that are called within overall method?
 
 
-def to_characteristic_xarray(characteristic_array, time_array):
+def to_characteristic_xarray(characteristic_array, time_array, x, y):
     # Use hard-coded and calculated inputs to add coordinate and variable information to characteristic array
 
-    characteristic_xarray = xr.DataArray(characteristic_array, dims=['x', 'y', 'plateau'])
-
-    if characteristic_xarray.sizes['x'] == 71:
-        characteristic_xarray = characteristic_xarray.assign_coords({'x': np.arange(-30, 41)})
-        characteristic_xarray.x.attrs['units'] = str(u.cm)
-    characteristic_xarray = characteristic_xarray.assign_coords({'time': (('x', 'y', 'plateau'),
-                                                                          time_array.to(u.ms).value)})
-    characteristic_xarray.time.attrs['units'] = str(u.ms)
-
-    """
-    coords=[('x', np.arange(-30, 41), {'units': str(u.cm)})  # LAPD length
-        if characteristic_array.shape[0] == 71
-        else ('x', np.arange(characteristic_array.shape[0])),  # other length
-        ('y', np.arange(characteristic_array.shape[1])),          # generic y
-        ('time', time_array.to(u.ms).value, {'units': str(u.ms)})],  # in ms
-    """
+    time_array_ms = time_array.to(u.ms).value
+    characteristic_xarray = xr.DataArray(characteristic_array, dims=['x', 'y', 'plateau'],
+                                         coords=(('x', x, {'units': str(u.cm)}),
+                                                 ('y', y, {'units': str(u.cm)}),
+                                                 ('plateau', np.arange(characteristic_array.shape[2] + 1))))
+    characteristic_xarray = characteristic_xarray.assign_coords(
+        {'time': ('plateau', time_array_ms.mean(axis=(0, 1)), {'units': str(u.ms)})})
+    # Average the plateau time coordinate for all x,y positions to make 1D coordinate, keeping plateau dimension
 
     return characteristic_xarray

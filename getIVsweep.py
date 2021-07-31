@@ -1,6 +1,7 @@
 # Make sure to add code comments and write documentation!
 
 import numpy as np
+import astropy.units as u
 
 from hdf5reader import *
 
@@ -14,7 +15,7 @@ def get_isweep_vsweep(filename):
 
     file = open_hdf5(filename)
     x_round, y_round, shot_list = get_xy(file)
-    xy_shot_ref = categorize_shots_xy(x_round, y_round, shot_list)
+    xy_shot_ref, x, y = categorize_shots_xy(x_round, y_round, shot_list)
 
     isweep_data_raw, vsweep_data_raw, isweep_headers_raw, vsweep_headers_raw = get_sweep_data_headers(file)
 
@@ -29,9 +30,7 @@ def get_isweep_vsweep(filename):
 
     # Can I convert isweep and vsweep arrays to real units here? Should do as long as numpy can handle astropy units
 
-    # Is the below necessary? Check the MATLAB code
     # To reflect MATLAB code, should I take (pointwise?) standard deviation for each across these shots too? (For error)
-    # isweep_sumsq = np.ndarray((1065,), float)
 
     # Create 4D array: the first two dimensions correspond to all combinations of unique x and y positions,
     #    the third dimension represents the nth shot taken at that unique positions
@@ -46,9 +45,11 @@ def get_isweep_vsweep(filename):
     isweep_means = np.mean(isweep_xy_shots_array, 2)
     vsweep_means = np.mean(vsweep_xy_shots_array, 2)
 
-    # Note: This function returns the bias values first, then the current
     file.close()
-    return vsweep_means, isweep_means
+
+    # Note: This function returns the bias values first, then the current
+    bias, current = to_real_sweep_units(vsweep_means, isweep_means)
+    return bias, current, x, y
 
 
 def get_xy(file):
@@ -115,7 +116,7 @@ def categorize_shots_xy(x_round, y_round, shot_list):
         # noinspection PyTypeChecker
         xy_shot_ref[x_loc[i]][y_loc[i]].append(i)  # full of references to nth shot taken
 
-    return xy_shot_ref
+    return xy_shot_ref, x, y
 
     # st_data = []
     # This part: list of links to nth smallest shot numbers (inside larger shot number array)
@@ -190,3 +191,22 @@ def scale_offset_decompress(data_raw, scales, offsets):
     num_shots = data_raw.shape[0]
 
     return data_raw * scales.reshape(num_shots, 1) + offsets.reshape(num_shots, 1)
+
+
+def to_real_sweep_units(bias, current):
+    r"""
+    Parameters
+    ----------
+    :param bias: array
+    :param current: array
+    :return: bias and current array in real units
+    """
+
+    # The conversion factors from abstract units to real bias (V) and current values (A) are hard-coded in here.
+    # Note that current is multiplied by -1 to get the "upright" traditional Isweep-Vsweep curve. Add to documentation?
+
+    # Conversion factors taken from MATLAB code: Current = isweep / 11 ohms; Voltage = vsweep * 100
+    gain = 100.  # voltage gain
+    resistance = 11.  # current values from input current; implied units of ohms per volt since measured as potential
+
+    return bias * gain * u.V, -1. * current / resistance * u.A
