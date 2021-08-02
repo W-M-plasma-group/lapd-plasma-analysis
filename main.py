@@ -1,5 +1,4 @@
 import matplotlib.pyplot as plt
-from pprint import pprint
 
 from getIVsweep import *
 from characterization import *
@@ -30,7 +29,7 @@ interferometry_filename = hdf5_filename  # interferometry data stored in same HD
 # File options
 """ Set the below variable to True to open an existing diagnostic dataset from a NetCDF file
     or False to create a new diagnostic dataset from the given HDF5 file. """
-use_existing = False
+use_existing = True
 """ Set the below variable to True when creating a new diagnostic dataset to save the dataset to a NetCDF file. """
 save_diagnostics = True
 # End of file options
@@ -48,16 +47,16 @@ radial_plot(diagnostics_dataset, diagnostic='n_e', plot='contour')
 plt.show()
 
 # Analysis of single sample Isweep-Vsweep curve
-# """
+"""
 sample_indices = (30, 0, 7)  # x position, y position, plateau number within frame
 sample_plateau = characteristics[sample_indices].item()
-pprint(swept_probe_analysis(sample_plateau, probe_area, ion_type, 
+print(swept_probe_analysis(sample_plateau, probe_area, ion_type, 
                             visualize=True, plot_EEDF=True, bimaxwellian=False))
 plt.show()
 print("Done analyzing sample characteristic")
 # """
 
-density_scaling, has_xy, electron_density = interferometry_calibration(
+electron_density, density_scaling = interferometry_calibration(
     diagnostics_dataset['n_e'], interferometry_filename,
     steady_state_start_plateau, steady_state_end_plateau, core_region=core_region)
 

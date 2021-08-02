@@ -123,10 +123,13 @@ def interferometry_calibration(density_xarray, interferometry_filename,
                             + density_scaling['y'] if has_y else 0) / (has_x + has_y)  # average x and y scale factors
 
     # Return the calibrated electron temperature data only in the steady state region (given by plateau indices)
-    calibrated_density_xarray = (density_xarray * density_scale_factor).where(
+    steady_state_scale_factor = density_scale_factor.where(
         both(density_xarray.plateau >= steady_state_start, density_xarray.plateau <= steady_state_end))
+    calibrated_density_xarray = density_xarray * steady_state_scale_factor
 
-    return density_scaling, (has_x, has_y), calibrated_density_xarray
+    print("Average interferometry calibration factor:", steady_state_scale_factor.mean().item())
+
+    return calibrated_density_xarray, density_scaling
 
 
 def to_real_interferometry_units(interferometry_data_array, interferometry_time_array):
