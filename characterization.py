@@ -1,4 +1,5 @@
 import warnings
+import math
 import numpy as np
 import xarray as xr
 import astropy.units as u
@@ -190,6 +191,10 @@ def get_characteristic_array(bias, current, plateau_ranges):
     #    to analyze. Invalid ones should be skipped, but preserved in the array.
 
     print("Creating characteristic array... (May take up to 60 seconds)")
+    num_pos = plateau_ranges.shape[0] * plateau_ranges.shape[1]
+    for pos in range(num_pos):
+        print(' ' if pos % 10 ** round(math.log10(num_pos) - 1) != 0 else '|', end="")
+    print(" (", num_pos, ")")
     for i in range(plateau_ranges.shape[0]):
         for j in range(plateau_ranges.shape[1]):
             for p in range(plateau_ranges.shape[2]):
@@ -197,7 +202,9 @@ def get_characteristic_array(bias, current, plateau_ranges):
                 characteristic_array[i, j, p] = create_ranged_characteristic(
                     bias[i, j], current[i, j], start_ind, stop_ind)
 
-        print("Finished x position", i + 1, "/", plateau_ranges.shape[0])
+        # print("Finished x position", i + 1, "/", plateau_ranges.shape[0])
+        print('.', end="")
+    print(" ")
 
     return characteristic_array
 
@@ -213,7 +220,7 @@ def to_characteristic_xarray(characteristic_array, time_array, x, y):
     characteristic_xarray = xr.DataArray(characteristic_array, dims=['x', 'y', 'plateau'],
                                          coords=(('x', x, {'units': str(u.cm)}),
                                                  ('y', y, {'units': str(u.cm)}),
-                                                 ('plateau', np.arange(characteristic_array.shape[2] + 1))))
+                                                 ('plateau', np.arange(characteristic_array.shape[2]) + 1)))
     characteristic_xarray = characteristic_xarray.assign_coords(
         {'time': ('plateau', time_array_ms.mean(axis=(0, 1)), {'units': str(u.ms)})})
     # Average the plateau time coordinate for all x,y positions to make 1D coordinate, keeping plateau dimension
