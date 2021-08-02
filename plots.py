@@ -3,7 +3,7 @@ import warnings
 from astropy import visualization
 
 
-def radial_plot(diagnostics_xarray, diagnostic='T_e', plot='contour'):
+def radial_diagnostic_plot(diagnostics_xarray, diagnostic='T_e', plot='contour'):
     # Return a plot of the specified type for the specified diagnostic.
 
     if diagnostics_xarray.sizes['x'] > 1 and diagnostics_xarray.sizes['y'] > 1:

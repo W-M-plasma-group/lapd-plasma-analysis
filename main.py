@@ -6,6 +6,8 @@ from diagnostics import *
 from plots import *
 from netCDFaccess import *
 from interferometry import *
+from neutrals import *
+from setup import *
 
 print("Imported helper files")
 
@@ -34,6 +36,9 @@ use_existing = True
 save_diagnostics = True
 # End of file options
 
+
+experimental_parameters = setup_lapd(hdf5_filename)
+print(experimental_parameters)
 bias, current, x, y = get_isweep_vsweep(hdf5_filename)
 
 diagnostics_dataset = read_netcdf(open_filename) if use_existing else False  # the desired dataset, or False to use HDF5
@@ -43,7 +48,7 @@ if not diagnostics_dataset:  # diagnostic dataset not loaded; create new from HD
     if save_diagnostics:
         write_netcdf(diagnostics_dataset, save_filename)
 
-radial_plot(diagnostics_dataset, diagnostic='n_e', plot='contour')
+radial_diagnostic_plot(diagnostics_dataset, diagnostic='n_e', plot='contour')
 plt.show()
 
 # Analysis of single sample Isweep-Vsweep curve
