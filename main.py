@@ -38,7 +38,7 @@ save_diagnostics = True
 
 
 experimental_parameters = setup_lapd(hdf5_filename)
-print(experimental_parameters)
+print("Experimental parameters:", [str(param) for param in experimental_parameters])
 bias, current, x, y = get_isweep_vsweep(hdf5_filename)
 
 diagnostics_dataset = read_netcdf(open_filename) if use_existing else False  # the desired dataset, or False to use HDF5

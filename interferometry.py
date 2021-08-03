@@ -81,18 +81,21 @@ def interferometry_calibration(density_xarray, interferometry_filename,
         density_collapse_time_x = x_integral.idxmax('plateau').coords['time'].mean()
 
         # Align times so that interferometry data collapse matches x density data max
-        aligned_x_time = {'x_time': ('time', inter_data.coords['time'] - inter_collapse_time + density_collapse_time_x)}
-        inter_data = inter_data.assign_coords(aligned_x_time)
+        aligned_x_time = inter_data.coords['time'] - inter_collapse_time + density_collapse_time_x
+        inter_data = inter_data.assign_coords({'x_time': ('time', aligned_x_time.data)})
 
         # Group data by closest
-        # inter_avg_x_time = crunch_data(inter_data, density_data.coords['time'], dt)
+        inter_avg_x_time = crunch_data(inter_data, 'time', density_data.coords['time'], dt)
+        # print(crunch_data(inter_data, 'time', density_data.coords['time'], dt))
         # inter_avg_x_time = inter_avg_x_time.assign_coords({'time'})
+        """
         inter_avg_x_time = xr.DataArray([inter_data.where(both(inter_data.coords['x_time'] > t - dt / 2,
                                                                inter_data.coords['x_time'] < t + dt / 2)
                                                           ).mean() for t in density_data.coords['time']],
                                         dims=['plateau'],
                                         coords={'plateau': density_data.coords['plateau'],
                                                 'time': ('plateau', density_data.coords['time'])})
+        """
         density_scaling['x'] = inter_avg_x_time / x_integral
 
     if has_y:
@@ -138,7 +141,6 @@ def to_real_interferometry_units(interferometry_data_array, interferometry_time_
     return interferometry_data_array * area_factor, interferometry_time_array * time_factor
 
 
-# def crunch_data(data_array, destination_coord, dim_name, coord_name):
 def crunch_data(data_array, dimension, destination_coordinate, step):
     # "Crunch" interferometry data into the density data timescale by averaging all interferometry measurements
     #     into a "bucket" around the closest matching density time coordinate (within half a time step)
@@ -146,21 +148,27 @@ def crunch_data(data_array, dimension, destination_coordinate, step):
     #     [density]   |__o__|__o__|__o__|__o__|__o__|   <-- measurements grouped by closest density measurement "o"
     # Take the mean of all interferometry measurements in the same "bucket" to match timescales
     r"""
+    Group data along a specified dimension into bins determined by a destination coordinate and a step size,
+    then return the mean of each bin with the dimensions and coordinates of the destination coordinate.
 
-    :param dimension:
-    :param data_array:
-    :param destination_coordinate:
+    Parameters
+    ----------
+    :param data_array: xarray DataArray
+    :param dimension: string, dimension in data_array
+    :param destination_coordinate: xarray DataArray, used as coordinate
     :param step:
     :return:
     """
 
-    """return data_array.interp_like(
-        destination_coord.swap_dims({dim_name: coord_name})
-        ).swap_dims({coord_name: dim_name})
-
-    # .assign_coords({dim_name: (coord_name, destination_coord.coords[dim_name])})"""
-    # xr.concat([destination_coordinate[0] - step / 2, destination_coordinate + step / 2]
-
-    return data_array.groupby_bins(dimension, np.linspace(
+    grouped_mean = data_array.groupby_bins(dimension, np.linspace(
         destination_coordinate[0] - step / 2, destination_coordinate[-1] + step / 2, len(destination_coordinate) + 1
-           )).mean()
+           ), labels=destination_coordinate.data).mean()
+
+    destination_dimension = destination_coordinate.dims[0]
+
+    named_mean = grouped_mean.rename({dimension + '_bins': dimension})
+    named_mean = named_mean.assign_coords({destination_dimension:
+                                           (dimension, destination_coordinate[destination_dimension].data)})
+    named_mean = named_mean.swap_dims({dimension: destination_dimension})
+
+    return named_mean
