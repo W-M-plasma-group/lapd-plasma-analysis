@@ -84,18 +84,9 @@ def interferometry_calibration(density_xarray, interferometry_filename,
         aligned_x_time = inter_data.coords['time'] - inter_collapse_time + density_collapse_time_x
         inter_data = inter_data.assign_coords({'x_time': ('time', aligned_x_time.data)})
 
-        # Group data by closest
+        # Average all interferometry measurements into data point with closest corresponding density time coordinate
         inter_avg_x_time = crunch_data(inter_data, 'time', density_data.coords['time'], dt)
-        # print(crunch_data(inter_data, 'time', density_data.coords['time'], dt))
-        # inter_avg_x_time = inter_avg_x_time.assign_coords({'time'})
-        """
-        inter_avg_x_time = xr.DataArray([inter_data.where(both(inter_data.coords['x_time'] > t - dt / 2,
-                                                               inter_data.coords['x_time'] < t + dt / 2)
-                                                          ).mean() for t in density_data.coords['time']],
-                                        dims=['plateau'],
-                                        coords={'plateau': density_data.coords['plateau'],
-                                                'time': ('plateau', density_data.coords['time'])})
-        """
+
         density_scaling['x'] = inter_avg_x_time / x_integral
 
     if has_y:
@@ -160,15 +151,26 @@ def crunch_data(data_array, dimension, destination_coordinate, step):
     :return:
     """
 
+    # Group input data "data_array" along the dimension specified by "dimension" (dimension coordinate values used)
+    #    by the coordinate in the xarray "destination_coordinate", assumed to have regular spacing "step" and take means
     grouped_mean = data_array.groupby_bins(dimension, np.linspace(
         destination_coordinate[0] - step / 2, destination_coordinate[-1] + step / 2, len(destination_coordinate) + 1
            ), labels=destination_coordinate.data).mean()
 
-    destination_dimension = destination_coordinate.dims[0]
+    # This result has only one dimension, the input data "dimension" + "_bins", labeled with the destination coordinate.
+    #    We want to return an xarray with all the dimensions and coordinates (in this case: plateau dimension,
+    #    plateau dimension coordinate, time non-dimension coordinate) of the destination data.
+    #    This involves renaming the "_bins" dimension to match the destination coordinate,
+    #    creating a new coordinate identical to the destination coordinate's dimension coordinate,
+    #    and swapping the two new coordinates to give the xarray the same dimension coordinate as the destination.
 
-    named_mean = grouped_mean.rename({dimension + '_bins': dimension})
+    destination_dimension = destination_coordinate.dims[0]  # The name of the dimension of the 1D destination coordinate
+
+    named_mean = grouped_mean.rename({dimension + "_bins": dimension})  # Remove "_bins" suffix
+    # Add the destination dimension coordinate to the output xarray as a new coordinate
     named_mean = named_mean.assign_coords({destination_dimension:
                                            (dimension, destination_coordinate[destination_dimension].data)})
+    # Make the new destination dimension coordinate the main (dimension) coordinate of the output as well
     named_mean = named_mean.swap_dims({dimension: destination_dimension})
 
     return named_mean
