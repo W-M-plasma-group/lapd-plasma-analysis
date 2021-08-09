@@ -38,7 +38,7 @@ save_diagnostics = True
 
 
 experimental_parameters = setup_lapd(hdf5_filename)
-print("Experimental parameters:", [str(param) for param in experimental_parameters])
+print("Experimental parameters:", {key: str(value) for key, value in experimental_parameters.items()})
 bias, current, x, y = get_isweep_vsweep(hdf5_filename)
 
 diagnostics_dataset = read_netcdf(open_filename) if use_existing else False  # the desired dataset, or False to use HDF5
@@ -68,6 +68,10 @@ electron_density, density_scaling = interferometry_calibration(
 # debug
 # print(density_scaling, has_xy, electron_density, sep="\n")
 electron_density.squeeze().plot.contourf(robust=True)
+plt.show()
+
+plasma_neutrals(diagnostics_dataset['n_e'], None, experimental_parameters,
+                steady_state_start_plateau, steady_state_end_plateau)
 plt.show()
 
 # Note: The non-bimaxwellian plasmapy electron temperature seems to be the *reciprocal* of the correct value.
