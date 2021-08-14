@@ -73,7 +73,7 @@ def interferometry_calibration(density_xarray, interferometry_filename,
 
     density_scaling = dict()  # create empty dictionary to hold x and y scaling factors where necessary
 
-    # TODO separate  by radial or areal, not x or y dimensions. Implementation may be easier; or still try sep function?
+    # TODO separate by radial or areal, not x or y dimensions. Implementation may be easier; or still try sep function?
 
     if has_x:
         # Line integral along x dimension

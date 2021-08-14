@@ -70,7 +70,7 @@ electron_density, density_scaling = interferometry_calibration(
 electron_density.squeeze().plot.contourf(robust=True)
 plt.show()
 
-plasma_neutrals(diagnostics_dataset['n_e'], None, experimental_parameters,
+plasma_neutrals(diagnostics_dataset['n_e'], experimental_parameters,
                 steady_state_start_plateau, steady_state_end_plateau)
 plt.show()
 
