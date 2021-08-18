@@ -13,10 +13,11 @@ def plasma_diagnostics(characteristic_xarray, probe_area, ion_type, bimaxwellian
     xarray_dict = {str(i): xarray_list[i] for i in range(number_of_diagnostics)}
     diagnostic_dataset = xr.Dataset(xarray_dict)
 
+    print("Calculating plasma diagnostics... (May take several minutes)")
     diagnostic_names_assigned = False
     for i in range(characteristic_xarray.sizes['x']):
         for j in range(characteristic_xarray.sizes['y']):
-            for p in range(characteristic_xarray.sizes['plateau']):
+            for p in range(characteristic_xarray.sizes['time']):
                 characteristic = characteristic_xarray[i, j, p].item()
                 diagnostics = verify_plateau(characteristic, probe_area, ion_type, bimaxwellian)
                 if diagnostics == 1:

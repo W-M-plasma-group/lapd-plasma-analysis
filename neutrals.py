@@ -19,10 +19,11 @@ def plasma_neutrals(electron_density, experimental_parameters, steady_state_star
     # RADIAL/AREAL CODE #
     # _________________ #
 
-    both, plateau = xr.ufuncs.logical_and, electron_density.coords['plateau']  # rename variables for comprehensibility
+    both = xr.ufuncs.logical_and
+    plateau = electron_density.coords['plateau']  # rename variables for comprehensibility
 
     steady_state_mask = both(plateau >= steady_state_start, plateau <= steady_state_end)
-    steady_state_electron_density = electron_density.where(steady_state_mask, drop=True).mean('plateau')
+    steady_state_electron_density = electron_density.where(steady_state_mask, drop=True).mean('time')
 
     if electron_density.sizes['x'] == 1 and electron_density.sizes['y'] == 1:  # scalar (0D) data
         raise ValueError("Finding neutral gas ratio for zero-dimensional position data is unsupported")
@@ -33,6 +34,7 @@ def plasma_neutrals(electron_density, experimental_parameters, steady_state_star
         linear_electron_density = steady_state_electron_density.squeeze()  # squeeze out length-1 dimension
 
         # Find average electron density at each absolute radial position (average symmetrically about zero position)
+        # Change to xarray concat -> average along new dimension to ensure average of real and nan not divided by 2
         radial_electron_density = (linear_electron_density + linear_electron_density.assign_coords(
             {radial_dimension: -1 * linear_electron_density.coords[radial_dimension]})) / 2
 
@@ -41,6 +43,6 @@ def plasma_neutrals(electron_density, experimental_parameters, steady_state_star
         #
 
     elif electron_density.sizes['x'] > 1 and electron_density.sizes['y'] > 1:  # areal (2D) data
-        pass  # not yet implemented
+        print("Areal neutral analysis is not yet implemented")
 
     return
