@@ -2,7 +2,6 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/../lapd-mach-probe/.idea/lapd-mach-probe.iml" filepath="$PROJECT_DIR$/../lapd-mach-probe/.idea/lapd-mach-probe.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/lapd-plasma-analysis.iml" filepath="$PROJECT_DIR$/.idea/lapd-plasma-analysis.iml" />
     </modules>
   </component>
