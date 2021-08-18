@@ -13,11 +13,11 @@ def get_isweep_vsweep(filename):
     :return:
     """
 
-    file = open_hdf5(filename)
-    x_round, y_round, shot_list = get_xy(file)
+    hdf5_file = open_hdf5(filename)
+    x_round, y_round, shot_list = get_xy(hdf5_file)
     xy_shot_ref, x, y = categorize_shots_xy(x_round, y_round, shot_list)
 
-    isweep_data_raw, vsweep_data_raw, isweep_headers_raw, vsweep_headers_raw = get_sweep_data_headers(file)
+    isweep_data_raw, vsweep_data_raw, isweep_headers_raw, vsweep_headers_raw = get_sweep_data_headers(hdf5_file)
 
     print("Reading in scales and offsets from headers...")
     # Define: scale is 2nd index, offset is 3rd index
@@ -45,7 +45,7 @@ def get_isweep_vsweep(filename):
     isweep_means = np.mean(isweep_xy_shots_array, 2)
     vsweep_means = np.mean(vsweep_xy_shots_array, 2)
 
-    file.close()
+    hdf5_file.close()
 
     # Note: This function returns the bias values first, then the current
     bias, current = to_real_sweep_units(vsweep_means, isweep_means)
@@ -94,7 +94,7 @@ def categorize_shots_xy(x_round, y_round, shot_list):
     x_length = len(x)
     y_length = len(y)
 
-    # Act as soft warnings in case of limited x,y data
+    # Determine if data is areal, radial, or scalar
     if x_length == 1 and y_length == 1:
         print("Only one position value. No plots can be made")
     elif x_length == 1:
@@ -166,6 +166,8 @@ def get_scales_offsets(headers, scale_index, offset_index):
     :param offset_index:
     :return:
     """
+
+    # TODO Can access scales and offsets using dictionary string indexing! (See lapd-mach-probe get_mach_data_headers)
 
     scales = np.array([header[scale_index] for header in headers])
     offsets = np.array([header[offset_index] for header in headers])

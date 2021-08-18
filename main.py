@@ -21,9 +21,9 @@ steady_state_start_plateau, steady_state_end_plateau = 5, 11  # From MATLAB code
 # End of global parameters
 
 # File path names
-hdf5_filename = 'HDF5/8-3500A.hdf5'
+hdf5_filename = "/Users/leo/Plasma code/HDF5/8-3500A.hdf5"
 # save_filename = 'netCDF/diagnostic_dataset.nc'
-save_filename = 'diagnostic_dataset.nc'
+save_filename = "diagnostic_dataset.nc"
 open_filename = save_filename            # write to and read from the same location
 interferometry_filename = hdf5_filename  # interferometry data stored in same HDF5 file
 # End of file path names
