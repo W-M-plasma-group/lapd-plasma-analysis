@@ -38,7 +38,6 @@ def characterize_sweep_array(unadjusted_bias, unadjusted_current, x_round, y_rou
 
     characteristic_array = get_characteristic_array(bias, current, plateau_ranges)
     characteristic_xarray = to_characteristic_xarray(characteristic_array, time_array, x_round, y_round)
-    # (debug) print(characteristic_xarray)
     return characteristic_xarray
 
 
@@ -160,17 +159,17 @@ def create_ranged_characteristic(bias, current, start, end):
     except (AttributeError, AssertionError):
         warnings.warn("Input bias array does not have units of Amps. Ensure that current values are in real units.")
 
-    # real_bias, real_current = to_real_units(bias[start:end], current[start:end])
-    # return Characteristic(real_bias, real_current)
     return Characteristic(bias[start:end], current[start:end])
 
 
 def get_time_array(plateau_ranges, sample_sec=(100 / 16 * 10 ** 6) ** (-1) * u.s):
     # Make more robust; is mean time during shot okay? Clean up, decide final form
     # x, y, time in milliseconds since start of that [average] shot using sample_sec in milliseconds
+    # NOTE: MATLAB code stores peak voltage time (end of plateaus), then only uses plateau times for very first position
 
     # returns the time at the center of the ramp since the beginning of the shot
-    return np.mean(plateau_ranges, axis=-1) * sample_sec
+    # return np.mean(plateau_ranges, axis=-1) * sample_sec
+    return plateau_ranges[..., 1] * sample_sec  # Time of peak voltage at end of ramp
 
 
 """
@@ -193,7 +192,7 @@ def get_characteristic_array(bias, current, plateau_ranges):
     print("Creating characteristic array... (May take up to 60 seconds)")
     num_pos = plateau_ranges.shape[0] * plateau_ranges.shape[1]
     for pos in range(num_pos):
-        print(' ' if pos % 10 ** round(math.log10(num_pos) - 1) != 0 else '|', end="")
+        print(" " if pos % 10 ** round(math.log10(num_pos) - 1) != 0 else "|", end="")
     print(" (", num_pos, ")")
     for i in range(plateau_ranges.shape[0]):
         for j in range(plateau_ranges.shape[1]):
@@ -203,7 +202,7 @@ def get_characteristic_array(bias, current, plateau_ranges):
                     bias[i, j], current[i, j], start_ind, stop_ind)
 
         # print("Finished x position", i + 1, "/", plateau_ranges.shape[0])
-        print('.', end="")
+        print(".", end="")
     print(" ")
 
     return characteristic_array
@@ -222,7 +221,8 @@ def to_characteristic_xarray(characteristic_array, time_array, x, y):
                                                  ('y', y, {'units': str(u.cm)}),
                                                  ('plateau', np.arange(characteristic_array.shape[2]) + 1)))
     characteristic_xarray = characteristic_xarray.assign_coords(
-        {'time': ('plateau', time_array_ms.mean(axis=(0, 1)), {'units': str(u.ms)})})
+        {'time': ('plateau', np.median(time_array_ms, axis=(0, 1)), {'units': str(u.ms)})})
+    #   {'time': ('plateau', time_array_ms.mean(axis=(0, 1)), {'units': str(u.ms)})})
     # Average the plateau time coordinate for all x,y positions to make 1D coordinate, keeping plateau dimension
 
     return characteristic_xarray

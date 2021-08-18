@@ -7,11 +7,11 @@ def read_netcdf(filename):
         return open_netcdf(filename)
     else:
         netcdf_files = search_netcdf()
-        print("The file at the specified location '", filename, "' does not exist.",
+        print("The file at the specified location '", filename, "' does not exist. ",
               "The following NetCDF files were found in the current working directory:\n",
-              [str(i + 1) + ":" + str(netcdf_files[i]) for i in range(len(netcdf_files))])
-        file_choice = int(input("Type a number to select the corresponding file,"
-                                "or 0 to create a new diagnostic dataset from the given HDF5 file path."))
+              [str(i + 1) + ":" + str(netcdf_files[i]) for i in range(len(netcdf_files))], sep="")
+        file_choice = int(input("Type a number to select the corresponding file, "
+                                "or 0 to create a new diagnostic dataset from the given HDF5 file path.\n"))
         if file_choice == 0:
             return False
         dataset = xr.open_dataset(netcdf_files[file_choice - 1])

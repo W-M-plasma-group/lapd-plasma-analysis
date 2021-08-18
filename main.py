@@ -6,6 +6,8 @@ from diagnostics import *
 from plots import *
 from netCDFaccess import *
 from interferometry import *
+from neutrals import *
+from setup import *
 
 print("Imported helper files")
 
@@ -19,9 +21,9 @@ steady_state_start_plateau, steady_state_end_plateau = 5, 11  # From MATLAB code
 # End of global parameters
 
 # File path names
-hdf5_filename = 'HDF5/8-3500A.hdf5'
+hdf5_filename = "/Users/leo/Plasma code/HDF5/8-3500A.hdf5"
 # save_filename = 'netCDF/diagnostic_dataset.nc'
-save_filename = 'diagnostic_dataset.nc'
+save_filename = "diagnostic_dataset.nc"
 open_filename = save_filename            # write to and read from the same location
 interferometry_filename = hdf5_filename  # interferometry data stored in same HDF5 file
 # End of file path names
@@ -34,6 +36,9 @@ use_existing = True
 save_diagnostics = True
 # End of file options
 
+
+experimental_parameters = setup_lapd(hdf5_filename)
+print("Experimental parameters:", {key: str(value) for key, value in experimental_parameters.items()})
 bias, current, x, y = get_isweep_vsweep(hdf5_filename)
 
 diagnostics_dataset = read_netcdf(open_filename) if use_existing else False  # the desired dataset, or False to use HDF5
@@ -43,7 +48,7 @@ if not diagnostics_dataset:  # diagnostic dataset not loaded; create new from HD
     if save_diagnostics:
         write_netcdf(diagnostics_dataset, save_filename)
 
-radial_plot(diagnostics_dataset, diagnostic='n_e', plot='contour')
+radial_diagnostic_plot(diagnostics_dataset, diagnostic='n_e', plot='contour')
 plt.show()
 
 # Analysis of single sample Isweep-Vsweep curve
@@ -63,6 +68,10 @@ electron_density, density_scaling = interferometry_calibration(
 # debug
 # print(density_scaling, has_xy, electron_density, sep="\n")
 electron_density.squeeze().plot.contourf(robust=True)
+plt.show()
+
+plasma_neutrals(diagnostics_dataset['n_e'], experimental_parameters,
+                steady_state_start_plateau, steady_state_end_plateau)
 plt.show()
 
 # Note: The non-bimaxwellian plasmapy electron temperature seems to be the *reciprocal* of the correct value.
