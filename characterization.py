@@ -1,9 +1,10 @@
-import warnings
 import math
+import warnings
+
+import astropy.units as u
 import numpy as np
 import xarray as xr
-import astropy.units as u
-from plasmapy.diagnostics.langmuir import Characteristic
+from plasmapy.diagnostics.langmuir import Characteristic, _langmuir_futurewarning as future_warn  # noqa
 
 
 def characterize_sweep_array(unadjusted_bias, unadjusted_current, x_round, y_round, margin, sample_sec):
@@ -182,7 +183,6 @@ def get_time_array(plateau_ranges, sample_sec=(100 / 16 * 10 ** 6) ** (-1) * u.s
 
 
 def get_characteristic_array(bias, current, plateau_ranges):
-    # Make sure to store time information!
 
     characteristic_array = np.empty((plateau_ranges.shape[:3]), dtype=object)  # x, y, plateau
     # Address case where there are an irregular number of plateaus in a frame to begin with!
@@ -190,6 +190,8 @@ def get_characteristic_array(bias, current, plateau_ranges):
     #    to analyze. Invalid ones should be skipped, but preserved in the array.
 
     print("Creating characteristic array... (May take up to 60 seconds)")
+    warnings.simplefilter(action='ignore', category=FutureWarning)  # Suppress FutureWarnings to not break loading bar
+    print("    Note: plasmapy.langmuir.diagnostics pending deprecation FutureWarning suppressed")
     num_pos = plateau_ranges.shape[0] * plateau_ranges.shape[1]
     for pos in range(num_pos):
         print(" " if pos % 10 ** round(math.log10(num_pos) - 1) != 0 else "|", end="")
@@ -216,12 +218,12 @@ def to_characteristic_xarray(characteristic_array, time_array, x, y):
     # Use hard-coded and calculated inputs to add coordinate and variable information to characteristic array
 
     time_array_ms = time_array.to(u.ms).value
-    characteristic_xarray = xr.DataArray(characteristic_array, dims=['x', 'y', 'plateau'],
+    characteristic_xarray = xr.DataArray(characteristic_array, dims=['x', 'y', 'time'],
                                          coords=(('x', x, {'units': str(u.cm)}),
                                                  ('y', y, {'units': str(u.cm)}),
-                                                 ('plateau', np.arange(characteristic_array.shape[2]) + 1)))
+                                                 ('time', np.median(time_array_ms, axis=(0, 1)), {'units': str(u.ms)})))
     characteristic_xarray = characteristic_xarray.assign_coords(
-        {'time': ('plateau', np.median(time_array_ms, axis=(0, 1)), {'units': str(u.ms)})})
+        {'plateau': ('time', np.arange(characteristic_array.shape[2]) + 1)})
     #   {'time': ('plateau', time_array_ms.mean(axis=(0, 1)), {'units': str(u.ms)})})
     # Average the plateau time coordinate for all x,y positions to make 1D coordinate, keeping plateau dimension
 

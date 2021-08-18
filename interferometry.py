@@ -80,7 +80,7 @@ def interferometry_calibration(density_xarray, interferometry_filename,
         x_integral = core_density_array.integrate('x')
 
         # Find time of density collapse in x; take average to get one single average x density collapse time (scalar)
-        density_collapse_time_x = x_integral.idxmax('plateau').coords['time'].mean()
+        density_collapse_time_x = x_integral.idxmax('time').mean()
 
         # Align times so that interferometry data collapse matches x density data max
         aligned_x_time = inter_data.coords['time'] - inter_collapse_time + density_collapse_time_x
@@ -106,9 +106,9 @@ def interferometry_calibration(density_xarray, interferometry_filename,
         inter_avg_y_time = xr.DataArray([inter_data.where(both(inter_data.coords['y_time'] > t - dt / 2,
                                                                inter_data.coords['y_time'] < t + dt / 2)
                                                           ).mean() for t in density_data.coords['time']],
-                                        dims=['plateau'],
-                                        coords={'plateau': density_data.coords['plateau'],
-                                                'time': ('plateau', density_data.coords['time'])})
+                                        dims=['time'],
+                                        coords={'time':  density_data.coords['time'],
+                                                'plateau': ('time', density_data.coords['plateau'])})
         density_scaling['y'] = inter_avg_y_time / y_integral
 
     # SCALING FACTOR CALCULATION #
@@ -134,7 +134,7 @@ def to_real_interferometry_units(interferometry_data_array, interferometry_time_
     return interferometry_data_array * area_factor, interferometry_time_array * time_factor
 
 
-def crunch_data(data_array, dimension, destination_coordinate, step):
+def crunch_data(data_array, data_coordinate, destination_coordinate, step):
     # "Crunch" interferometry data into the density data timescale by averaging all interferometry measurements
     #     into a "bucket" around the closest matching density time coordinate (within half a time step)
     #     [inter. ]   (*   *) (*) (*   *) (*) (*   *)   <-- average together all (grouped together) measurements
@@ -147,7 +147,7 @@ def crunch_data(data_array, dimension, destination_coordinate, step):
     Parameters
     ----------
     :param data_array: xarray DataArray
-    :param dimension: string, dimension in data_array
+    :param data_coordinate: string, dimension in data_array
     :param destination_coordinate: xarray DataArray, used as coordinate
     :param step:
     :return:
@@ -155,13 +155,13 @@ def crunch_data(data_array, dimension, destination_coordinate, step):
 
     # Group input data "data_array" along the dimension specified by "dimension" (dimension coordinate values used)
     #    by the coordinate in the xarray "destination_coordinate", assumed to have regular spacing "step" and take means
-    grouped_mean = data_array.groupby_bins(dimension, np.linspace(
+    grouped_mean = data_array.groupby_bins(data_coordinate, np.linspace(
         destination_coordinate[0] - step / 2, destination_coordinate[-1] + step / 2, len(destination_coordinate) + 1),
                                            labels=destination_coordinate.data).mean()
 
     # This result has only one dimension, the input data "dimension" + "_bins", labeled with the destination coordinate.
-    #    We want to return an xarray with all the dimensions and coordinates (in this case: plateau dimension,
-    #    plateau dimension coordinate, time non-dimension coordinate) of the destination data.
+    #    We want to return an xarray with all the dimensions and coordinates (in this case: time dimension,
+    #    time dimension coordinate, plateau non-dimension coordinate) of the destination data.
     #    This involves renaming the "_bins" dimension to match the destination coordinate,
     #    creating a new coordinate identical to the destination coordinate's dimension coordinate,
     #    and swapping the two new coordinates to give the xarray the same dimension coordinate as the destination.
@@ -170,7 +170,7 @@ def crunch_data(data_array, dimension, destination_coordinate, step):
     destination_coordinate_name = destination_coordinate.name  # The name of the destination coordinate
 
     # Rename position-time-"_bins" dimension name to match destination coordinate, for example "x_time_bins" to "time"
-    named_mean = grouped_mean.rename({dimension + "_bins": destination_coordinate_name})
+    named_mean = grouped_mean.rename({data_coordinate + "_bins": destination_coordinate_name})
     # Add the destination dimension coordinate to the output xarray as a new coordinate
     named_mean = named_mean.assign_coords({destination_dimension: (destination_coordinate_name,
                                                                    destination_coordinate[destination_dimension].data)})
