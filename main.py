@@ -11,25 +11,25 @@ from setup import *
 
 print("Imported helper files")
 
-# Global parameters
+# User global parameters
 sample_sec = (100 / 16 * 1e6) ** (-1) * u.s               # Note that this is small. 10^6 is in the denominator
 probe_area = (1. * u.mm) ** 2                                 # From MATLAB code
 core_region = 26. * u.cm                                      # From MATLAB code
 ion_type = 'He-4+'
-smoothing_margin = 10
 bimaxwellian = False
+smoothing_margin = 10
 steady_state_start_plateau, steady_state_end_plateau = 5, 11  # From MATLAB code
 # End of global parameters
 
-# File path names
-hdf5_filename = "/Users/leo/Plasma code/HDF5/8-3500A.hdf5"
-# save_filename = 'netCDF/diagnostic_dataset.nc'
-save_filename = "diagnostic_dataset.nc"
-open_filename = save_filename            # write to and read from the same location
-interferometry_filename = hdf5_filename  # interferometry data stored in same HDF5 file
+# User file path names
+hdf5_path = "/Users/leo/Plasma code/HDF5/8-3500A.hdf5"
+interferometry_filename = hdf5_path  # interferometry data stored in same HDF5 file
+save_diagnostic_filename = "diagnostic_dataset.nc"    # Note: file saves to subfolder 'netcdf' to be created if needed
+open_diagnostic_filename = save_diagnostic_filename   # write to and read from the same location
+netcdf_subfolder_name = "netcdf"                      # subfolder to save and read netcdf files; "" for current folder
 # End of file path names
 
-# File options
+# User file options
 """ Set the below variable to True to open an existing diagnostic dataset from a NetCDF file
     or False to create a new diagnostic dataset from the given HDF5 file. """
 use_existing = True
@@ -38,16 +38,21 @@ save_diagnostics = True
 # End of file options
 
 
-experimental_parameters = setup_lapd(hdf5_filename)
-print("Experimental parameters:", {key: str(value) for key, value in experimental_parameters.items()})
-bias, current, x, y = get_isweep_vsweep(hdf5_filename)
+# Establish paths to create files in specified netcdf subfolder
+netcdf_subfolder_path = ensure_netcdf_directory(netcdf_subfolder_name)
+save_diagnostic_path = netcdf_path(save_diagnostic_filename, netcdf_subfolder_path, bimaxwellian)
+open_diagnostic_path = netcdf_path(open_diagnostic_filename, netcdf_subfolder_path, bimaxwellian)
 
-diagnostics_dataset = read_netcdf(open_filename) if use_existing else None  # the desired dataset, or None to use HDF5
+experimental_parameters = setup_lapd(hdf5_path)
+print("Experimental parameters:", {key: str(value) for key, value in experimental_parameters.items()})
+bias, current, x, y = get_isweep_vsweep(hdf5_path)
+
+diagnostics_dataset = read_netcdf(open_diagnostic_path) if use_existing else None  # desired dataset or None to use HDF5
 if not diagnostics_dataset:  # diagnostic dataset not loaded; create new from HDF5 file
     characteristics = characterize_sweep_array(bias, current, x, y, margin=smoothing_margin, sample_sec=sample_sec)
     diagnostics_dataset = plasma_diagnostics(characteristics, probe_area, ion_type, bimaxwellian=bimaxwellian)
     if save_diagnostics:
-        write_netcdf(diagnostics_dataset, save_filename)
+        write_netcdf(diagnostics_dataset, save_diagnostic_path)
 
 radial_diagnostic_plot(diagnostics_dataset, diagnostic='T_e', plot='contour')
 plt.show()
