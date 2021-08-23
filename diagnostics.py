@@ -31,11 +31,14 @@ def plasma_diagnostics(characteristic_xarray, probe_area, ion_type, bimaxwellian
                         diagnostic_dataset = diagnostic_dataset.rename(
                             {str(i): list(diagnostics.keys())[i] for i in range(len(diagnostics.keys()))})
                         for unit_key in diagnostics.keys():
-                            diagnostic_dataset[unit_key].attrs['unit'] = str(unit_safe(diagnostics[unit_key]))
+                            diagnostic_dataset[unit_key].attrs['units'] = str(unit_safe(diagnostics[unit_key]))
                         if bimaxwellian:
                             # electron temperature values broadcasted into array dimension of size two
+                            # TODO store as separate diagnostics 'T_e_hot' and 'T_e_cold'? This could eliminate need
+                            #     for two separate files (store in same) and for most contrivances in plots.py,
+                            #     but should make sure that ex. old T_e data from a previous HDF5 file isn't used
                             diagnostic_dataset['T_e'] = diagnostic_dataset['T_e'].expand_dims(
-                                dim={"population": 2}, axis=-1).copy()
+                                dim={"population": ["cold", "hot"]}, axis=-1).copy()
                         diagnostic_names_assigned = True
 
                     for key in diagnostics.keys():

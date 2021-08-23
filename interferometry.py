@@ -42,6 +42,8 @@ def interferometry_calibration(density_xarray, interferometry_filename,
     # DENSITY DATA #
     # ____________ #
 
+    # TODO correct interferometry issues for bimaxwellian diagnostics
+
     # Calculate density line integrals
     density_data = density_xarray * (1 / u.m ** 3).to(1 / u.cm ** 3).value  # density data in units of 1 / cm^3; rename?
 

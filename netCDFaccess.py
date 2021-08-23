@@ -56,9 +56,11 @@ def ensure_netcdf_directory(directory_path):
     return directory_path
 
 
-def netcdf_path(netcdf_filename, netcdf_subfolder, bimaxwellian):
+def netcdf_path(netcdf_name, netcdf_subfolder, bimaxwellian):
     # if not diagnostic_filename.endswith(".nc"):
-    if not os.path.splitext(netcdf_filename)[1] == ".nc":  # checks if file has .nc extension
-        raise ValueError("Name for NetCDF save file " + repr(netcdf_filename) + " should end with a .nc file extension")
-    else:  # valid filename
-        return os.path.join(netcdf_subfolder, netcdf_filename)
+    name, extension = os.path.splitext(netcdf_name)
+    if extension != "":  # checks if netcdf name has an extension
+        warnings.warn("Name for NetCDF save file " + repr(netcdf_name) + " should not end with a file extension "
+                      "(file extension will be added automatically). Trimming extension from filename.")
+    full_netcdf_filename = name + ("_bimaxwellian" if bimaxwellian else "") + ".nc"
+    return os.path.join(netcdf_subfolder, full_netcdf_filename)

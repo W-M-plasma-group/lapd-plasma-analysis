@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 import astropy.units as u
 import xarray as xr
 
@@ -40,6 +41,7 @@ def neutral_ratio(electron_density, experimental_parameters, steady_state_start,
 
         # debug
         radial_electron_density.where(radial_electron_density.coords[radial_dimension] >= 0, drop=True).plot()
+        plt.show()
         #
 
     elif electron_density.sizes['x'] > 1 and electron_density.sizes['y'] > 1:  # areal (2D) data

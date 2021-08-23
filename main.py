@@ -1,5 +1,3 @@
-import matplotlib.pyplot as plt
-
 from getIVsweep import *
 from characterization import *
 from diagnostics import *
@@ -23,25 +21,25 @@ steady_state_start_plateau, steady_state_end_plateau = 5, 11  # From MATLAB code
 
 # User file path names
 hdf5_path = "/Users/leo/Plasma code/HDF5/8-3500A.hdf5"
-interferometry_filename = hdf5_path  # interferometry data stored in same HDF5 file
-save_diagnostic_filename = "diagnostic_dataset.nc"    # Note: file saves to subfolder 'netcdf' to be created if needed
-open_diagnostic_filename = save_diagnostic_filename   # write to and read from the same location
-netcdf_subfolder_name = "netcdf"                      # subfolder to save and read netcdf files; "" for current folder
+interferometry_filename = hdf5_path           # interferometry data stored in same HDF5 file
+save_diagnostic_name = "diagnostic_dataset"   # Note: file is saved to a subfolder "netcdf" to be created if necessary
+open_diagnostic_name = save_diagnostic_name   # write to and read from the same location
+netcdf_subfolder_name = "netcdf"              # subfolder to save and read netcdf files; set to "" to use current folder
 # End of file path names
 
 # User file options
 """ Set the below variable to True to open an existing diagnostic dataset from a NetCDF file
     or False to create a new diagnostic dataset from the given HDF5 file. """
 use_existing = True
-""" Set the below variable to True when creating a new diagnostic dataset to save the dataset to a NetCDF file. """
+""" Set the below variable to True to save diagnostic data to a NetCDF file if a new one is created from HDF5 data. """
 save_diagnostics = True
 # End of file options
 
 
 # Establish paths to create files in specified netcdf subfolder
 netcdf_subfolder_path = ensure_netcdf_directory(netcdf_subfolder_name)
-save_diagnostic_path = netcdf_path(save_diagnostic_filename, netcdf_subfolder_path, bimaxwellian)
-open_diagnostic_path = netcdf_path(open_diagnostic_filename, netcdf_subfolder_path, bimaxwellian)
+save_diagnostic_path = netcdf_path(save_diagnostic_name, netcdf_subfolder_path, bimaxwellian)
+open_diagnostic_path = netcdf_path(open_diagnostic_name, netcdf_subfolder_path, bimaxwellian)
 
 experimental_parameters = setup_lapd(hdf5_path)
 print("Experimental parameters:", {key: str(value) for key, value in experimental_parameters.items()})
@@ -55,15 +53,18 @@ if not diagnostics_dataset:  # diagnostic dataset not loaded; create new from HD
         write_netcdf(diagnostics_dataset, save_diagnostic_path)
 
 radial_diagnostic_plot(diagnostics_dataset, diagnostic='T_e', plot='contour')
-plt.show()
 
 # Analysis of single sample Isweep-Vsweep curve
-"""
+# """
 sample_indices = (30, 0, 7)  # x position, y position, plateau number within frame
-sample_plateau = characteristics[sample_indices].item()
-print(swept_probe_analysis(sample_plateau, probe_area, ion_type, 
-                            visualize=True, plot_EEDF=True, bimaxwellian=False))
+"""
+sample_plateau = diagnostics_dataset[sample_indices].item()
+print(swept_probe_analysis(sample_plateau, probe_area, ion_type,
+                           visualize=True, plot_EEDF=True, bimaxwellian=bimaxwellian))
 plt.show()
+# """
+"""
+print({diagnostic: diagnostics_dataset[diagnostic][sample_indices].values for diagnostic in diagnostics_dataset.keys()})
 print("Done analyzing sample characteristic")
 # """
 
@@ -77,7 +78,6 @@ electron_density.squeeze().plot.contourf(robust=True)
 plt.show()
 
 neutral_ratio(diagnostics_dataset['n_e'], experimental_parameters, steady_state_start_plateau, steady_state_end_plateau)
-plt.show()
 
 # TODO Finish adding code from the MATLAB main method to Python code!
 

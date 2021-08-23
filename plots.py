@@ -1,6 +1,7 @@
 # Add comments
 from warnings import warn
 
+import matplotlib.pyplot as plt
 import numpy as np
 
 
@@ -16,6 +17,7 @@ def radial_diagnostic_plot(diagnostics_dataset, diagnostic='T_e', plot='contour'
         raise ValueError("The input choice of diagnostic", diagnostic,
                          "is not a valid diagnostic. Valid diagnostics are:", diagnostics_dataset.keys())
     pos_time_diagnostic_xarray = radial_diagnostics_dataset[diagnostic]
+    units = pos_time_diagnostic_xarray.attrs['units']
 
     allowed_plot_types = ('contour', 'surface')
     if plot not in allowed_plot_types:
@@ -35,20 +37,30 @@ def radial_diagnostic_plot(diagnostics_dataset, diagnostic='T_e', plot='contour'
                          "that is invalid for surface plotting (must be two or three-dimensional)")
 
     # Plot the variable, creating separate plots for multi-variable diagnostics
-    for var in range(pos_time_diagnostic_xarray.shape[-1]):
-        pos_time_var_xarray = pos_time_diagnostic_xarray[..., var]
+    number_of_vars = pos_time_diagnostic_xarray.shape[-1]
+    for var in range(number_of_vars):
+        radial_crop_plot(pos_time_diagnostic_xarray[..., var], plot_type=plot)
+    if number_of_vars == 2:  # two-variable diagnostic, for example bimaxwellian electron temperature
+        # Note: this option is hardcoded specifically to plot T_e_hot - T_e_cold for bimaxwellian temperature data
+        difference_data = pos_time_diagnostic_xarray[..., 1] - pos_time_diagnostic_xarray[..., 0]
+        radial_crop_plot(difference_data.assign_attrs({"standard_name": diagnostic + " difference",
+                                                       "units": units}), plot_type=plot)
 
-        if plot == "contour":
-            pos_time_var_xarray.plot.contourf(x='time', y='x', robust=True)
-        elif plot == "surface":
-            # TODO raise issue on xarray about surface plotting not handling np.nan properly in choosing colormap!
-            # color_min, color_max = np.nanpercentile(pos_time_var_xarray, 2), np.nanpercentile(pos_time_var_xarray, 98)
-            # cropped_var_xarray.plot.surface(x='time', y='x', cmap='viridis', vmin=color_min, vmax=color_max)
 
-            # crop outlier diagnostic values; make sure that this is acceptable data handling
-            # note: only crops high values; cropping low and high would require xarray.ufuncs.logical_and, aka "both"
-            q1, q3 = np.nanpercentile(pos_time_var_xarray, [25, 75])
-            cropped_var_xarray = pos_time_var_xarray.where(pos_time_var_xarray <= q3 + 1.5 * (q3 - q1))
-            color_min, color_max = np.nanmin(cropped_var_xarray), np.nanmax(cropped_var_xarray)
+def radial_crop_plot(pos_time_var_xarray, plot_type):
+    if plot_type == "contour":
+        pos_time_var_xarray.plot.contourf(x='time', y='x', robust=True)
+        plt.show()
+    elif plot_type == "surface":
+        # TODO raise issue on xarray about surface plotting not handling np.nan properly in choosing colormap!
+        # color_min, color_max = np.nanpercentile(pos_time_var_xarray, 2), np.nanpercentile(pos_time_var_xarray, 98)
+        # cropped_var_xarray.plot.surface(x='time', y='x', cmap='viridis', vmin=color_min, vmax=color_max)
 
-            cropped_var_xarray.plot.surface(x='time', y='x', cmap='viridis', vmin=color_min, vmax=color_max)
+        # crop outlier diagnostic values; make sure that this is acceptable data handling
+        # note: only crops high values; cropping low and high would require xarray.ufuncs.logical_and, aka "both"
+        q1, q3 = np.nanpercentile(pos_time_var_xarray, [25, 75])
+        cropped_var_xarray = pos_time_var_xarray.where(pos_time_var_xarray <= q3 + 1.5 * (q3 - q1))
+        color_min, color_max = np.nanmin(cropped_var_xarray), np.nanmax(cropped_var_xarray)
+
+        cropped_var_xarray.plot.surface(x='time', y='x', cmap='viridis', vmin=color_min, vmax=color_max)
+        plt.show()
