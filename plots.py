@@ -1,24 +1,26 @@
 # Add comments
-import warnings
-from astropy import visualization
+from warnings import warn
+
+import numpy as np
 
 
-def radial_diagnostic_plot(diagnostics_xarray, diagnostic='T_e', plot='contour'):
-    # Return a plot of the specified type for the specified diagnostic.
+def radial_diagnostic_plot(diagnostics_dataset, diagnostic='T_e', plot='contour'):
+    # Return a plot of the specified type for the specified diagnostic in the dataset.
 
-    if diagnostics_xarray.sizes['x'] > 1 and diagnostics_xarray.sizes['y'] > 1:
-        raise ValueError("x and y dimensions have lengths", diagnostics_xarray.shape[:2],
+    if diagnostics_dataset.sizes['x'] > 1 and diagnostics_dataset.sizes['y'] > 1:
+        raise ValueError("x and y dimensions have lengths", diagnostics_dataset.shape[:2],
                          "both greater than 1. A radial plot cannot be made. Areal plots are not yet supported.")
-    radial_diagnostics_xarray = diagnostics_xarray.squeeze()
+    radial_diagnostics_dataset = diagnostics_dataset.squeeze()
 
-    if diagnostic not in diagnostics_xarray:
+    if diagnostic not in diagnostics_dataset:
         raise ValueError("The input choice of diagnostic", diagnostic,
-                         "is not a valid diagnostic. Valid diagnostics are:", diagnostics_xarray.keys())
-    pos_time_diagnostic_xarray = radial_diagnostics_xarray[diagnostic]
+                         "is not a valid diagnostic. Valid diagnostics are:", diagnostics_dataset.keys())
+    pos_time_diagnostic_xarray = radial_diagnostics_dataset[diagnostic]
 
     allowed_plot_types = ('contour', 'surface')
     if plot not in allowed_plot_types:
-        warnings.warn("The type of plot '" + str(plot) + "' is not supported. Defaulting to contour plot.")
+        warn("The type of plot '" + str(plot) + "' is not in the supported plot type list " + str(allowed_plot_types) +
+             ". Defaulting to contour plot.")
         plot = 'contour'
 
     # Determine if chosen diagnostic has one or multiple values in the quantity
@@ -35,9 +37,18 @@ def radial_diagnostic_plot(diagnostics_xarray, diagnostic='T_e', plot='contour')
     # Plot the variable, creating separate plots for multi-variable diagnostics
     for var in range(pos_time_diagnostic_xarray.shape[-1]):
         pos_time_var_xarray = pos_time_diagnostic_xarray[..., var]
-        # print(pos_time_var_xarray)
-        with visualization.quantity_support():
-            if plot == "contour":
-                pos_time_var_xarray.plot.contourf(x='time', y='x', robust=True)
-            elif plot == "surface":
-                pos_time_var_xarray.plot.surface(x='time', y='x', robust=True)
+
+        if plot == "contour":
+            pos_time_var_xarray.plot.contourf(x='time', y='x', robust=True)
+        elif plot == "surface":
+            # TODO raise issue on xarray about surface plotting not handling np.nan properly in choosing colormap!
+            # color_min, color_max = np.nanpercentile(pos_time_var_xarray, 2), np.nanpercentile(pos_time_var_xarray, 98)
+            # cropped_var_xarray.plot.surface(x='time', y='x', cmap='viridis', vmin=color_min, vmax=color_max)
+
+            # crop outlier diagnostic values; make sure that this is acceptable data handling
+            # note: only crops high values; cropping low and high would require xarray.ufuncs.logical_and, aka "both"
+            q1, q3 = np.nanpercentile(pos_time_var_xarray, [25, 75])
+            cropped_var_xarray = pos_time_var_xarray.where(pos_time_var_xarray <= q3 + 1.5 * (q3 - q1))
+            color_min, color_max = np.nanmin(cropped_var_xarray), np.nanmax(cropped_var_xarray)
+
+            cropped_var_xarray.plot.surface(x='time', y='x', cmap='viridis', vmin=color_min, vmax=color_max)

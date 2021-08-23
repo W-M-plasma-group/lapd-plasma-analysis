@@ -13,7 +13,7 @@ def read_netcdf(filename):
         file_choice = int(input("Type a number to select the corresponding file, "
                                 "or 0 to create a new diagnostic dataset from the given HDF5 file path.\n"))
         if file_choice == 0:
-            return False
+            return None
         dataset = xr.open_dataset(netcdf_files[file_choice - 1])
     return dataset
 

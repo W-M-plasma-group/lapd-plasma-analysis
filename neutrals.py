@@ -2,7 +2,7 @@ import astropy.units as u
 import xarray as xr
 
 
-def plasma_neutrals(electron_density, experimental_parameters, steady_state_start, steady_state_end):
+def neutral_ratio(electron_density, experimental_parameters, steady_state_start, steady_state_end):
     # SETUP CODE #
     # __________ #
 

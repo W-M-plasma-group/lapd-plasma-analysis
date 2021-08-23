@@ -40,7 +40,7 @@ def plasma_diagnostics(characteristic_xarray, probe_area, ion_type, bimaxwellian
 
                     for key in diagnostics.keys():
                         diagnostic_value = value_safe(diagnostics[key])
-                        if key == 'T_e' and flag_electron_temperature(diagnostic_value, minimum=0, maximum=15):
+                        if key == 'T_e' and flag_diagnostic(diagnostic_value, minimum=0, maximum=15):
                             # remove unrealistic electron temperature values; hard-coded acceptable temperature range
                             diagnostic_value = np.nan
                         diagnostic_dataset[key][i, j, p] = diagnostic_value
@@ -59,10 +59,10 @@ def verify_plateau(characteristic, probe_area, ion_type, bimaxwellian):
     return diagnostics
 
 
-def flag_electron_temperature(temp, minimum, maximum):  # discard T_e values outside of specified range
+def flag_diagnostic(diagnostic, minimum, maximum):  # discard T_e and other diagnostic values outside of specified range
 
-    temp_1d = np.atleast_1d(temp)
-    return (temp_1d < minimum).any() or (temp_1d > maximum).any()
+    diagnostic_1d = np.atleast_1d(diagnostic)
+    return (diagnostic_1d < minimum).any() or (diagnostic_1d > maximum).any()
 
 
 def value_safe(quantity_or_scalar):  # Get value of quantity or scalar, depending on type

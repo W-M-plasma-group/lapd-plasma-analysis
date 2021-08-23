@@ -4,7 +4,7 @@ import warnings
 import astropy.units as u
 import numpy as np
 import xarray as xr
-from plasmapy.diagnostics.langmuir import Characteristic, _langmuir_futurewarning as future_warn  # noqa
+from plasmapy.diagnostics.langmuir import Characteristic
 
 
 def characterize_sweep_array(unadjusted_bias, unadjusted_current, x_round, y_round, margin, sample_sec):
@@ -163,7 +163,7 @@ def create_ranged_characteristic(bias, current, start, end):
     return Characteristic(bias[start:end], current[start:end])
 
 
-def get_time_array(plateau_ranges, sample_sec=(100 / 16 * 10 ** 6) ** (-1) * u.s):
+def get_time_array(plateau_ranges, sample_sec=(100 / 16 * 1e6) ** (-1) * u.s):
     # Make more robust; is mean time during shot okay? Clean up, decide final form
     # x, y, time in milliseconds since start of that [average] shot using sample_sec in milliseconds
     # NOTE: MATLAB code stores peak voltage time (end of plateaus), then only uses plateau times for very first position
@@ -224,7 +224,6 @@ def to_characteristic_xarray(characteristic_array, time_array, x, y):
                                                  ('time', np.median(time_array_ms, axis=(0, 1)), {'units': str(u.ms)})))
     characteristic_xarray = characteristic_xarray.assign_coords(
         {'plateau': ('time', np.arange(characteristic_array.shape[2]) + 1)})
-    #   {'time': ('plateau', time_array_ms.mean(axis=(0, 1)), {'units': str(u.ms)})})
     # Average the plateau time coordinate for all x,y positions to make 1D coordinate, keeping plateau dimension
 
     return characteristic_xarray

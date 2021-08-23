@@ -12,11 +12,12 @@ from setup import *
 print("Imported helper files")
 
 # Global parameters
-sample_sec = (100 / 16 * 10 ** 6) ** (-1) * u.s               # Note that this is small. 10^6 is in the denominator
+sample_sec = (100 / 16 * 1e6) ** (-1) * u.s               # Note that this is small. 10^6 is in the denominator
 probe_area = (1. * u.mm) ** 2                                 # From MATLAB code
 core_region = 26. * u.cm                                      # From MATLAB code
 ion_type = 'He-4+'
 smoothing_margin = 10
+bimaxwellian = False
 steady_state_start_plateau, steady_state_end_plateau = 5, 11  # From MATLAB code
 # End of global parameters
 
@@ -41,14 +42,14 @@ experimental_parameters = setup_lapd(hdf5_filename)
 print("Experimental parameters:", {key: str(value) for key, value in experimental_parameters.items()})
 bias, current, x, y = get_isweep_vsweep(hdf5_filename)
 
-diagnostics_dataset = read_netcdf(open_filename) if use_existing else False  # the desired dataset, or False to use HDF5
+diagnostics_dataset = read_netcdf(open_filename) if use_existing else None  # the desired dataset, or None to use HDF5
 if not diagnostics_dataset:  # diagnostic dataset not loaded; create new from HDF5 file
     characteristics = characterize_sweep_array(bias, current, x, y, margin=smoothing_margin, sample_sec=sample_sec)
-    diagnostics_dataset = plasma_diagnostics(characteristics, probe_area, ion_type, bimaxwellian=False)
+    diagnostics_dataset = plasma_diagnostics(characteristics, probe_area, ion_type, bimaxwellian=bimaxwellian)
     if save_diagnostics:
         write_netcdf(diagnostics_dataset, save_filename)
 
-radial_diagnostic_plot(diagnostics_dataset, diagnostic='n_e', plot='contour')
+radial_diagnostic_plot(diagnostics_dataset, diagnostic='T_e', plot='contour')
 plt.show()
 
 # Analysis of single sample Isweep-Vsweep curve
@@ -70,8 +71,9 @@ electron_density, density_scaling = interferometry_calibration(
 electron_density.squeeze().plot.contourf(robust=True)
 plt.show()
 
-plasma_neutrals(diagnostics_dataset['n_e'], experimental_parameters,
-                steady_state_start_plateau, steady_state_end_plateau)
+neutral_ratio(diagnostics_dataset['n_e'], experimental_parameters, steady_state_start_plateau, steady_state_end_plateau)
 plt.show()
+
+# TODO Finish adding code from the MATLAB main method to Python code!
 
 # Note: The non-bimaxwellian plasmapy electron temperature seems to be the *reciprocal* of the correct value.

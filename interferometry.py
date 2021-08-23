@@ -129,8 +129,8 @@ def interferometry_calibration(density_xarray, interferometry_filename,
 
 
 def to_real_interferometry_units(interferometry_data_array, interferometry_time_array):
-    area_factor = 8. * 10 ** 13 / (u.cm ** 2)  # from MATLAB code
-    time_factor = ((4.88 * 10 ** -5) * u.s).to(u.ms)  # from MATLAB code
+    area_factor = 8e13 / (u.cm ** 2)  # from MATLAB code
+    time_factor = (4.88e-5 * u.s).to(u.ms)  # from MATLAB code
     return interferometry_data_array * area_factor, interferometry_time_array * time_factor
 
 
