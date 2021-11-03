@@ -19,7 +19,7 @@ def get_isweep_vsweep(filename):
 
     isweep_data_raw, vsweep_data_raw, isweep_headers_raw, vsweep_headers_raw = get_sweep_data_headers(hdf5_file)
 
-    print("Reading in scales and offsets from headers...")
+    # print("Reading in scales and offsets from headers...")
     # Define: scale is 2nd index, offset is 3rd index
     isweep_scales, isweep_offsets = get_scales_offsets(isweep_headers_raw, scale_index=1, offset_index=2)
     vsweep_scales, vsweep_offsets = get_scales_offsets(vsweep_headers_raw, scale_index=1, offset_index=2)
@@ -64,9 +64,6 @@ def get_xy(file):
     motor_data = structures_at_path(file, '/Raw data + config/6K Compumotor')
     motion_path = (motor_data["Datasets"])[0]
     probe_motion = file[motion_path]
-    # print("Data type of probe_motion dataset: ", probe_motion.dtype)
-
-    print("Rounding position data...")
 
     places = 1
     x_round = np.round(probe_motion['x'], decimals=places)
@@ -94,6 +91,8 @@ def categorize_shots_xy(x_round, y_round, shot_list):
     x_length = len(x)
     y_length = len(y)
 
+    # May not be necessary
+    """
     # Determine if data is areal, radial, or scalar
     if x_length == 1 and y_length == 1:
         print("Only one position value. No plots can be made")
@@ -101,6 +100,7 @@ def categorize_shots_xy(x_round, y_round, shot_list):
         print("Only one unique x value. Will only consider y position")
     elif y_length == 1:
         print("Only one unique y value. Will only consider x position")
+    """
 
     # Can these be rewritten as NumPy arrays?
 
@@ -140,6 +140,7 @@ def get_sweep_data_headers(file):
     sis_group = structures_at_path(file, '/Raw data + config/SIS crate/')
     # print("Datasets in sis_data structure: " + str(sis_group["Datasets"]))
 
+    # TODO Can we use string-based Numpy field indexing to access these instead of hard-coding integer indices?
     isweep_data_path = (sis_group['Datasets'])[2]
     isweep_headers_path = (sis_group['Datasets'])[3]
     vsweep_data_path = (sis_group['Datasets'])[4]

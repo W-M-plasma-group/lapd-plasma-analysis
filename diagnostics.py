@@ -4,11 +4,21 @@ from plasmapy.diagnostics.langmuir import swept_probe_analysis
 
 
 def plasma_diagnostics(characteristic_xarray, probe_area, ion_type, bimaxwellian=False):
+    r"""
+    Performs plasma diagnostics on a DataArray of Characteristic objects and returns the diagnostics as a Dataset.
 
-    # take in xarray of characteristics, output xarray Dataset object
+    Parameters
+    ----------
+    :param characteristic_xarray: DataArray
+    :param probe_area: units of area
+    :param ion_type: string corresponding to a Particle
+    :param bimaxwellian: boolean
+    :return: Dataset object containing diagnostic values at each position
+    """
 
     number_of_diagnostics = 9 if bimaxwellian else 8
 
+    # Create a dataset with the given number of DataArrays, each with correct x, y, time(plat) dimension sizes but empty
     xarray_list = [xr.full_like(characteristic_xarray, np.nan, dtype=float) for _ in range(number_of_diagnostics)]
     xarray_dict = {str(i): xarray_list[i] for i in range(number_of_diagnostics)}
     diagnostic_dataset = xr.Dataset(xarray_dict)
@@ -18,7 +28,7 @@ def plasma_diagnostics(characteristic_xarray, probe_area, ion_type, bimaxwellian
     for i in range(characteristic_xarray.sizes['x']):
         for j in range(characteristic_xarray.sizes['y']):
             for p in range(characteristic_xarray.sizes['time']):
-                characteristic = characteristic_xarray[i, j, p].item()
+                characteristic = characteristic_xarray[i, j, p].item()  # Get characteristic at x=i, y=j, plateau-1=p
                 diagnostics = verify_plateau(characteristic, probe_area, ion_type, bimaxwellian)
                 if diagnostics == 1:
                     print("Plateau at position (", i, ",", j, ",", p, ") is unusable")
@@ -48,6 +58,8 @@ def plasma_diagnostics(characteristic_xarray, probe_area, ion_type, bimaxwellian
                             diagnostic_value = np.nan
                         diagnostic_dataset[key][i, j, p] = diagnostic_value
 
+    # Calculate pressure and return as DataArray in diagnostic dataset
+    # diagnostic_dataset['Pe'] = calculate_pressure(diagnostic_dataset)
     return diagnostic_dataset
 
 
@@ -68,7 +80,7 @@ def flag_diagnostic(diagnostic, minimum, maximum):  # discard T_e and other diag
     return (diagnostic_1d < minimum).any() or (diagnostic_1d > maximum).any()
 
 
-def value_safe(quantity_or_scalar):  # Get value of quantity or scalar, depending on type
+def value_safe(quantity_or_scalar):     # Get value of quantity or scalar, depending on type
 
     try:
         val = quantity_or_scalar.value  # input is a quantity with dimension and value
@@ -77,10 +89,13 @@ def value_safe(quantity_or_scalar):  # Get value of quantity or scalar, dependin
     return val
 
 
-def unit_safe(quantity_or_scalar):  # Get unit of quantity or scalar, if possible
+def unit_safe(quantity_or_scalar):      # Get unit of quantity or scalar, if possible
 
     try:
         unit = quantity_or_scalar.unit
     except AttributeError:
         unit = None  # The input data is dimensionless
     return unit
+
+
+

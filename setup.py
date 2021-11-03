@@ -22,9 +22,12 @@ def setup_lapd(filename):
     # print(discharge)
     mean_discharge = np.mean(discharge[..., 4])
 
-    return {"Fill pressure": mean_fill_pressure * u.Torr,
-            "Peak field": mean_peak_field * u.gauss,
-            "Discharge": mean_discharge * u.A}              # in MATLAB-given units
+    return ({"Fill pressure": mean_fill_pressure * u.Torr,
+             "Peak field": mean_peak_field * u.gauss,
+             "Discharge": mean_discharge * u.A},                     # in MATLAB-given units
+            {"Fill pressure": np.round(mean_fill_pressure * u.Torr, 7),
+             "Peak field": np.round(mean_peak_field * u.gauss),
+             "Discharge": np.round(mean_discharge * u.A)})
 
 
 def get_gas_pressure(file):

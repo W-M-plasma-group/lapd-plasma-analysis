@@ -43,21 +43,25 @@ def characterize_sweep_array(unadjusted_bias, unadjusted_current, x_round, y_rou
 
 
 def smooth_current_array(bias, current, margin):
-    # This still distorts the shape of the current, especially at the ends of each plateau, but is much faster
+    # Distorts shape of current, especially at ends of plateaus, but much faster than smoothing plateaus individually
 
     if margin < 0:
         raise ValueError("Cannot smooth over negative number", margin, "of points")
     if margin == 0:
-        warnings.warn("Zero-point smoothing is redundant")
+        warnings.warn("Zero-point smoothing is redundant")  # TODO eliminate this line
+        return bias, current
     if current.shape[-1] <= margin:
         raise ValueError("Last dimension length", current.shape[-1], "is too short to take", margin, "-point mean over")
 
     current_sum = np.cumsum(np.insert(current, 0, 0, axis=-1), axis=-1)
+
+    # Find cumulative mean of each consecutive block of (margin + 1) elements per row
     smooth_current_full = (current_sum[..., margin:] - current_sum[..., :-margin]) / margin
 
-    adjusted_bias = bias[..., (margin - 1) // 2:-(margin - 1) // 2]  # Aligns bias with new, shorter current array
+    # Aligns bias with new, shorter current array; remove only the last element if margin is 1
+    trimmed_bias = bias[..., (margin - 1) // 2:-(margin - 1) // 2] if margin > 1 else bias
 
-    return adjusted_bias, smooth_current_full
+    return trimmed_bias, smooth_current_full
 
 
 def isolate_plateaus(bias, margin=0):
