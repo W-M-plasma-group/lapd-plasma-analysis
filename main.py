@@ -1,3 +1,7 @@
+"""
+The lapd-plasma-analysis repository was written by Leo Murphy based on code 
+written in MATLAB by Conor Perks (MIT) and using the PlasmaPy online code library.
+"""
 from getIVsweep import *
 from characterization import *
 from diagnostics import *
@@ -18,11 +22,11 @@ steady_state_start_plateau, steady_state_end_plateau = 5, 11  # From MATLAB code
 # End of global parameters
 
 # User file path names
-hdf5_path = "/Users/leo/Plasma code/HDF5/9-4000A.hdf5"
+hdf5_path = "/Users/REPLACE-THIS-PATH.hdf5"   # Link to the HDF5 files, available on the GitHub repository Releases page 
 interferometry_filename = hdf5_path           # interferometry data stored in same HDF5 file
-save_diagnostic_name = "diagnostic_dataset"   # Note: file is saved to a subfolder "netcdf" to be created if necessary
+save_diagnostic_name = "diagnostic_dataset"  # Note: file is saved to a subfolder “netcdf” to be created if necessary
 open_diagnostic_name = save_diagnostic_name   # write to and read from the same location
-netcdf_subfolder_name = "netcdf"              # subfolder to save and read netcdf files; set to "" to use current folder
+netcdf_subfolder_name = "netcdf"              # subfolder to save and read netcdf files; set to “” to use current folder
 # End of file path names
 
 # User file options
@@ -39,10 +43,12 @@ netcdf_subfolder_path = ensure_netcdf_directory(netcdf_subfolder_name)
 save_diagnostic_path = netcdf_path(save_diagnostic_name, netcdf_subfolder_path, bimaxwellian)
 open_diagnostic_path = netcdf_path(open_diagnostic_name, netcdf_subfolder_path, bimaxwellian)
 
+# Read experimental parameters
 experimental_parameters, experimental_parameters_rounded = setup_lapd(hdf5_path)
 print("Experimental parameters:", {key: str(value) for key, value in experimental_parameters_rounded.items()})
 bias, current, x, y = get_isweep_vsweep(hdf5_path)
 
+# Create the diagnostics dataset by generating new or opening from a NetCDF file
 diagnostics_dataset = read_netcdf(open_diagnostic_path) if use_existing else None  # desired dataset or None to use HDF5
 if not diagnostics_dataset:  # diagnostic dataset not loaded; create new from HDF5 file
     characteristics = characterize_sweep_array(bias, current, x, y, margin=smoothing_margin, sample_sec=sample_sec)
@@ -52,26 +58,25 @@ if not diagnostics_dataset:  # diagnostic dataset not loaded; create new from HD
 
 print("Plasma diagnostics:", [key for key in diagnostics_dataset.keys()])
 
+# Contour plot of electron temperature
 radial_diagnostic_plot(diagnostics_dataset, diagnostic='T_e', plot='contour')
 
-# Analysis of single sample Isweep-Vsweep curve
-# """
+# Uncomment this section to perform analysis of a single sample Isweep-Vsweep curve
+"""
 sample_indices = (30, 0, 7)  # x position, y position, plateau number within frame
-# """
 sample_plateau = characteristics[sample_indices].item()
 print(swept_probe_analysis(sample_plateau, probe_area, ion_type,
                            visualize=True, plot_EEDF=True, bimaxwellian=bimaxwellian))
 plt.show()
-# """
+"""
 """
 print({diagnostic: diagnostics_dataset[diagnostic][sample_indices].values for diagnostic in diagnostics_dataset.keys()})
 print("Done analyzing sample characteristic")
-# """
+"""
 
-# Need to select steady state time period! Move this to another function?
+# Note: in the future, this will consider only the steady-state region
 if not bimaxwellian:
     pressure = (3 / 2) * diagnostics_dataset['n_e'] * diagnostics_dataset['T_e'] * (1. * u.eV * u.m ** -3).to(u.Pa)
-    # TODO RAISE ISSUE OF RECIPROCAL TEMPERATURE FOR NON-BIMAXWELLIAN TEMPERATURE
     both = xr.ufuncs.logical_and
     plateau = pressure.coords['plateau']  # rename variables for comprehensibility
 
@@ -81,20 +86,17 @@ if not bimaxwellian:
     plt.show()
 else:
     print("Pressure plotting not yet supported for bimaxwellian temperature distributions.")
-# 1.6021e-19)  # [Pa]
-
 
 electron_density, density_scaling = interferometry_calibration(
     diagnostics_dataset['n_e'], interferometry_filename,
     steady_state_start_plateau, steady_state_end_plateau, core_region=core_region)
 
-# debug
-# print(density_scaling, has_xy, electron_density, sep="\n")
+# Plot electron density data that was calibrated using interferometry data
 electron_density.squeeze().plot.contourf(robust=True)
 plt.show()
 
 neutral_ratio(diagnostics_dataset['n_e'], experimental_parameters, steady_state_start_plateau, steady_state_end_plateau)
 
-# TODO Finish adding plot generation code
-
-# Note: The non-bimaxwellian plasmapy electron temperature seems to be the *reciprocal* of the correct value.
+# Note: Plot generation code and neutral fraction analysis is incomplete.
+# Note: The non-bimaxwellian electron temperature calculated using the PlasmaPy code seems to be 
+#    the *reciprocal* of the correct value. I may raise an issue on the PlasmaPy GitHub page.
