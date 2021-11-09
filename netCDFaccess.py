@@ -4,6 +4,7 @@ import warnings
 import xarray as xr
 
 
+# Return a dataset opened from a NetCDF file, or None if no file was found
 def read_netcdf(filename):
     if check_netcdf(filename):
         return open_netcdf(filename)
@@ -20,6 +21,7 @@ def read_netcdf(filename):
     return dataset
 
 
+# Ensure that the file path contains an xarray Dataset
 def check_netcdf(filename):
     try:
         xr.open_dataset(filename)
@@ -38,6 +40,7 @@ def write_netcdf(dataset, filename):
     dataset.to_netcdf(path=filename)
 
 
+# Search the current working directory and all subfolders for .nc (NetCDF) files
 def search_netcdf():
     netcdf_files = []
     for path, dirs, files in os.walk(os.getcwd()):
@@ -47,6 +50,7 @@ def search_netcdf():
     return netcdf_files
 
 
+# Check that the specified NetCDF subdirectory exists, and if not, create it
 def ensure_netcdf_directory(directory_path):
     if not os.path.isdir(directory_path):  # directory does not exist and should be created
         if os.path.split(directory_path)[0] != "" and not os.path.isabs(directory_path):
@@ -56,8 +60,8 @@ def ensure_netcdf_directory(directory_path):
     return directory_path
 
 
+# Generate the netcdf file path to save diagnostic data
 def netcdf_path(netcdf_name, netcdf_subfolder, bimaxwellian):
-    # if not diagnostic_filename.endswith(".nc"):
     name, extension = os.path.splitext(netcdf_name)
     if extension != "":  # checks if netcdf name has an extension
         warnings.warn("Name for NetCDF save file " + repr(netcdf_name) + " should not end with a file extension "

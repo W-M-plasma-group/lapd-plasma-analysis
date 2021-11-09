@@ -8,19 +8,21 @@ def setup_lapd(filename):
 
     print("Setting up HDF5 file...")
     setup_file = open_hdf5(filename)
-
-    # Note: hard-coded indices for relevant data
-    # print(list(setup_file['/MSI/Gas pressure/'].attrs.items()))
+    # Note: relevant data is accessed using hard-coded indices
+    
+    # Gas fill pressure
     gas_pressure = np.array([list(row) for row in get_gas_pressure(setup_file)])
-    # print(gas_pressure.shape)
     mean_fill_pressure = np.mean(gas_pressure[..., 4])
-
+    
+    # Peak magnetic field 
     magnetic_field = np.array([list(row) for row in get_magnetic_field(setup_file)])
     mean_peak_field = np.mean(magnetic_field[..., 3])
 
+    # Cathode heater discharge current
     discharge = np.array([list(row) for row in get_discharge(setup_file)])
-    # print(discharge)
     mean_discharge = np.mean(discharge[..., 4])
+    # Future work: plotting the discharge current could give a really helpful 
+    #     visualization of the plasma heating over time
 
     return ({"Fill pressure": mean_fill_pressure * u.Torr,
              "Peak field": mean_peak_field * u.gauss,
