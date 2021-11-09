@@ -1,6 +1,7 @@
 """
 The lapd-plasma-analysis repository was written by Leo Murphy based on code 
 written in MATLAB by Conor Perks (MIT) and using the PlasmaPy online code library.
+Comments are added inline. A separate documentation page is not yet complete.
 """
 from getIVsweep import *
 from characterization import *

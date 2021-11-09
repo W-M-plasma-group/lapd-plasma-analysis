@@ -6,7 +6,7 @@ import numpy as np
 
 
 def radial_diagnostic_plot(diagnostics_dataset, diagnostic='T_e', plot='contour'):
-    # TODO is this actually a linear diagnostic plot?
+    # TODO This is more accurately a linear diagnostic plot.
     # Return a plot of the specified type for the specified diagnostic in the dataset.
 
     if diagnostics_dataset.sizes['x'] > 1 and diagnostics_dataset.sizes['y'] > 1:
@@ -46,7 +46,6 @@ def radial_diagnostic_plot(diagnostics_dataset, diagnostic='T_e', plot='contour'
         difference_data = pos_time_diagnostic_xarray[..., 1] - pos_time_diagnostic_xarray[..., 0]
         radial_crop_plot(difference_data.assign_attrs({"standard_name": diagnostic + " difference",
                                                        "units": units}), plot_type=plot)
-    # TODO difference in bimaxwellian temperature not working correctly
 
 
 def radial_crop_plot(pos_time_var_xarray, plot_type):

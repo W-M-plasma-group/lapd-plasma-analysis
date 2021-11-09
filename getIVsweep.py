@@ -1,5 +1,3 @@
-# Make sure to add code comments and write documentation!
-
 import numpy as np
 import astropy.units as u
 
@@ -8,9 +6,9 @@ from hdf5reader import *
 
 def get_isweep_vsweep(filename):
     r"""
-
-    :param filename:
-    :return:
+    Reads all sweep data (V-sweep and I-sweep) from HDF5 file Langmuir code.
+    :param filename: File path of HDF5 file from LAPD
+    :return: bias, current, x, y: the relevant multi-dimensional sweep data and position data
     """
 
     hdf5_file = open_hdf5(filename)
@@ -19,7 +17,6 @@ def get_isweep_vsweep(filename):
 
     isweep_data_raw, vsweep_data_raw, isweep_headers_raw, vsweep_headers_raw = get_sweep_data_headers(hdf5_file)
 
-    # print("Reading in scales and offsets from headers...")
     # Define: scale is 2nd index, offset is 3rd index
     isweep_scales, isweep_offsets = get_scales_offsets(isweep_headers_raw, scale_index=1, offset_index=2)
     vsweep_scales, vsweep_offsets = get_scales_offsets(vsweep_headers_raw, scale_index=1, offset_index=2)
@@ -28,9 +25,9 @@ def get_isweep_vsweep(filename):
     isweep_processed = scale_offset_decompress(isweep_data_raw, isweep_scales, isweep_offsets)
     vsweep_processed = scale_offset_decompress(vsweep_data_raw, vsweep_scales, vsweep_offsets)
 
-    # Can I convert isweep and vsweep arrays to real units here? Should do as long as numpy can handle astropy units
+    # Note: I may be able to convert isweep and vsweep arrays to real units here, as long as numpy can handle astropy units
 
-    # To reflect MATLAB code, should I take (pointwise?) standard deviation for each across these shots too? (For error)
+    # Note: I may take the standard deviation across shots to approximate error for sweep curves, as done in MATLAB code
 
     # Create 4D array: the first two dimensions correspond to all combinations of unique x and y positions,
     #    the third dimension represents the nth shot taken at that unique positions
@@ -102,7 +99,7 @@ def categorize_shots_xy(x_round, y_round, shot_list):
         print("Only one unique y value. Will only consider x position")
     """
 
-    # Can these be rewritten as NumPy arrays?
+    # Can these lists be rewritten as NumPy arrays?
 
     # Creates an empty 2D array with a cell for each unique x,y position combination,
     #    then fills each cell with a list of indexes to the nth shot number such that
@@ -118,10 +115,7 @@ def categorize_shots_xy(x_round, y_round, shot_list):
 
     return xy_shot_ref, x, y
 
-    # st_data = []
-    # This part: list of links to nth smallest shot numbers (inside larger shot number array)
-    # This part: (# unique x positions * # unique y positions) grid storing location? of shot numbers at that position
-    # SKIP REMAINING X, Y POSITION DATA PROCESSING
+    # Some x,y position data processing in the MATLAB code was not translated.
 
 
 def get_sweep_data_headers(file):
@@ -140,7 +134,7 @@ def get_sweep_data_headers(file):
     sis_group = structures_at_path(file, '/Raw data + config/SIS crate/')
     # print("Datasets in sis_data structure: " + str(sis_group["Datasets"]))
 
-    # TODO Can we use string-based Numpy field indexing to access these instead of hard-coding integer indices?
+    # QUESTION: Can we use string-based Numpy field indexing to access these instead of hard-coding integer indices?
     isweep_data_path = (sis_group['Datasets'])[2]
     isweep_headers_path = (sis_group['Datasets'])[3]
     vsweep_data_path = (sis_group['Datasets'])[4]
@@ -168,7 +162,7 @@ def get_scales_offsets(headers, scale_index, offset_index):
     :return:
     """
 
-    # TODO Can access scales and offsets using dictionary string indexing! (See lapd-mach-probe get_mach_data_headers)
+    # NOTE: We can access scales and offsets using dictionary string indexing
 
     scales = np.array([header[scale_index] for header in headers])
     offsets = np.array([header[offset_index] for header in headers])
@@ -206,7 +200,7 @@ def to_real_sweep_units(bias, current):
     """
 
     # The conversion factors from abstract units to real bias (V) and current values (A) are hard-coded in here.
-    # Note that current is multiplied by -1 to get the "upright" traditional Isweep-Vsweep curve. Add to documentation?
+    # Note that current is multiplied by -1 to get the "upright" traditional Isweep-Vsweep curve. This should be added to the documentation.
 
     # Conversion factors taken from MATLAB code: Current = isweep / 11 ohms; Voltage = vsweep * 100
     gain = 100.  # voltage gain
