@@ -9,6 +9,7 @@ def setup_lapd(filename):
     print("Setting up HDF5 file...")
     setup_file = open_hdf5(filename)
     # Note: relevant data is accessed using hard-coded indices
+    # TODO: access using numpy named fields?
     
     # Gas fill pressure
     gas_pressure = np.array([list(row) for row in get_gas_pressure(setup_file)])
@@ -21,12 +22,13 @@ def setup_lapd(filename):
     # Cathode heater discharge current
     discharge = np.array([list(row) for row in get_discharge(setup_file)])
     mean_discharge = np.mean(discharge[..., 4])
-    # Future work: plotting the discharge current could give a really helpful 
+    # TODO Future work: plotting the discharge current could give a really helpful
     #     visualization of the plasma heating over time
 
+    # Return experimental parameters, first exact, then rounded, using MATLAB-code-given units
     return ({"Fill pressure": mean_fill_pressure * u.Torr,
              "Peak field": mean_peak_field * u.gauss,
-             "Discharge": mean_discharge * u.A},                     # in MATLAB-given units
+             "Discharge": mean_discharge * u.A},
             {"Fill pressure": np.round(mean_fill_pressure * u.Torr, 7),
              "Peak field": np.round(mean_peak_field * u.gauss),
              "Discharge": np.round(mean_discharge * u.A)})

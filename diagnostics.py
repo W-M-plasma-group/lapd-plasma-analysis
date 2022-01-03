@@ -12,6 +12,7 @@ def plasma_diagnostics(characteristic_xarray, probe_area, ion_type, lapd_paramet
     :param characteristic_xarray: DataArray
     :param probe_area: units of area
     :param ion_type: string corresponding to a Particle
+    :param lapd_parameters: dictionary of LAPD experimental parameters
     :param bimaxwellian: boolean
     :return: Dataset object containing diagnostic values at each position
     """
