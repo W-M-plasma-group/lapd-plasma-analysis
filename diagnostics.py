@@ -3,7 +3,7 @@ import xarray as xr
 from plasmapy.diagnostics.langmuir import swept_probe_analysis
 
 
-def plasma_diagnostics(characteristic_xarray, probe_area, ion_type, bimaxwellian=False):
+def plasma_diagnostics(characteristic_xarray, probe_area, ion_type, lapd_parameters, bimaxwellian=False):
     r"""
     Performs plasma diagnostics on a DataArray of Characteristic objects and returns the diagnostics as a Dataset.
 
@@ -22,6 +22,7 @@ def plasma_diagnostics(characteristic_xarray, probe_area, ion_type, bimaxwellian
     xarray_list = [xr.full_like(characteristic_xarray, np.nan, dtype=float) for _ in range(number_of_diagnostics)]
     xarray_dict = {str(i): xarray_list[i] for i in range(number_of_diagnostics)}
     diagnostic_dataset = xr.Dataset(xarray_dict)
+    diagnostic_dataset.assign_attrs(lapd_parameters)
 
     print("Calculating plasma diagnostics... (May take several minutes)")
     diagnostic_names_assigned = False
@@ -53,7 +54,7 @@ def plasma_diagnostics(characteristic_xarray, probe_area, ion_type, bimaxwellian
 
                     for key in diagnostics.keys():
                         diagnostic_value = value_safe(diagnostics[key])
-                        if key == 'T_e' and flag_diagnostic(diagnostic_value, minimum=0, maximum=15):
+                        if key == 'T_e' and flag_diagnostic(diagnostic_value, minimum=0, maximum=10):
                             # remove unrealistic electron temperature values; hard-coded acceptable temperature range
                             diagnostic_value = np.nan
                         diagnostic_dataset[key][i, j, p] = diagnostic_value

@@ -1,5 +1,5 @@
 """
-The lapd-plasma-analysis repository was written by Leo Murphy based on code 
+The lapd-plasma-analysis repository was written by Leo Murphy based on code
 written in MATLAB by Conor Perks (MIT) and using the PlasmaPy online code library.
 Comments are added inline. A separate documentation page is not yet complete.
 """
@@ -18,16 +18,16 @@ probe_area = (1. * u.mm) ** 2                                 # From MATLAB code
 core_region = 26. * u.cm                                      # From MATLAB code
 ion_type = 'He-4+'
 bimaxwellian = False
-smoothing_margin = 0
+smoothing_margin = 0                                          # Optimal values in range 0-25
 steady_state_start_plateau, steady_state_end_plateau = 5, 11  # From MATLAB code
 # End of global parameters
 
 # User file path names
-hdf5_path = "/Users/REPLACE-THIS-PATH.hdf5"   # Link to the HDF5 files, available on the GitHub repository Releases page 
+hdf5_path = "/Users/REPLACE-THIS-PATH.hdf5"   # Link to the HDF5 files, available on the GitHub repository Releases page
 interferometry_filename = hdf5_path           # interferometry data stored in same HDF5 file
-save_diagnostic_name = "diagnostic_dataset"  # Note: file is saved to a subfolder “netcdf” to be created if necessary
+save_diagnostic_name = "diagnostic_dataset"   # Note: file is saved to a subfolder "netcdf" to be created if necessary
 open_diagnostic_name = save_diagnostic_name   # write to and read from the same location
-netcdf_subfolder_name = "netcdf"              # subfolder to save and read netcdf files; set to “” to use current folder
+netcdf_subfolder_name = "netcdf"              # subfolder to save and read netcdf files; set to "" to use current folder
 # End of file path names
 
 # User file options
@@ -38,6 +38,7 @@ use_existing = True
 save_diagnostics = True
 # End of file options
 
+# TODO IF NAME == MAIN
 
 # Establish paths to create files in specified netcdf subfolder
 netcdf_subfolder_path = ensure_netcdf_directory(netcdf_subfolder_name)
@@ -53,31 +54,43 @@ bias, current, x, y = get_isweep_vsweep(hdf5_path)
 diagnostics_dataset = read_netcdf(open_diagnostic_path) if use_existing else None  # desired dataset or None to use HDF5
 if not diagnostics_dataset:  # diagnostic dataset not loaded; create new from HDF5 file
     characteristics = characterize_sweep_array(bias, current, x, y, margin=smoothing_margin, sample_sec=sample_sec)
+
+    # Analysis of single sample Isweep-Vsweep curve
+    # """
+    sample_indices = (1, 0, 2)  # x position, y position, plateau number within frame
+    # """
+    sample_plateau = characteristics[sample_indices].item()
+    # sample_plateau.plot()
+    plt.title("Sample Langmuir sweep curve", size=28)
+    plt.xlabel("Bias [V]", size=18)
+    plt.ylabel("Current [mA]", size=18)
+    plt.xticks(fontsize=18)
+    plt.yticks(fontsize=18)
+    plt.show()
+    print(swept_probe_analysis(sample_plateau, probe_area, ion_type,
+                               visualize=True, plot_EEDF=True, bimaxwellian=bimaxwellian))
+    plt.show()
+    # """
+
     diagnostics_dataset = plasma_diagnostics(characteristics, probe_area, ion_type, bimaxwellian=bimaxwellian)
     if save_diagnostics:
         write_netcdf(diagnostics_dataset, save_diagnostic_path)
 
 print("Plasma diagnostics:", [key for key in diagnostics_dataset.keys()])
 
-# Contour plot of electron temperature
 radial_diagnostic_plot(diagnostics_dataset, diagnostic='T_e', plot='contour')
 
-# Uncomment this section to perform analysis of a single sample Isweep-Vsweep curve
-"""
-sample_indices = (30, 0, 7)  # x position, y position, plateau number within frame
-sample_plateau = characteristics[sample_indices].item()
-print(swept_probe_analysis(sample_plateau, probe_area, ion_type,
-                           visualize=True, plot_EEDF=True, bimaxwellian=bimaxwellian))
-plt.show()
-"""
+
 """
 print({diagnostic: diagnostics_dataset[diagnostic][sample_indices].values for diagnostic in diagnostics_dataset.keys()})
 print("Done analyzing sample characteristic")
-"""
+# """
 
 # Note: in the future, this will consider only the steady-state region
 if not bimaxwellian:
     pressure = (3 / 2) * diagnostics_dataset['n_e'] * diagnostics_dataset['T_e'] * (1. * u.eV * u.m ** -3).to(u.Pa)
+    # TODO RAISE ISSUE OF RECIPROCAL TEMPERATURE FOR NON-BIMAXWELLIAN TEMPERATURE
+    # TODO add bimaxwellian single-temperature data to diagnostic_dataset and use to calculate pressure
     both = xr.ufuncs.logical_and
     plateau = pressure.coords['plateau']  # rename variables for comprehensibility
 
@@ -99,5 +112,5 @@ plt.show()
 neutral_ratio(diagnostics_dataset['n_e'], experimental_parameters, steady_state_start_plateau, steady_state_end_plateau)
 
 # Note: Plot generation code and neutral fraction analysis is incomplete.
-# Note: The non-bimaxwellian electron temperature calculated using the PlasmaPy code seems to be 
+# Note: The non-bimaxwellian electron temperature calculated using the PlasmaPy code seems to be
 #    the *reciprocal* of the correct value. I may raise an issue on the PlasmaPy GitHub page.
