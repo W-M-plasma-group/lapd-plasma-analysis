@@ -1,10 +1,12 @@
-import math
 import warnings
 
 import astropy.units as u
 import numpy as np
 import xarray as xr
 from plasmapy.diagnostics.langmuir import Characteristic
+
+import sys
+from tqdm import tqdm
 
 
 def characterize_sweep_array(unadjusted_bias, unadjusted_current, x_round, y_round, margin, sample_sec):
@@ -48,7 +50,7 @@ def smooth_current_array(bias, current, margin):
     if margin < 0:
         raise ValueError("Cannot smooth over negative number", margin, "of points")
     if margin == 0:
-        warnings.warn("Zero-point smoothing is redundant")  # TODO eliminate this line
+        # warnings.warn("Zero-point smoothing is redundant")
         return bias, current
     if current.shape[-1] <= margin:
         raise ValueError("Last dimension length", current.shape[-1], "is too short to take", margin, "-point mean over")
@@ -189,33 +191,24 @@ def get_time_array(plateau_ranges, sample_sec=(100 / 16 * 1e6) ** (-1) * u.s):
 def get_characteristic_array(bias, current, plateau_ranges):
 
     characteristic_array = np.empty((plateau_ranges.shape[:3]), dtype=object)  # x, y, plateau
-    # Address case where there are an irregular number of plateaus in a frame to begin with!
+    # TODO Address case where there are an irregular number of plateaus in a frame to begin with.
     #    This should be addressed by creating a secondary array (or list?) containing the indices of valid plateaus
     #    to analyze. Invalid ones should be skipped, but preserved in the array.
 
-    print("Creating characteristic array... (May take up to 60 seconds)")
+    print("Creating characteristic array...")  # (May take up to 60 seconds)
     warnings.simplefilter(action='ignore', category=FutureWarning)  # Suppress FutureWarnings to not break loading bar
     print("    Note: plasmapy.langmuir.diagnostics pending deprecation FutureWarning suppressed")
     num_pos = plateau_ranges.shape[0] * plateau_ranges.shape[1]
-    for pos in range(num_pos):
-        print(" " if pos % 10 ** round(math.log10(num_pos) - 1) != 0 else "|", end="")
-    print(" (", num_pos, ")")
-    for i in range(plateau_ranges.shape[0]):
-        for j in range(plateau_ranges.shape[1]):
-            for p in range(plateau_ranges.shape[2]):
-                start_ind, stop_ind = plateau_ranges[i, j, p]
-                characteristic_array[i, j, p] = create_ranged_characteristic(
-                    bias[i, j], current[i, j], start_ind, stop_ind)
-
-        # print("Finished x position", i + 1, "/", plateau_ranges.shape[0])
-        print(".", end="")
-    print(" ")
+    with tqdm(total=num_pos, unit="position", file=sys.stdout) as pbar:
+        for i in range(plateau_ranges.shape[0]):
+            for j in range(plateau_ranges.shape[1]):
+                for p in range(plateau_ranges.shape[2]):
+                    start_ind, stop_ind = plateau_ranges[i, j, p]
+                    characteristic_array[i, j, p] = create_ranged_characteristic(
+                        bias[i, j], current[i, j], start_ind, stop_ind)
+                pbar.update(1)
 
     return characteristic_array
-
-
-# Instead of having several separate methods "trade off", can have one overarching method that organizes things and
-#    smaller helper functions that are called within overall method?
 
 
 def to_characteristic_xarray(characteristic_array, time_array, x, y):
