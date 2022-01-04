@@ -12,6 +12,7 @@ def get_isweep_vsweep(filename):
     """
 
     hdf5_file = open_hdf5(filename)
+    # print("Categorizing shots by x,y position...")
     x_round, y_round, shot_list = get_xy(hdf5_file)
     xy_shot_ref, x, y = categorize_shots_xy(x_round, y_round, shot_list)
 
@@ -21,11 +22,11 @@ def get_isweep_vsweep(filename):
     isweep_scales, isweep_offsets = get_scales_offsets(isweep_headers_raw, scale_index=1, offset_index=2)
     vsweep_scales, vsweep_offsets = get_scales_offsets(vsweep_headers_raw, scale_index=1, offset_index=2)
 
-    print("Decompressing raw data...")
+    # print("Decompressing raw data...")
     isweep_processed = scale_offset_decompress(isweep_data_raw, isweep_scales, isweep_offsets)
     vsweep_processed = scale_offset_decompress(vsweep_data_raw, vsweep_scales, vsweep_offsets)
 
-    # Note: I may be able to convert isweep and vsweep arrays to real units here, as long as numpy can handle astropy units
+    # Note: I may be able to convert isweep/vsweep arrays to real units here, as long as numpy can handle astropy units
 
     # Note: I may take the standard deviation across shots to approximate error for sweep curves, as done in MATLAB code
 
@@ -107,7 +108,6 @@ def categorize_shots_xy(x_round, y_round, shot_list):
     #    (for example, a shot might have been taken at the combination of the 10th unique
     #       x position and the 15th unique y position in the lists x and y)
     # For every shot index i, x_round[i] and y_round[i] give the x,y position of the shot taken at that index
-    print("Categorizing shots by x,y position...")
     xy_shot_ref = [[[] for _ in range(y_length)] for _ in range(x_length)]
     for i in range(len(shot_list)):
         # noinspection PyTypeChecker

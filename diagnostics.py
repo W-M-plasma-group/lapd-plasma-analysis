@@ -1,6 +1,11 @@
 import numpy as np
 import xarray as xr
+
 from plasmapy.diagnostics.langmuir import swept_probe_analysis
+
+import sys
+import warnings
+from tqdm import tqdm
 
 
 def plasma_diagnostics(characteristic_xarray, probe_area, ion_type, lapd_parameters, bimaxwellian=False):
@@ -17,48 +22,56 @@ def plasma_diagnostics(characteristic_xarray, probe_area, ion_type, lapd_paramet
     :return: Dataset object containing diagnostic values at each position
     """
 
-    number_of_diagnostics = 9 if bimaxwellian else 8
+    num_diagnostics = 9 if bimaxwellian else 8
 
     # Create a dataset with the given number of DataArrays, each with correct x, y, time(plat) dimension sizes but empty
-    xarray_list = [xr.full_like(characteristic_xarray, np.nan, dtype=float) for _ in range(number_of_diagnostics)]
-    xarray_dict = {str(i): xarray_list[i] for i in range(number_of_diagnostics)}
+    xarray_list = [xr.full_like(characteristic_xarray, np.nan, dtype=float) for _ in range(num_diagnostics)]
+    xarray_dict = {str(i): xarray_list[i] for i in range(num_diagnostics)}
     diagnostic_dataset = xr.Dataset(xarray_dict)
     diagnostic_dataset.assign_attrs(lapd_parameters)
 
-    print("Calculating plasma diagnostics... (May take several minutes)")
+    print("Calculating plasma diagnostics...")  # (May take several minutes)
     diagnostic_names_assigned = False
-    for i in range(characteristic_xarray.sizes['x']):
-        for j in range(characteristic_xarray.sizes['y']):
-            for p in range(characteristic_xarray.sizes['time']):
-                characteristic = characteristic_xarray[i, j, p].item()  # Get characteristic at x=i, y=j, plateau-1=p
-                diagnostics = verify_plateau(characteristic, probe_area, ion_type, bimaxwellian)
-                if diagnostics == 1:
-                    print("Plateau at position (", i, ",", j, ",", p, ") is unusable")
-                    # characteristic_array[i, j, p].plot()
-                elif diagnostics == 2:
-                    print("Unknown error at position (", i, ",", j, ",", p, ")")
-                    # characteristic_array[i, j, p].plot()
-                else:
-                    if not diagnostic_names_assigned:
-                        diagnostic_dataset = diagnostic_dataset.rename(
-                            {str(i): list(diagnostics.keys())[i] for i in range(len(diagnostics.keys()))})
-                        for unit_key in diagnostics.keys():
-                            diagnostic_dataset[unit_key].attrs['units'] = str(unit_safe(diagnostics[unit_key]))
-                        if bimaxwellian:
-                            # electron temperature values broadcasted into array dimension of size two
-                            # TODO store as separate diagnostics 'T_e_hot' and 'T_e_cold'? This could eliminate need
-                            #     for two separate files (store in same) and for most contrivances in plots.py,
-                            #     but should make sure that ex. old T_e data from a previous HDF5 file isn't used
-                            diagnostic_dataset['T_e'] = diagnostic_dataset['T_e'].expand_dims(
-                                dim={"population": ["cold", "hot"]}, axis=-1).copy()
-                        diagnostic_names_assigned = True
+    num_positions = characteristic_xarray.sizes['x'] * characteristic_xarray.sizes['y']
+    warnings.simplefilter(action='ignore')  # Suppress warnings to not break progress bar
+    with tqdm(total=num_positions, unit="position", file=sys.stdout) as pbar:
+        for i in range(characteristic_xarray.sizes['x']):
+            for j in range(characteristic_xarray.sizes['y']):
+                for p in range(characteristic_xarray.sizes['time']):
+                    characteristic = characteristic_xarray[i, j, p].item()  # Get characteristic @ x=i, y=j, plateau-1=p
+                    diagnostics = verify_plateau(characteristic, probe_area, ion_type, bimaxwellian)
+                    if diagnostics == 1:
+                        # TODO print these two tqdm.write statements to separate log file
+                        pass
+                        # tqdm.write("Plateau at position (" + str(i) + ", " + str(j) + ", " + str(p) + ") is unusable")
+                        # characteristic_array[i, j, p].plot()
+                    elif diagnostics == 2:
+                        pass
+                        # tqdm.write("Unknown error at position (" + str(i) + ", " + str(j) + "," + str(p) + ")")
+                        # characteristic_array[i, j, p].plot()
+                    else:
+                        if not diagnostic_names_assigned:
+                            diagnostic_dataset = diagnostic_dataset.rename(
+                                {str(i): list(diagnostics.keys())[i] for i in range(len(diagnostics.keys()))})
+                            for unit_key in diagnostics.keys():
+                                diagnostic_dataset[unit_key].attrs['units'] = str(unit_safe(diagnostics[unit_key]))
+                            if bimaxwellian:
+                                # electron temperature values broadcasted into array dimension of size two
+                                # TODO store as separate diagnostics 'T_e_hot' and 'T_e_cold'? This could eliminate need
+                                #     for two separate files (store in same) and for most contrivances in plots.py,
+                                #     but should make sure that ex. old T_e data from a previous HDF5 file isn't used
+                                diagnostic_dataset['T_e'] = diagnostic_dataset['T_e'].expand_dims(
+                                    dim={"population": ["cold", "hot"]}, axis=-1).copy()
+                            diagnostic_names_assigned = True
 
-                    for key in diagnostics.keys():
-                        diagnostic_value = value_safe(diagnostics[key])
-                        if key == 'T_e' and flag_diagnostic(diagnostic_value, minimum=0, maximum=10):
-                            # remove unrealistic electron temperature values; hard-coded acceptable temperature range
-                            diagnostic_value = np.nan
-                        diagnostic_dataset[key][i, j, p] = diagnostic_value
+                        for key in diagnostics.keys():
+                            diagnostic_value = value_safe(diagnostics[key])
+                            if key == 'T_e' and flag_diagnostic(diagnostic_value, minimum=0, maximum=10):
+                                # remove unrealistic electron temperature values; hard-coded acceptable temp range
+                                diagnostic_value = np.nan
+                            diagnostic_dataset[key][i, j, p] = diagnostic_value
+            pbar.update(1)
+    warnings.simplefilter(action='default')  # Restore warnings to default handling
 
     # Calculate pressure and return as DataArray in diagnostic dataset
     # diagnostic_dataset['Pe'] = calculate_pressure(diagnostic_dataset)
