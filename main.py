@@ -33,7 +33,7 @@ netcdf_subfolder_name = "netcdf"              # Subfolder to save and read netcd
 # User file options
 """ Set the below variable to True to open an existing diagnostic dataset from a NetCDF file
     or False to create a new diagnostic dataset from the given HDF5 file. """
-use_existing = True
+use_existing = False
 """ Set the below variable to True to save diagnostic data to a NetCDF file if a new one is created from HDF5 data. """
 save_diagnostics = True
 # End of file options
