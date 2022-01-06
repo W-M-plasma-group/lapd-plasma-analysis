@@ -11,13 +11,14 @@ from netCDFaccess import *
 from interferometry import *
 from neutrals import *
 from setup import *
+from bapsflib import lapd   # TODO move to getIVsweep.py
 
 # User global parameters
 sample_sec = (100 / 16 * 1e6) ** (-1) * u.s                   # Note that this is small. 10^6 is in the denominator
 probe_area = (1. * u.mm) ** 2                                 # From MATLAB code
 core_region = 26. * u.cm                                      # From MATLAB code
 ion_type = 'He-4+'
-bimaxwellian = False
+bimaxwellian = True
 smoothing_margin = 0                                          # Optimal values in range 0-25
 steady_state_start_plateau, steady_state_end_plateau = 5, 11  # From MATLAB code
 # End of global parameters
@@ -33,7 +34,7 @@ netcdf_subfolder_name = "netcdf"              # Subfolder to save and read netcd
 # User file options
 """ Set the below variable to True to open an existing diagnostic dataset from a NetCDF file
     or False to create a new diagnostic dataset from the given HDF5 file. """
-use_existing = False
+use_existing = True
 """ Set the below variable to True to save diagnostic data to a NetCDF file if a new one is created from HDF5 data. """
 save_diagnostics = True
 # End of file options
@@ -41,13 +42,16 @@ save_diagnostics = True
 if __name__ == "__main__":
     # Build paths to save and open netcdf files in specified subfolder
     netcdf_subfolder_path = ensure_netcdf_directory(netcdf_subfolder_name)
-    save_diagnostic_path = netcdf_path(save_diagnostic_name, netcdf_subfolder_path, bimaxwellian)
-    open_diagnostic_path = netcdf_path(open_diagnostic_name, netcdf_subfolder_path, bimaxwellian)
+
+    lapd_file = lapd.File(hdf5_path)
+    save_diagnostic_path = netcdf_path(lapd_file.info['file'], netcdf_subfolder_path, bimaxwellian)
+    open_diagnostic_path = netcdf_path(lapd_file.info['file'], netcdf_subfolder_path, bimaxwellian)
 
     # Read LAPD experimental parameters
     experimental_parameters, experimental_parameters_rounded = setup_lapd(hdf5_path)
     print("Experimental parameters:", {key: str(value) for key, value in experimental_parameters_rounded.items()})
     bias, current, x, y = get_isweep_vsweep(hdf5_path)
+    # TODO create position matrix in diagnostic dataset to avoid having to reload and recalculate position data?
 
     # Create the diagnostics dataset by generating new or opening existing NetCDF file
     diagnostics_dataset = read_netcdf(open_diagnostic_path) if use_existing else None  # desired dataset or None to use HDF5
@@ -62,7 +66,7 @@ if __name__ == "__main__":
     print("Plasma diagnostics:", [key for key in diagnostics_dataset.keys()])
 
     # Plot one chosen diagnostic against radial position and time
-    radial_diagnostic_plot(diagnostics_dataset, diagnostic='T_e', plot='contour')
+    radial_diagnostic_plot(diagnostics_dataset, diagnostic=('T_e_avg' if bimaxwellian else 'T_e'), plot='contour')
 
     """
     print({diagnostic: diagnostics_dataset[diagnostic][sample_indices].values for diagnostic in diagnostics_dataset.keys()})
@@ -80,21 +84,17 @@ if __name__ == "__main__":
 
     # Calculation for pressure; in the future, this will consider only the steady-state region
     # TODO use interferometry calibrated electron density
-    if not bimaxwellian:
-        pressure = (3 / 2) * diagnostics_dataset['n_e'] * diagnostics_dataset['T_e'] * (1. * u.eV * u.m ** -3).to(u.Pa)
-        # TODO RAISE ISSUE OF RECIPROCAL TEMPERATURE FOR NON-BIMAXWELLIAN TEMPERATURE
-        # TODO add bimaxwellian single-temperature data to diagnostic_dataset and use to calculate pressure
-        both = xr.ufuncs.logical_and
-        plateau = pressure.coords['plateau']  # rename variables for comprehensibility
+    electron_temperature = diagnostics_dataset['T_e_avg'] if bimaxwellian else diagnostics_dataset['T_e']
+    pressure = (3 / 2) * diagnostics_dataset['n_e'] * electron_temperature * (1. * u.eV * u.m ** -3).to(u.Pa)
+    # TODO RAISE ISSUE OF RECIPROCAL TEMPERATURE FOR NON-BIMAXWELLIAN TEMPERATURE
+    plateau = pressure.coords['plateau']  # rename variable for comprehensibility
 
-        steady_state_pressure = pressure.where(
-            both(plateau >= steady_state_start_plateau, plateau <= steady_state_end_plateau))
-        steady_state_pressure.squeeze(dim='y').assign_attrs({"units": str(u.Pa)}).plot.contourf(x='time', y='x',
-                                                                                                robust=True)
-        plt.title("Steady state pressure")
-        plt.show()
-    else:
-        print("Pressure plotting not yet supported for bimaxwellian temperature distributions.")
+    steady_state_pressure = pressure.where(
+        np.logical_and(plateau >= steady_state_start_plateau, plateau <= steady_state_end_plateau))
+    steady_state_pressure.squeeze(dim='y').assign_attrs({"units": str(u.Pa)}).plot.contourf(x='time', y='x',
+                                                                                            robust=True)
+    plt.title("Steady state pressure")
+    plt.show()
 
     # Plot neutral ratios (NOTE: INCOMPLETE)
     neutral_ratio(diagnostics_dataset['n_e'], experimental_parameters, steady_state_start_plateau, steady_state_end_plateau)

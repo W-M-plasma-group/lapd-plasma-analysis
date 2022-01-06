@@ -11,6 +11,7 @@ def get_isweep_vsweep(filename):
     :return: bias, current, x, y: the relevant multi-dimensional sweep data and position data
     """
 
+    print("Loading HDF5 data...")
     hdf5_file = open_hdf5(filename)
     # print("Categorizing shots by x,y position...")
     x_round, y_round, shot_list = get_xy(hdf5_file)

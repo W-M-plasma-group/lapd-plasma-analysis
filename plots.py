@@ -7,6 +7,7 @@ import numpy as np
 
 def radial_diagnostic_plot(diagnostics_dataset, diagnostic='T_e', plot='contour'):
     # TODO This is more accurately a linear diagnostic plot.
+    # TODO allow list of diagnostics to plot to be passed
     # Return a plot of the specified type for the specified diagnostic in the dataset.
 
     if diagnostics_dataset.sizes['x'] > 1 and diagnostics_dataset.sizes['y'] > 1:
@@ -20,7 +21,7 @@ def radial_diagnostic_plot(diagnostics_dataset, diagnostic='T_e', plot='contour'
     pos_time_diagnostic_xarray = radial_diagnostics_dataset[diagnostic]
     units = pos_time_diagnostic_xarray.attrs['units']
 
-    allowed_plot_types = ('contour', 'surface')
+    allowed_plot_types = {'contour', 'surface'}
     if plot not in allowed_plot_types:
         warn("The type of plot '" + str(plot) + "' is not in the supported plot type list " + str(allowed_plot_types) +
              ". Defaulting to contour plot.")

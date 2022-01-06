@@ -37,7 +37,7 @@ def open_netcdf(filename):
 
 def write_netcdf(dataset, filename):
     print("Saving diagnostic dataset...")
-    dataset.to_netcdf(path=filename)
+    dataset.to_netcdf(path=filename, mode='a')
 
 
 # Search the current working directory and all subfolders for .nc (NetCDF) files
@@ -66,5 +66,5 @@ def netcdf_path(netcdf_name, netcdf_subfolder, bimaxwellian):
     if extension != "":  # checks if netcdf name has an extension
         warnings.warn("Name for NetCDF save file " + repr(netcdf_name) + " should not end with a file extension "
                       "(file extension will be added automatically). Trimming extension from filename.")
-    full_netcdf_filename = name + ("_bimaxwellian" if bimaxwellian else "") + ".nc"
-    return os.path.join(netcdf_subfolder, full_netcdf_filename)
+    # full_netcdf_filename = name + ("_bimaxwellian" if bimaxwellian else "") + ".nc"
+    return os.path.join(netcdf_subfolder, name + ".nc")
