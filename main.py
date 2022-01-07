@@ -14,20 +14,19 @@ from setup import *
 from bapsflib import lapd   # TODO move to getIVsweep.py
 
 # User global parameters
-sample_sec = (100 / 16 * 1e6) ** (-1) * u.s                   # Note that this is small. 10^6 is in the denominator
-probe_area = (1. * u.mm) ** 2                                 # From MATLAB code
-core_region = 26. * u.cm                                      # From MATLAB code
+sample_sec = (100 / 16 * 1e6) ** (-1) * u.s                      # Note that this is small. 10^6 is in the denominator
+probe_area = (1. * u.mm) ** 2                                    # From MATLAB code
+core_region = 26. * u.cm                                         # From MATLAB code
 ion_type = 'He-4+'
 bimaxwellian = True
-smoothing_margin = 0                                          # Optimal values in range 0-25
-steady_state_start_plateau, steady_state_end_plateau = 5, 11  # From MATLAB code
+smoothing_margin = 0                                             # Optimal values in range 0-25
+steady_state_start_plateau, steady_state_end_plateau = 5, 11     # From MATLAB code
+diagnostics_plotted = ['T_e_cold', 'T_e_hot', 'T_e_avg', 'T_e']  # String or list of strings
 # End of global parameters
 
 # User file path names
 hdf5_path = "/Users/leo/Plasma code/HDF5/9-4000A.hdf5"   # Path of chosen HDF5 file; available under repository Releases
 interferometry_filename = hdf5_path           # Interferometry data stored in same HDF5 file
-save_diagnostic_name = "diagnostic_dataset"   # File is saved to a subfolder (named below) to be created if necessary
-open_diagnostic_name = save_diagnostic_name   # Write diagnostics to and read diagnostics from the same location
 netcdf_subfolder_name = "netcdf"              # Subfolder to save and read netcdf files; set to "" to use current folder
 # End of file path names
 
@@ -44,8 +43,11 @@ if __name__ == "__main__":
     netcdf_subfolder_path = ensure_netcdf_directory(netcdf_subfolder_name)
 
     lapd_file = lapd.File(hdf5_path)
-    save_diagnostic_path = netcdf_path(lapd_file.info['file'], netcdf_subfolder_path, bimaxwellian)
-    open_diagnostic_path = netcdf_path(lapd_file.info['file'], netcdf_subfolder_path, bimaxwellian)
+    full_netcdf_path = netcdf_path(lapd_file.info['file'], netcdf_subfolder_path)
+    save_diagnostic_path = open_diagnostic_path = full_netcdf_path
+    print("Diagnostic dataset will be saved to or opened from the path", repr(full_netcdf_path))
+    # save_diagnostic_path = netcdf_path(lapd_file.info['file'], netcdf_subfolder_path)
+    # open_diagnostic_path = netcdf_path(lapd_file.info['file'], netcdf_subfolder_path)
 
     # Read LAPD experimental parameters
     experimental_parameters, experimental_parameters_rounded = setup_lapd(hdf5_path)
@@ -65,8 +67,11 @@ if __name__ == "__main__":
     # Print list of diagnostics generated
     print("Plasma diagnostics:", [key for key in diagnostics_dataset.keys()])
 
-    # Plot one chosen diagnostic against radial position and time
-    radial_diagnostic_plot(diagnostics_dataset, diagnostic=('T_e_avg' if bimaxwellian else 'T_e'), plot='contour')
+    # Plot one or more chosen diagnostics against linear position and time
+    # linear_diagnostic_plot(diagnostics_dataset, diagnostic=('T_e_avg' if bimaxwellian else 'T_e'), plot='contour')
+    linear_diagnostic_plot(diagnostics_dataset, diagnostic=diagnostics_plotted, plot='contour')
+
+    # TODO somehow separate bimaxwellian and non-bimaxwellian diagnostic data because they can be different!
 
     """
     print({diagnostic: diagnostics_dataset[diagnostic][sample_indices].values for diagnostic in diagnostics_dataset.keys()})
