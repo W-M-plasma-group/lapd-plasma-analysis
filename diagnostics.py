@@ -29,6 +29,7 @@ def plasma_diagnostics(characteristic_xarray, probe_area, ion_type, lapd_paramet
     xarray_dict = {str(i): xarray_list[i] for i in range(num_diagnostics)}
     diagnostic_dataset = xr.Dataset(xarray_dict)
     diagnostic_dataset.assign_attrs(lapd_parameters)
+    diagnostic_dataset.assign_attrs({"bimaxwellian": bimaxwellian})
 
     """
     What to do
@@ -114,13 +115,6 @@ def verify_plateau(characteristic, probe_area, ion_type, bimaxwellian):
     except (TypeError, RuntimeError):
         return 2
     return diagnostics
-
-
-# TODO remove
-"""def flag_diagnostic(diagnostic, minimum, maximum):  # discard T_e and other diagnostic values outside of specified range
-
-    diagnostic_1d = np.atleast_1d(diagnostic)
-    return np.nan if (diagnostic_1d < minimum).any() or (diagnostic_1d > maximum).any() else diagnostic"""
 
 
 def validate_diagnostic(diagnostic, minimum, maximum):  # discard diagnostic values (e.g. T_e) outside specified range

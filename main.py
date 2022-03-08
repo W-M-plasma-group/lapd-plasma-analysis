@@ -21,7 +21,7 @@ ion_type = 'He-4+'
 bimaxwellian = True
 smoothing_margin = 0                                             # Optimal values in range 0-25
 steady_state_start_plateau, steady_state_end_plateau = 5, 11     # From MATLAB code
-diagnostics_plotted = ['T_e_cold', 'T_e_hot', 'T_e_avg', 'T_e']  # String or list of strings
+diagnostics_plotted = ['T_e_cold', 'T_e']                        # String or list of strings
 # End of global parameters
 
 # User file path names
@@ -33,7 +33,7 @@ netcdf_subfolder_name = "netcdf"              # Subfolder to save and read netcd
 # User file options
 """ Set the below variable to True to open an existing diagnostic dataset from a NetCDF file
     or False to create a new diagnostic dataset from the given HDF5 file. """
-use_existing = True
+use_existing = False
 """ Set the below variable to True to save diagnostic data to a NetCDF file if a new one is created from HDF5 data. """
 save_diagnostics = True
 # End of file options
@@ -46,8 +46,6 @@ if __name__ == "__main__":
     full_netcdf_path = netcdf_path(lapd_file.info['file'], netcdf_subfolder_path)
     save_diagnostic_path = open_diagnostic_path = full_netcdf_path
     print("Diagnostic dataset will be saved to or opened from the path", repr(full_netcdf_path))
-    # save_diagnostic_path = netcdf_path(lapd_file.info['file'], netcdf_subfolder_path)
-    # open_diagnostic_path = netcdf_path(lapd_file.info['file'], netcdf_subfolder_path)
 
     # Read LAPD experimental parameters
     experimental_parameters, experimental_parameters_rounded = setup_lapd(hdf5_path)
@@ -65,16 +63,16 @@ if __name__ == "__main__":
             write_netcdf(diagnostics_dataset, save_diagnostic_path)
 
     # Print list of diagnostics generated
-    print("Plasma diagnostics:", [key for key in diagnostics_dataset.keys()])
+    # print("Plasma diagnostics:", [key for key in diagnostics_dataset.keys()])
 
-    # Plot one or more chosen diagnostics against linear position and time
-    # linear_diagnostic_plot(diagnostics_dataset, diagnostic=('T_e_avg' if bimaxwellian else 'T_e'), plot='contour')
-    linear_diagnostic_plot(diagnostics_dataset, diagnostic=diagnostics_plotted, plot='contour')
+    # Plot chosen diagnostics by linear position and time, then time-averaged diagnostics for each position
+    linear_diagnostic_plot(diagnostics_dataset, diagnostics_plotted, plot='contour')
+    linear_diagnostic_plot(diagnostics_dataset, diagnostics_plotted, plot='line')
 
     # TODO somehow separate bimaxwellian and non-bimaxwellian diagnostic data because they can be different!
 
     """
-    print({diagnostic: diagnostics_dataset[diagnostic][sample_indices].values for diagnostic in diagnostics_dataset.keys()})
+    print({diagnostic: diagnostics_dataset[diagnostic][(30, 0, 7)].values for diagnostic in diagnostics_dataset.keys()})
     print("Done analyzing sample characteristic")
     # """
 
@@ -84,25 +82,22 @@ if __name__ == "__main__":
         steady_state_start_plateau, steady_state_end_plateau, core_region=core_region)
 
     # Plot electron density data that was calibrated using interferometry data
-    electron_density.squeeze().plot.contourf(robust=True)
-    plt.show()
+    # linear_diagnostic_plot(xr.Dataset({"n_e_cal": electron_density}), "n_e_cal", plot="contour")
+    linear_diagnostic_plot(xr.Dataset({"n_e_cal": electron_density}), "n_e_cal", plot="line")
+    # linear_diagnostic_plot(xr.Dataset({"n_e_hot": electron_density * diagnostics_dataset['hot_fraction']}), "n_e_hot", plot="contour")
+    if bimaxwellian:
+        linear_diagnostic_plot(xr.Dataset({"n_e_hot": electron_density * diagnostics_dataset['hot_fraction']}), "n_e_hot", plot="line")
 
     # Calculation for pressure; in the future, this will consider only the steady-state region
-    # TODO use interferometry calibrated electron density
+    # Why is the pressure about twice what is expected as given in Overleaf document?
     electron_temperature = diagnostics_dataset['T_e_avg'] if bimaxwellian else diagnostics_dataset['T_e']
-    pressure = (3 / 2) * diagnostics_dataset['n_e'] * electron_temperature * (1. * u.eV * u.m ** -3).to(u.Pa)
+    pressure = (3 / 2) * electron_temperature * electron_density * (1. * u.eV * u.m ** -3).to(u.Pa)
+    linear_diagnostic_plot(xr.Dataset({"p_e": pressure}), "p_e", plot="contour")
+    linear_diagnostic_plot(xr.Dataset({"p_e": pressure}), "p_e", plot="line")
     # TODO RAISE ISSUE OF RECIPROCAL TEMPERATURE FOR NON-BIMAXWELLIAN TEMPERATURE
-    plateau = pressure.coords['plateau']  # rename variable for comprehensibility
-
-    steady_state_pressure = pressure.where(
-        np.logical_and(plateau >= steady_state_start_plateau, plateau <= steady_state_end_plateau))
-    steady_state_pressure.squeeze(dim='y').assign_attrs({"units": str(u.Pa)}).plot.contourf(x='time', y='x',
-                                                                                            robust=True)
-    plt.title("Steady state pressure")
-    plt.show()
 
     # Plot neutral ratios (NOTE: INCOMPLETE)
-    neutral_ratio(diagnostics_dataset['n_e'], experimental_parameters, steady_state_start_plateau, steady_state_end_plateau)
+    # neutral_ratio(diagnostics_dataset['n_e'], experimental_parameters, steady_state_start_plateau, steady_state_end_plateau)
 
     # Note: Plot generation code and neutral fraction analysis is incomplete.
     # Note: The non-bimaxwellian electron temperature calculated using the PlasmaPy code seems to be
