@@ -31,6 +31,8 @@ def plasma_diagnostics(characteristic_xarray, probe_area, ion_type, lapd_paramet
     diagnostic_dataset.assign_attrs(lapd_parameters)
     diagnostic_dataset.assign_attrs({"bimaxwellian": bimaxwellian})
 
+    print("Bimaxwellian, immediately after: ", diagnostic_dataset.attrs['bimaxwellian'])
+
     """
     What to do
     - Get dictionary with plasma diagnostic names as keys

@@ -37,7 +37,8 @@ def open_netcdf(filename):
 
 def write_netcdf(dataset, filename):
     print("Saving diagnostic dataset...")
-    dataset.to_netcdf(path=filename, mode='a')
+    save_mode = 'a' if check_netcdf(filename) else 'w'
+    dataset.to_netcdf(path=filename, mode=save_mode)
 
 
 # Search the current working directory and all subfolders for .nc (NetCDF) files

@@ -18,14 +18,14 @@ sample_sec = (100 / 16 * 1e6) ** (-1) * u.s                      # Note that thi
 probe_area = (1. * u.mm) ** 2                                    # From MATLAB code
 core_region = 26. * u.cm                                         # From MATLAB code
 ion_type = 'He-4+'
-bimaxwellian = True
+bimaxwellian = False
 smoothing_margin = 0                                             # Optimal values in range 0-25
 steady_state_start_plateau, steady_state_end_plateau = 5, 11     # From MATLAB code
 diagnostics_plotted = ['T_e_cold', 'T_e']                        # String or list of strings
 # End of global parameters
 
 # User file path names
-hdf5_path = "/Users/leo/Plasma code/HDF5/9-4000A.hdf5"   # Path of chosen HDF5 file; available under repository Releases
+hdf5_path = "/Users/leo/Plasma code/HDF5/16-2000A-redo.hdf5"   # Path of chosen HDF5 file; available under repository Releases
 interferometry_filename = hdf5_path           # Interferometry data stored in same HDF5 file
 netcdf_subfolder_name = "netcdf"              # Subfolder to save and read netcdf files; set to "" to use current folder
 # End of file path names
@@ -59,8 +59,11 @@ if __name__ == "__main__":
         characteristics = characterize_sweep_array(bias, current, x, y, margin=smoothing_margin, sample_sec=sample_sec)
         diagnostics_dataset = plasma_diagnostics(characteristics, probe_area, ion_type,
                                                  experimental_parameters, bimaxwellian=bimaxwellian)
+        print("Bimaxwellian, main.py: ", diagnostics_dataset.attrs['bimaxwellian'])
         if save_diagnostics:
             write_netcdf(diagnostics_dataset, save_diagnostic_path)
+    else:
+        print(diagnostics_dataset.attrs['bimaxwellian'])
 
     # Print list of diagnostics generated
     # print("Plasma diagnostics:", [key for key in diagnostics_dataset.keys()])
