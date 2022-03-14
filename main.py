@@ -18,7 +18,8 @@ sample_sec = (100 / 16 * 1e6) ** (-1) * u.s                      # Note that thi
 probe_area = (1. * u.mm) ** 2                                    # From MATLAB code
 core_region = 26. * u.cm                                         # From MATLAB code
 ion_type = 'He-4+'
-bimaxwellian = False
+bimaxwellian = False                                             # TODO rely on metadata to determine if bimaxwellian when opening file; save with different names
+# TODO compare bimaxwellian n_e, n_i, etc. with nonbimaxwellian to determine if we need to store under different filenames or just in same file with different diagnostic names
 smoothing_margin = 0                                             # Optimal values in range 0-25
 steady_state_start_plateau, steady_state_end_plateau = 5, 11     # From MATLAB code
 diagnostics_plotted = ['T_e_cold', 'T_e']                        # String or list of strings
