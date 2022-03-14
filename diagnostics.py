@@ -28,10 +28,10 @@ def plasma_diagnostics(characteristic_xarray, probe_area, ion_type, lapd_paramet
     xarray_list = [xr.full_like(characteristic_xarray, np.nan, dtype=float) for _ in range(num_diagnostics)]
     xarray_dict = {str(i): xarray_list[i] for i in range(num_diagnostics)}
     diagnostic_dataset = xr.Dataset(xarray_dict)
-    diagnostic_dataset.assign_attrs(lapd_parameters)
-    diagnostic_dataset.assign_attrs({"bimaxwellian": bimaxwellian})
+    diagnostic_dataset = diagnostic_dataset.assign_attrs(lapd_parameters)
+    diagnostic_dataset = diagnostic_dataset.assign_attrs({"bimaxwellian": bimaxwellian})
 
-    print("Bimaxwellian, immediately after: ", diagnostic_dataset.attrs['bimaxwellian'])
+    # print("Diagnostic dataset attributes:", diagnostic_dataset.attrs)
 
     """
     What to do
