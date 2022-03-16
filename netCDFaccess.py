@@ -61,14 +61,15 @@ def ensure_netcdf_directory(directory_path):
     return directory_path
 
 
-# Generate the netcdf file path to save diagnostic data
-def netcdf_path(netcdf_name, netcdf_subfolder):
+# Generate the netcdf file path to save/open diagnostic data
+def netcdf_path(netcdf_name, netcdf_subfolder, bimaxwellian):
     name, extension = os.path.splitext(netcdf_name)
     # TODO remove
     # if extension != "":  # checks if netcdf name has an extension
     #      warnings.warn("Name for NetCDF save file " + repr(netcdf_name) + " should not end with a file extension "
     #                    "(file extension will be added automatically). Trimming extension from filename.")
     # full_netcdf_filename = name + ("_bimaxwellian" if bimaxwellian else "") + ".nc"
-    full_netcdf_path = os.path.join(netcdf_subfolder, name + ".nc")
-    # print("Diagnostic dataset will be saved at", repr(full_netcdf_path))
+    bimaxwellian_filename = (name + "_bimax") if bimaxwellian else name
+    full_netcdf_path = os.path.join(netcdf_subfolder, bimaxwellian_filename + ".nc")
+    # print("Diagnostic dataset filename:", repr(full_netcdf_path))
     return full_netcdf_path

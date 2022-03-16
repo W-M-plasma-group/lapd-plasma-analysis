@@ -18,17 +18,17 @@ sample_sec = (100 / 16 * 1e6) ** (-1) * u.s                      # Note that thi
 probe_area = (1. * u.mm) ** 2                                    # From MATLAB code
 core_region = 26. * u.cm                                         # From MATLAB code
 ion_type = 'He-4+'
-bimaxwellian = False                                             # TODO rely on metadata to determine if bimaxwellian when opening file; save with different names
+bimaxwellian = True                                              # TODO rely on metadata to determine if bimaxwellian when opening file; save with different names
 # TODO compare bimaxwellian n_e, n_i, etc. with nonbimaxwellian to determine if we need to store under different filenames or just in same file with different diagnostic names
 smoothing_margin = 0                                             # Optimal values in range 0-25
 steady_state_start_plateau, steady_state_end_plateau = 5, 11     # From MATLAB code
-diagnostics_plotted = ['T_e_cold', 'T_e']                        # String or list of strings
+diagnostics_plotted = ['T_e_cold', 'T_e_avg']                        # String or list of strings
 # End of global parameters
 
 # User file path names
-hdf5_path = "/Users/leo/Plasma code/HDF5/16-2000A-redo.hdf5"   # Path of chosen HDF5 file; available under repository Releases
+hdf5_path = "/data/BAPSF_Data/Particle_Transport/March_2022/01_line_valves85V_7400A.hdf5"   # Path of chosen HDF5 file; available under repository Releases
 interferometry_filename = hdf5_path           # Interferometry data stored in same HDF5 file
-netcdf_subfolder_name = "netcdf"              # Subfolder to save and read netcdf files; set to "" to use current folder
+netcdf_subfolder_name = "/data/ltmurphy/March_2022/netcdf"              # Subfolder to save and read netcdf files; set to "" to use current folder
 # End of file path names
 
 # User file options
@@ -44,7 +44,8 @@ if __name__ == "__main__":
     netcdf_subfolder_path = ensure_netcdf_directory(netcdf_subfolder_name)
 
     lapd_file = lapd.File(hdf5_path)
-    full_netcdf_path = netcdf_path(lapd_file.info['file'], netcdf_subfolder_path)
+    # lapd_file.overview.print()
+    full_netcdf_path = netcdf_path(lapd_file.info['file'], netcdf_subfolder_path, bimaxwellian)
     save_diagnostic_path = open_diagnostic_path = full_netcdf_path
     print("Diagnostic dataset will be saved to or opened from the path", repr(full_netcdf_path))
 
@@ -58,6 +59,7 @@ if __name__ == "__main__":
     diagnostics_dataset = read_netcdf(open_diagnostic_path) if use_existing else None  # desired dataset or None to use HDF5
     if not diagnostics_dataset:  # diagnostic dataset not loaded; create new from HDF5 file
         characteristics = characterize_sweep_array(bias, current, x, y, margin=smoothing_margin, sample_sec=sample_sec)
+        # print("CHARACTERISTIC SHAPE:", characteristics.shape)
         diagnostics_dataset = plasma_diagnostics(characteristics, probe_area, ion_type,
                                                  experimental_parameters, bimaxwellian=bimaxwellian)
         print("Bimaxwellian, main.py: ", diagnostics_dataset.attrs['bimaxwellian'])
@@ -75,9 +77,9 @@ if __name__ == "__main__":
 
     # TODO somehow separate bimaxwellian and non-bimaxwellian diagnostic data because they can be different!
 
-    """
-    print({diagnostic: diagnostics_dataset[diagnostic][(30, 0, 7)].values for diagnostic in diagnostics_dataset.keys()})
-    print("Done analyzing sample characteristic")
+    # """
+    # print({diagnostic: diagnostics_dataset[diagnostic][(30, 0, 7)].values for diagnostic in diagnostics_dataset.keys()})
+    # print("Done analyzing sample characteristic")
     # """
 
     # Perform interferometry calibration for electron density

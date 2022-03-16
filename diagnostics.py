@@ -52,7 +52,7 @@ def plasma_diagnostics(characteristic_xarray, probe_area, ion_type, lapd_paramet
 
     print("Calculating plasma diagnostics...")  # (May take several minutes)
     diagnostic_names_assigned = False
-    num_positions = characteristic_xarray.sizes['x'] * characteristic_xarray.sizes['y']
+    num_positions = characteristic_xarray.sizes['x'] * characteristic_xarray.sizes['y'] * characteristic_xarray.sizes['time']
     warnings.simplefilter(action='ignore')  # Suppress warnings to not break progress bar
     with tqdm(total=num_positions, unit="position", file=sys.stdout) as pbar:
         for i in range(characteristic_xarray.sizes['x']):
@@ -60,6 +60,11 @@ def plasma_diagnostics(characteristic_xarray, probe_area, ion_type, lapd_paramet
                 for p in range(characteristic_xarray.sizes['time']):
                     characteristic = characteristic_xarray[i, j, p].item()  # Get characteristic @ x=i, y=j, plateau-1=p
                     diagnostics = verify_plateau(characteristic, probe_area, ion_type, bimaxwellian)
+
+                    # DEBUG
+                    print(i, j, p, ": \n", diagnostics)
+                    #
+
                     if diagnostics == 1:
                         # TODO print these two tqdm.write statements to a separate log file
                         pass
@@ -97,9 +102,13 @@ def plasma_diagnostics(characteristic_xarray, probe_area, ion_type, lapd_paramet
                             elif key == 'T_e':
                                 diagnostic_dataset[key][i, j, p] = validate_diagnostic(value_safe(diagnostics[key]), minimum=0, maximum=10)
                             else:
-                                diagnostic_dataset[key][i, j, p] = value_safe(diagnostics[key])
+                                try:
+                                    diagnostic_dataset[key][i, j, p] = value_safe(diagnostics[key])
+                                except KeyError:
+                                    print("Hey, problem with key", key, "at position", i, j, p)
+                                    print("Here are the diagnostics here: \n", diagnostics)
 
-                pbar.update(1)
+                    pbar.update(1)
 
     warnings.simplefilter(action='default')  # Restore warnings to default handling
 

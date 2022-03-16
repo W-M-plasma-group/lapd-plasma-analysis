@@ -131,15 +131,19 @@ def get_sweep_data_headers(file):
     :return: arrays of raw isweep and vsweep data and headers
     """
 
+    # HARD CODING IN!!
+    mar2022 = True
+    #
+
     # SIS crate data
     sis_group = structures_at_path(file, '/Raw data + config/SIS crate/')
     # print("Datasets in sis_data structure: " + str(sis_group["Datasets"]))
 
     # QUESTION: Can we use string-based Numpy field indexing to access these instead of hard-coding integer indices?
-    isweep_data_path = (sis_group['Datasets'])[2]
-    isweep_headers_path = (sis_group['Datasets'])[3]
-    vsweep_data_path = (sis_group['Datasets'])[4]
-    vsweep_headers_path = (sis_group['Datasets'])[5]
+    isweep_data_path = (sis_group['Datasets'])[4 if mar2022 else 2]
+    isweep_headers_path = (sis_group['Datasets'])[5 if mar2022 else 3]
+    vsweep_data_path = (sis_group['Datasets'])[2 if mar2022 else 4]
+    vsweep_headers_path = (sis_group['Datasets'])[3 if mar2022 else 5]
 
     isweep_data_raw = np.array(file[isweep_data_path])
     isweep_headers_raw = file[isweep_headers_path]
@@ -206,5 +210,6 @@ def to_real_sweep_units(bias, current):
     # Conversion factors taken from MATLAB code: Current = isweep / 11 ohms; Voltage = vsweep * 100
     gain = 100.  # voltage gain
     resistance = 11.  # current values from input current; implied units of ohms per volt since measured as potential
+    invert = 1  # or -1
 
-    return bias * gain * u.V, -1. * current / resistance * u.A
+    return bias * gain * u.V, current / resistance * u.A * invert

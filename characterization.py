@@ -3,6 +3,7 @@ import warnings
 import astropy.units as u
 import numpy as np
 import xarray as xr
+from scipy.signal import find_peaks, butter, sosfilt
 from plasmapy.diagnostics.langmuir import Characteristic
 
 import sys
@@ -27,8 +28,8 @@ def characterize_sweep_array(unadjusted_bias, unadjusted_current, x_round, y_rou
     """
 
     bias, current = smooth_current_array(unadjusted_bias, unadjusted_current, margin=margin)
-    plateau_ranges = isolate_plateaus(bias, margin=margin)
-    time_array = get_time_array(plateau_ranges, sample_sec)
+    ramp_bounds = isolate_plateaus(bias, margin=margin)
+    time_array = get_time_array(ramp_bounds, sample_sec)
 
     # debug
     """
@@ -39,7 +40,7 @@ def characterize_sweep_array(unadjusted_bias, unadjusted_current, x_round, y_rou
     plt.show()
     # """
 
-    characteristic_array = get_characteristic_array(bias, current, plateau_ranges)
+    characteristic_array = get_characteristic_array(bias, current, ramp_bounds)
     characteristic_xarray = to_characteristic_xarray(characteristic_array, time_array, x_round, y_round)
     return characteristic_xarray
 
@@ -68,79 +69,63 @@ def smooth_current_array(bias, current, margin):
 
 def isolate_plateaus(bias, margin=0):
     r"""
-    Function to identify start and stop frames of every ramp section within each plateau.
-    Returns array containing frame indices for each shot.
 
-    Parameters
-    ----------
-    :param bias: array
-    :param margin: int, optional
-    :return: array of ramp start and stop indices
+    :param bias:
+    :param margin:
+    :return:
     """
 
-    quench_slope = -1  # "Threshold for voltage quench slope": MATLAB code comment
-    quench_diff = 10  # Threshold for separating distinct voltage quench frames
+    # Assume strictly that all plateaus start and end at the same time after the start of the shot as in any other shot
+    bias_avg = np.mean(bias, axis=(0, 1))
+    bias_std = np.std(bias, axis=(0, 1))
+    # Report on how dissimilar the vsweep biases are and if they can be averaged together safely
+    print("Langmuir average error between shots:", np.mean(bias_std))
+    print("Langmuir variation in bias over time:", np.std(bias))
+    """
+    print(vsweep_std)
+    import matplotlib.pyplot as plt
+    plt.plot(vsweep_avg)
+    plt.plot(vsweep_std)
+    plt.show()
+    """
 
-    # Not in MATLAB code
-    rise_slope = 0.4  # Threshold for increases in slope
-    rise_diff = 100  # Threshold for separating distinct voltage ramp frames
+    # Low-pass filter?
 
-    # The bias has three types of regions: constant low, increase at constant rate ("ramp"), and rapid decrease
-    #    down to minimum value ("quench"). The ramp region is where useful Isweep-Vsweep data points are collected.
-    # Since the bias changes almost linearly within each of these three regions, the slope (gradient) of the bias
-    #    (normalized to be less than 1) can be used to divide the frames up into regions.
-    # Note: Selecting ramps out of plateaus (the constant low bias and following ramp region) is not in the original
-    #    MATLAB code, but is determined to be necessary for PlasmaPy diagnostics functions to work correctly.
+    # Initial fit to guess number of peaks
+    min_plateau_width = 500  # change as necessary
+    guess_num_plateaus = len(find_peaks(bias_avg, height=0, distance=min_plateau_width)[0])
+    guess_plateau_spacing = bias.shape[-1] // guess_num_plateaus
+    # print("Guessed number of plateaus:", guess_num_plateaus)
 
-    bias_gradient = np.gradient(bias, axis=-1)
-    normalized_bias_gradient = bias_gradient / np.amax(bias_gradient, axis=-1, keepdims=True)
+    # Second fit to find maximum bias frames
+    peak_frames, peak_properties = find_peaks(bias_avg, height=0, distance=guess_plateau_spacing // 2,
+                                              width=min_plateau_width, rel_height=0.97)  # 0.97 may be hardcoded
+    # print("Calculated maxima:\n", peak_frames)
+    # print("Calculated approximate ramp starts:\n", peak_properties['left_ips'].astype(int))
 
-    # Previous efforts to create quench_frames solely using array methods (fastest! but harder) lie here
-    # quench_frames = np.array((normalized_bias_gradient < quench_slope).nonzero())
-    # quench_frames_by_position = frame_array[..., normalized_bias_gradient < quench_slope]
-
-    # Using list comprehension, this line fills each x,y position in array with a list of quench frames
-    quench_frames = np.array([[(same_xy < quench_slope).nonzero()[0]
-                               for same_xy in same_x]
-                              for same_x in normalized_bias_gradient], dtype=object)
-
-    # Using list comprehension, this line creates an array storing significant quench frames (plus the last one, which
-    #    should also be significant) for each x,y position
-    # Define "significant"
-    sig_quench_frames = np.array([[same_xy[(np.diff(same_xy) > quench_diff).tolist() + [True]]
-                                   for same_xy in same_x]
-                                  for same_x in quench_frames])
-
-    # Using list comprehension, this line fills each x,y position in array with a list of pre-ramp frames
-    ramp_frames = np.array([[(same_xy > rise_slope).nonzero()[0]
-                             for same_xy in same_x]
-                            for same_x in normalized_bias_gradient], dtype=object)
-
-    # Using list comprehension, this line creates an array storing significant ramp start frames (plus the first one,
-    #    which should also be significant) for each x,y position
-    sig_ramp_frames = np.array([[same_xy[[True] + (np.diff(same_xy) > rise_diff).tolist()]
-                                 for same_xy in same_x]
-                                for same_x in ramp_frames])
-
-    # print("This is the average of the non-quench normalized gradient array at the test indices:",
-    #       np.mean(normalized_bias_gradient[test_indices +
-    #                                        (normalized_bias_gradient[test_indices] > quench_slope).nonzero()]))
-
-    # Is there a more efficient way to do this next code (such as with list comprehension)?
-    # Using a for loop, these next lines identify the indices of the maximum bias within each plateau
-    # Does being a ragged array mess this up at all? What about with sig_ramp_frames?
-    max_bias_frames = np.full_like(sig_quench_frames, np.nan)
-
-    for i in range(sig_quench_frames.shape[0]):
-        for j in range(sig_quench_frames.shape[1]):
-            for p in range(sig_quench_frames.shape[2]):
-                start_ind = sig_ramp_frames[i, j, p]
-                max_bias_frames[i, j, p] = np.argmax(bias[i, j, start_ind:sig_quench_frames[i, j, p]]) + start_ind
-
-    pad = (margin - 1) // 2
-    plateau_bounds = np.stack((sig_ramp_frames + pad, max_bias_frames - pad), axis=-1)
-
-    return plateau_bounds
+    """
+    # print(max_bias_frames)
+    import matplotlib.pyplot as plt
+    # for i in range(0, len(bias), 10):
+    #     plt.plot(bias[i, 0])
+    plt.plot(bias_avg)
+    plt.plot(peak_properties['left_ips'].astype(int), bias_avg[peak_properties['left_ips'].astype(int)], 'ro')
+    plt.show()
+    """
+    """
+    # Find start of each ramp
+    # low pass filter?
+    # peak_spacing = bias.shape[-1] // len(peak_frames)
+    print(peak_properties["widths"])
+    sos = butter(N=10, Wn=1 / peak_spacing / 10, btype='lp', output='sos')  # 10th order?
+    filtered = sosfilt(sos, bias_avg)
+    import matplotlib.pyplot as plt
+    plt.plot(filtered)
+    plt.plot(bias_avg)
+    plt.show()
+    """
+    # print(peak_frames.shape, peak_properties['left_ips'].shape)
+    return np.stack((peak_properties['left_ips'].astype(int), peak_frames))
 
 
 def create_ranged_characteristic(bias, current, start, end):
@@ -176,37 +161,25 @@ def get_time_array(plateau_ranges, sample_sec=(100 / 16 * 1e6) ** (-1) * u.s):
 
     # returns the time at the center of the ramp since the beginning of the shot
     # return np.mean(plateau_ranges, axis=-1) * sample_sec
-    return plateau_ranges[..., 1] * sample_sec  # Time of peak voltage at end of ramp
-
-
-"""
-    x_length = bias.shape[0]
-    y_length = bias.shape[1]
-
-    print("Splitting frames into plateaus...")
-    max_bias_indices = np.nanargmax(np.arange(1), axis=-1)  # Is splitting more efficient to calculate the max indices?
-"""
+    return plateau_ranges[1] * sample_sec  # Time of peak voltage at end ("top") of ramp
 
 
 def get_characteristic_array(bias, current, plateau_ranges):
 
-    characteristic_array = np.empty((plateau_ranges.shape[:3]), dtype=object)  # x, y, plateau
-    # TODO Address case where there are an irregular number of plateaus in a frame to begin with.
-    #    This should be addressed by creating a secondary array (or list?) containing the indices of valid plateaus
-    #    to analyze. Invalid ones should be skipped, but preserved in the array.
+    num_plateaus = plateau_ranges.shape[-1]
+    characteristic_array = np.empty(bias.shape[:2] + (num_plateaus,), dtype=object)  # x, y, plateau
 
     print("Creating characteristic array...")  # (May take up to 60 seconds)
     warnings.simplefilter(action='ignore', category=FutureWarning)  # Suppress FutureWarnings to not break loading bar
     print("    Note: plasmapy.langmuir.diagnostics pending deprecation FutureWarning suppressed")
-    num_pos = plateau_ranges.shape[0] * plateau_ranges.shape[1]
+    num_pos = bias.shape[0] * bias.shape[1] * num_plateaus
     with tqdm(total=num_pos, unit="position", file=sys.stdout) as pbar:
-        for i in range(plateau_ranges.shape[0]):
-            for j in range(plateau_ranges.shape[1]):
-                for p in range(plateau_ranges.shape[2]):
-                    start_ind, stop_ind = plateau_ranges[i, j, p]
+        for i in range(bias.shape[0]):
+            for j in range(bias.shape[1]):
+                for p in range(num_plateaus):
                     characteristic_array[i, j, p] = create_ranged_characteristic(
-                        bias[i, j], current[i, j], start_ind, stop_ind)
-                pbar.update(1)
+                        bias[i, j], current[i, j], start=plateau_ranges[0, p], end=plateau_ranges[1, p])
+                    pbar.update(1)
 
     return characteristic_array
 
@@ -218,7 +191,7 @@ def to_characteristic_xarray(characteristic_array, time_array, x, y):
     characteristic_xarray = xr.DataArray(characteristic_array, dims=['x', 'y', 'time'],
                                          coords=(('x', x, {'units': str(u.cm)}),
                                                  ('y', y, {'units': str(u.cm)}),
-                                                 ('time', np.median(time_array_ms, axis=(0, 1)), {'units': str(u.ms)})))
+                                                 ('time', time_array_ms, {'units': str(u.ms)})))
     characteristic_xarray = characteristic_xarray.assign_coords(
         {'plateau': ('time', np.arange(characteristic_array.shape[2]) + 1)})
     # Average the plateau time coordinate for all x,y positions to make 1D coordinate, keeping plateau dimension
