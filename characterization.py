@@ -81,13 +81,6 @@ def isolate_plateaus(bias, margin=0):
     # Report on how dissimilar the vsweep biases are and if they can be averaged together safely
     print("Langmuir average error between shots:", np.mean(bias_std))
     print("Langmuir variation in bias over time:", np.std(bias))
-    """
-    print(vsweep_std)
-    import matplotlib.pyplot as plt
-    plt.plot(vsweep_avg)
-    plt.plot(vsweep_std)
-    plt.show()
-    """
 
     # Low-pass filter?
 
@@ -95,36 +88,11 @@ def isolate_plateaus(bias, margin=0):
     min_plateau_width = 500  # change as necessary
     guess_num_plateaus = len(find_peaks(bias_avg, height=0, distance=min_plateau_width)[0])
     guess_plateau_spacing = bias.shape[-1] // guess_num_plateaus
-    # print("Guessed number of plateaus:", guess_num_plateaus)
 
     # Second fit to find maximum bias frames
     peak_frames, peak_properties = find_peaks(bias_avg, height=0, distance=guess_plateau_spacing // 2,
                                               width=min_plateau_width, rel_height=0.97)  # 0.97 may be hardcoded
-    # print("Calculated maxima:\n", peak_frames)
-    # print("Calculated approximate ramp starts:\n", peak_properties['left_ips'].astype(int))
 
-    """
-    # print(max_bias_frames)
-    import matplotlib.pyplot as plt
-    # for i in range(0, len(bias), 10):
-    #     plt.plot(bias[i, 0])
-    plt.plot(bias_avg)
-    plt.plot(peak_properties['left_ips'].astype(int), bias_avg[peak_properties['left_ips'].astype(int)], 'ro')
-    plt.show()
-    """
-    """
-    # Find start of each ramp
-    # low pass filter?
-    # peak_spacing = bias.shape[-1] // len(peak_frames)
-    print(peak_properties["widths"])
-    sos = butter(N=10, Wn=1 / peak_spacing / 10, btype='lp', output='sos')  # 10th order?
-    filtered = sosfilt(sos, bias_avg)
-    import matplotlib.pyplot as plt
-    plt.plot(filtered)
-    plt.plot(bias_avg)
-    plt.show()
-    """
-    # print(peak_frames.shape, peak_properties['left_ips'].shape)
     return np.stack((peak_properties['left_ips'].astype(int), peak_frames))
 
 
