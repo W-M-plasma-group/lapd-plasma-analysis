@@ -68,7 +68,6 @@ def netcdf_path(netcdf_name, netcdf_subfolder, bimaxwellian):
     # if extension != "":  # checks if netcdf name has an extension
     #      warnings.warn("Name for NetCDF save file " + repr(netcdf_name) + " should not end with a file extension "
     #                    "(file extension will be added automatically). Trimming extension from filename.")
-    # full_netcdf_filename = name + ("_bimaxwellian" if bimaxwellian else "") + ".nc"
     bimaxwellian_filename = (name + "_bimax") if bimaxwellian else name
     full_netcdf_path = os.path.join(netcdf_subfolder, bimaxwellian_filename + ".nc")
     # print("Diagnostic dataset filename:", repr(full_netcdf_path))
