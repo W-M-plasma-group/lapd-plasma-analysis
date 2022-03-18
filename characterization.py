@@ -8,6 +8,7 @@ from plasmapy.diagnostics.langmuir import Characteristic
 
 import sys
 from tqdm import tqdm
+# import some sort of multiprocessing module?
 
 
 def characterize_sweep_array(unadjusted_bias, unadjusted_current, x_round, y_round, margin, sample_sec):
@@ -93,7 +94,7 @@ def isolate_plateaus(bias, margin=0):
     peak_frames, peak_properties = find_peaks(bias_avg, height=0, distance=guess_plateau_spacing // 2,
                                               width=min_plateau_width, rel_height=0.97)  # 0.97 may be hardcoded
 
-    return np.stack((peak_properties['left_ips'].astype(int), peak_frames))
+    return np.stack((peak_properties['left_ips'].astype(int) + margin // 2, peak_frames - margin // 2))
 
 
 def create_ranged_characteristic(bias, current, start, end):
@@ -141,14 +142,13 @@ def get_characteristic_array(bias, current, plateau_ranges):
     warnings.simplefilter(action='ignore', category=FutureWarning)  # Suppress FutureWarnings to not break loading bar
     print("    Note: plasmapy.langmuir.diagnostics pending deprecation FutureWarning suppressed")
     num_pos = bias.shape[0] * bias.shape[1] * num_plateaus
-    with tqdm(total=num_pos, unit="position", file=sys.stdout) as pbar:
+    with tqdm(total=num_pos, unit="characteristic", file=sys.stdout) as pbar:
         for i in range(bias.shape[0]):
             for j in range(bias.shape[1]):
                 for p in range(num_plateaus):
                     characteristic_array[i, j, p] = create_ranged_characteristic(
                         bias[i, j], current[i, j], start=plateau_ranges[0, p], end=plateau_ranges[1, p])
                     pbar.update(1)
-
     return characteristic_array
 
 
