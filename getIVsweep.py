@@ -209,7 +209,7 @@ def to_real_sweep_units(bias, current):
 
     # Conversion factors taken from MATLAB code: Current = isweep / 11 ohms; Voltage = vsweep * 100
     gain = 100.  # voltage gain
-    resistance = 11.  # current values from input current; implied units of ohms per volt since measured as potential
+    resistance = 1.25  # 11.  # current values from input current; implied units of ohms per volt since measured as potential
     invert = 1  # or -1
 
     return bias * gain * u.V, current / resistance * u.A * invert

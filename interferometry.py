@@ -63,6 +63,8 @@ def interferometry_calibration(density_xarray, interferometry_filename,
     # Find average step in density (n_e) time coordinate by dividing total time elapsed by number of time measurements
     density_time_coord = density_data.coords['time']
     dt = (density_time_coord[-1] - density_time_coord[0]) / len(density_time_coord)  # time step for density time coord.
+    print("density time length:", density_time_coord[-1] - density_time_coord[0])
+    print("interferometry time length:", inter_time[-1] - inter_time[0])
 
     # Select elements of density array with both x and y in the core position range (|x| < 26 cm & |y| < 26 cm)
     x_mask, y_mask = abs(density_data.x) < core_region.value, abs(density_data.y) < core_region.value
