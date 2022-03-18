@@ -64,11 +64,9 @@ def interferometry_calibration(density_xarray, interferometry_filename,
     density_time_coord = density_data.coords['time']
     dt = (density_time_coord[-1] - density_time_coord[0]) / len(density_time_coord)  # time step for density time coord.
 
-    both = xr.ufuncs.logical_and  # Rename function for readability
-
     # Select elements of density array with both x and y in the core position range (|x| < 26 cm & |y| < 26 cm)
     x_mask, y_mask = abs(density_data.x) < core_region.value, abs(density_data.y) < core_region.value
-    core_density_array = density_data.where(both(x_mask, y_mask), drop=True)
+    core_density_array = density_data.where(np.logical_and(x_mask, y_mask), drop=True)
 
     # Interpolate nan values linearly to allow trapezoidal integration over incomplete dimensions
     core_density_array = core_density_array.interpolate_na(dim='x', use_coordinate=True, max_gap=10.)  # 10 cm max gap
@@ -105,8 +103,8 @@ def interferometry_calibration(density_xarray, interferometry_filename,
         inter_data = inter_data.assign_coords(aligned_y_time)
 
         # Average all interferometry measurements into data point with closest corresponding density time coordinate
-        inter_avg_y_time = xr.DataArray([inter_data.where(both(inter_data.coords['y_time'] > t - dt / 2,
-                                                               inter_data.coords['y_time'] < t + dt / 2)
+        inter_avg_y_time = xr.DataArray([inter_data.where(np.logical_and(inter_data.coords['y_time'] > t - dt / 2,
+                                                                        inter_data.coords['y_time'] < t + dt / 2)
                                                           ).mean() for t in density_data.coords['time']],
                                         dims=['time'],
                                         coords={'time':  density_data.coords['time'],
@@ -122,7 +120,7 @@ def interferometry_calibration(density_xarray, interferometry_filename,
 
     # Return the calibrated electron temperature data only in the steady state region (given by plateau indices)
     steady_state_scale_factor = density_scale_factor.where(
-        both(density_xarray.plateau >= steady_state_start, density_xarray.plateau <= steady_state_end))
+        np.logical_and(density_xarray.plateau >= steady_state_start, density_xarray.plateau <= steady_state_end))
     calibrated_density_xarray = density_xarray * steady_state_scale_factor
 
     print("Average interferometry calibration factor:", steady_state_scale_factor.mean().item())
