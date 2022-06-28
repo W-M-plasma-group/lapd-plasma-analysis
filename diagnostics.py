@@ -1,6 +1,7 @@
 import numpy as np
 import xarray as xr
 
+import astropy.units as u
 from plasmapy.diagnostics.langmuir import swept_probe_analysis, reduce_bimaxwellian_temperature
 
 import sys
@@ -50,30 +51,31 @@ def plasma_diagnostics(characteristic_xarray, probe_area, ion_type, lapd_paramet
             - Flag each temperature for unrealistic values
     """
 
+    # import matplotlib.pyplot as plt
     print("Calculating plasma diagnostics...")  # (May take several minutes)
     diagnostic_names_assigned = False
     num_positions = characteristic_xarray.sizes['x'] * characteristic_xarray.sizes['y'] * characteristic_xarray.sizes['time']
     warnings.simplefilter(action='ignore')  # Suppress warnings to not break progress bar
-    with tqdm(total=num_positions, unit="position", file=sys.stdout) as pbar:
+    with tqdm(total=num_positions, unit="characteristic", file=sys.stdout) as pbar:
         for i in range(characteristic_xarray.sizes['x']):
             for j in range(characteristic_xarray.sizes['y']):
                 for p in range(characteristic_xarray.sizes['time']):
                     characteristic = characteristic_xarray[i, j, p].item()  # Get characteristic @ x=i, y=j, plateau-1=p
-                    diagnostics = verify_plateau(characteristic, probe_area, ion_type, bimaxwellian)
-
-                    # DEBUG
-                    print(i, j, p, ": \n", diagnostics)
-                    #
-
+                    # TODO document trimming; allow the trim voltage as parameter/let user set
+                    trimmed_characteristic = characteristic[characteristic.bias < 7 * u.V]
+                    diagnostics = verify_plateau(trimmed_characteristic, probe_area, ion_type, bimaxwellian)
                     if diagnostics == 1:
-                        # TODO print these two tqdm.write statements to a separate log file
+                        # TODO print tqdm.write statements to a separate log file
                         pass
                         # tqdm.write("Plateau at position (" + str(i) + ", " + str(j) + ", " + str(p) + ") is unusable")
-                        # characteristic_array[i, j, p].plot()
+                        # trimmed_characteristic.plot()
+                        # plt.title("Plateau at position (" + str(i) + ", " + str(j) + ", " + str(p) + ") is unusable")
+                        # plt.show()
                     elif diagnostics == 2:
                         pass
-                        # tqdm.write("Unknown error at position (" + str(i) + ", " + str(j) + "," + str(p) + ")")
-                        # characteristic_array[i, j, p].plot()
+                        # trimmed_characteristic.plot()
+                        # plt.title("Unknown error at position (" + str(i) + ", " + str(j) + "," + str(p) + ")")
+                        # plt.show()
                     else:
                         if not diagnostic_names_assigned:
                             diagnostic_names = {key: str(unit_safe(diagnostics[key])) for key in diagnostics.keys()}
@@ -105,9 +107,9 @@ def plasma_diagnostics(characteristic_xarray, probe_area, ion_type, lapd_paramet
                                 try:
                                     diagnostic_dataset[key][i, j, p] = value_safe(diagnostics[key])
                                 except KeyError:
-                                    print("Hey, problem with key", key, "at position", i, j, p)
-                                    print("Here are the diagnostics here: \n", diagnostics)
-
+                                    tqdm.write("Problem with key " + str(key) + " at position "
+                                               + str(i) + ", " + str(j) + ", " + str(p))
+                                    tqdm.write("Diagnostics: \n", diagnostics)
                     pbar.update(1)
 
     warnings.simplefilter(action='default')  # Restore warnings to default handling
@@ -119,18 +121,20 @@ def plasma_diagnostics(characteristic_xarray, probe_area, ion_type, lapd_paramet
 
 def verify_plateau(characteristic, probe_area, ion_type, bimaxwellian):
 
+    # TODO save error messages/optionally print to separate log file
     try:
         diagnostics = swept_probe_analysis(characteristic, probe_area, ion_type, bimaxwellian=bimaxwellian)
-    except ValueError:
+    except ValueError as e:
+        # print(e)
         return 1
-    except (TypeError, RuntimeError):
+    except (TypeError, RuntimeError) as e:
+        # print(e)
         return 2
     return diagnostics
 
 
 def validate_diagnostic(diagnostic, minimum, maximum):  # discard diagnostic values (e.g. T_e) outside specified range
 
-    # print(diagnostic)
     return value_safe(diagnostic) if minimum <= value_safe(diagnostic) <= maximum else np.nan
 
 

@@ -8,7 +8,6 @@ from plasmapy.diagnostics.langmuir import Characteristic
 
 import sys
 from tqdm import tqdm
-# import some sort of multiprocessing module?
 
 
 def characterize_sweep_array(unadjusted_bias, unadjusted_current, x_round, y_round, margin, sample_sec):
@@ -28,7 +27,8 @@ def characterize_sweep_array(unadjusted_bias, unadjusted_current, x_round, y_rou
     :return: 3D xarray DataArray of Characteristic objects
     """
 
-    bias, current = smooth_current_array(unadjusted_bias, unadjusted_current, margin=margin)
+    dc_current_offset = np.mean(unadjusted_current[..., :1000], axis=-1, keepdims=True)
+    bias, current = smooth_current_array(unadjusted_bias, unadjusted_current - dc_current_offset, margin=margin)
     ramp_bounds = isolate_plateaus(bias, margin=margin)
     time_array = get_time_array(ramp_bounds, sample_sec)
 
@@ -57,15 +57,15 @@ def smooth_current_array(bias, current, margin):
     if current.shape[-1] <= margin:
         raise ValueError("Last dimension length", current.shape[-1], "is too short to take", margin, "-point mean over")
 
-    current_sum = np.cumsum(np.insert(current, 0, 0, axis=-1), axis=-1)
+    current_sum = np.cumsum(np.insert(current, 0, 0, axis=-1), axis=-1, dtype=np.float64)
+    bias_sum = np.cumsum(np.insert(bias, 0, 0, axis=-1), axis=-1, dtype=np.float64)
 
     # Find cumulative mean of each consecutive block of (margin + 1) elements per row
     smooth_current_full = (current_sum[..., margin:] - current_sum[..., :-margin]) / margin
+    # Smooth bias in the same way to get shorter bias array
+    smooth_bias_full = (bias_sum[..., margin:] - bias_sum[..., :-margin]) / margin
 
-    # Aligns bias with new, shorter current array; remove only the last element if margin is 1
-    trimmed_bias = bias[..., (margin - 1) // 2:-(margin - 1) // 2] if margin > 1 else bias
-
-    return trimmed_bias, smooth_current_full
+    return smooth_bias_full.astype(float), smooth_current_full.astype(float)
 
 
 def isolate_plateaus(bias, margin=0):
@@ -124,13 +124,9 @@ def create_ranged_characteristic(bias, current, start, end):
 
 
 def get_time_array(plateau_ranges, sample_sec=(100 / 16 * 1e6) ** (-1) * u.s):
-    # Make more robust; is mean time during shot okay? Clean up, decide final form
-    # x, y, time in milliseconds since start of that [average] shot using sample_sec in milliseconds
     # NOTE: MATLAB code stores peak voltage time (end of plateaus), then only uses plateau times for very first position
-
-    # returns the time at the center of the ramp since the beginning of the shot
-    # return np.mean(plateau_ranges, axis=-1) * sample_sec
-    return plateau_ranges[1] * sample_sec  # Time of peak voltage at end ("top") of ramp
+    # This uses the time of the peak voltage for the average of all shots ("top of the average ramp")
+    return plateau_ranges[1] * sample_sec
 
 
 def get_characteristic_array(bias, current, plateau_ranges):
