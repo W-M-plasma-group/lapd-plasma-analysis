@@ -56,16 +56,25 @@ def smooth_characteristic(bias, current, margin):
     if current.shape[-1] <= margin:
         raise ValueError("Last dimension length", current.shape[-1], "is too short to take", margin, "-point mean over")
 
-    # TODO spin off to reduce duplicated code
-    current_sum = np.cumsum(np.insert(current, 0, 0, axis=-1), axis=-1, dtype=np.float64)
-    bias_sum = np.cumsum(np.insert(bias, 0, 0, axis=-1), axis=-1, dtype=np.float64)
+    return smooth_array(bias), smooth_array(current)
+
+
+def smooth_array(array, margin):
+    r"""
+    Utility function to smooth ndarray using moving average.
+
+    Parameters
+    ----------
+    :param array: ndarray to be smoothed
+    :param margin: width of moving average window
+    :return: smoothed ndarray with last dimension length decreased by margin
+    """
 
     # Find cumulative mean of each consecutive block of (margin + 1) elements per row
-    smooth_current_full = (current_sum[..., margin:] - current_sum[..., :-margin]) / margin
-    # Smooth bias in the same way to get shorter bias array
-    smooth_bias_full = (bias_sum[..., margin:] - bias_sum[..., :-margin]) / margin
+    array_sum = np.cumsum(np.insert(array, 0, 0, axis=-1), axis=-1, dtype=np.float64)
+    smoothed_array = (array_sum[..., margin:] - array_sum[..., :-margin]) / margin
 
-    return smooth_bias_full.astype(float), smooth_current_full.astype(float)
+    return smoothed_array.astype(float)
 
 
 def isolate_plateaus(bias, margin=0):
