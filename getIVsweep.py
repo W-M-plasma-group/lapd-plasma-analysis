@@ -4,7 +4,7 @@ import astropy.units as u
 from hdf5reader import *
 
 
-def get_isweep_vsweep(filename):
+def get_isweep_vsweep(filename, mar2022):
     r"""
     Reads all sweep data (V-sweep and I-sweep) from HDF5 file Langmuir code.
     :param filename: File path of HDF5 file from LAPD
@@ -17,7 +17,7 @@ def get_isweep_vsweep(filename):
     x_round, y_round, shot_list = get_xy(hdf5_file)
     xy_shot_ref, x, y = categorize_shots_xy(x_round, y_round, shot_list)
 
-    isweep_data_raw, vsweep_data_raw, isweep_headers_raw, vsweep_headers_raw = get_sweep_data_headers(hdf5_file)
+    isweep_data_raw, vsweep_data_raw, isweep_headers_raw, vsweep_headers_raw = get_sweep_data_headers(hdf5_file, mar2022)
 
     # Define: scale is 2nd index, offset is 3rd index
     isweep_scales, isweep_offsets = get_scales_offsets(isweep_headers_raw, scale_index=1, offset_index=2)
@@ -47,7 +47,7 @@ def get_isweep_vsweep(filename):
     hdf5_file.close()
 
     # Note: This function returns the bias values first, then the current
-    bias, current = to_real_sweep_units(vsweep_means, isweep_means)
+    bias, current = to_real_sweep_units(vsweep_means, isweep_means, mar2022)
     return bias, current, x, y
 
 
@@ -119,21 +119,17 @@ def categorize_shots_xy(x_round, y_round, shot_list):
     # Some x,y position data processing in the MATLAB code was not translated.
 
 
-def get_sweep_data_headers(file):
+def get_sweep_data_headers(file, mar2022):
     r"""
 
     Function to read raw isweep and vsweep data and headers from a file.
-    Returns four arrays arrays containing isweep and vsweep data and sweep headers in compressed format.
+    Returns four arrays containing isweep and vsweep data and sweep headers in compressed format.
 
     Parameters
     ----------
     :param file: file object
     :return: arrays of raw isweep and vsweep data and headers
     """
-
-    # HARD CODING IN!!
-    mar2022 = True
-    #
 
     # SIS crate data
     sis_group = structures_at_path(file, '/Raw data + config/SIS crate/')
@@ -195,7 +191,7 @@ def scale_offset_decompress(data_raw, scales, offsets):
     return data_raw * scales.reshape(num_shots, 1) + offsets.reshape(num_shots, 1)
 
 
-def to_real_sweep_units(bias, current):
+def to_real_sweep_units(bias, current, mar2022):
     r"""
     Parameters
     ----------
@@ -209,7 +205,7 @@ def to_real_sweep_units(bias, current):
 
     # Conversion factors taken from MATLAB code: Current = isweep / 11 ohms; Voltage = vsweep * 100
     gain = 100.  # voltage gain
-    resistance = 1.25  # 11.  # current values from input current; implied units of ohms per volt since measured as potential
-    invert = 1  # or -1
+    resistance = 1.25 if mar2022 else 11.  # current values from input current; implied units of ohms per volt since measured as potential
+    invert = 1 if mar2022 else -1
 
     return bias * gain * u.V, current / resistance * u.A * invert
