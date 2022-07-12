@@ -27,36 +27,36 @@ def characterize_sweep_array(unadjusted_bias, unadjusted_current, x_round, y_rou
     :return: 3D xarray DataArray of Characteristic objects
     """
 
-    dc_current_offset = np.mean(unadjusted_current[..., :1000], axis=-1, keepdims=True)
-    bias, current = smooth_current_array(unadjusted_bias, unadjusted_current - dc_current_offset, margin=margin)
+    dc_current_offset = np.mean(unadjusted_current[..., -1000:], axis=-1, keepdims=True)
+    bias, current = smooth_characteristic(unadjusted_bias, unadjusted_current - dc_current_offset, margin=margin)
     ramp_bounds = isolate_plateaus(bias, margin=margin)
     time_array = get_time_array(ramp_bounds, sample_sec)
-
-    # debug
-    """
-    # pprint(swept_probe_analysis(smooth_plateau, probe_area, 'He-4+', bimaxwellian=True, visualize=True, plot_EEDF=True))
-    plt.plot(adjusted_bias[sample_indices[:2]], 'b-',
-             plateau_ranges[sample_indices[0], sample_indices[1], :, 0], adjusted_bias[sample_indices[0], sample_indices[1], plateau_ranges[sample_indices[0], sample_indices[1], :, 0]], 'go',
-             plateau_ranges[sample_indices[0], sample_indices[1], :, 1], adjusted_bias[sample_indices[0], sample_indices[1], plateau_ranges[sample_indices[0], sample_indices[1], :, 1]], 'yo')
-    plt.show()
-    # """
 
     characteristic_array = get_characteristic_array(bias, current, ramp_bounds)
     characteristic_xarray = to_characteristic_xarray(characteristic_array, time_array, x_round, y_round)
     return characteristic_xarray
 
 
-def smooth_current_array(bias, current, margin):
-    # Distorts shape of current, especially at ends of plateaus, but much faster than smoothing plateaus individually
+def smooth_characteristic(bias, current, margin):
+    r"""
+    Simple moving-average smoothing function for bias and current.
+
+    Parameters
+    ----------
+    :param bias: ndarray
+    :param current: ndarray
+    :param margin: int, window length for moving average
+    :return: smoothed bias, smoothed current
+    """
 
     if margin < 0:
         raise ValueError("Cannot smooth over negative number", margin, "of points")
     if margin == 0:
-        # warnings.warn("Zero-point smoothing is redundant")
         return bias, current
     if current.shape[-1] <= margin:
         raise ValueError("Last dimension length", current.shape[-1], "is too short to take", margin, "-point mean over")
 
+    # TODO spin off to reduce duplicated code
     current_sum = np.cumsum(np.insert(current, 0, 0, axis=-1), axis=-1, dtype=np.float64)
     bias_sum = np.cumsum(np.insert(bias, 0, 0, axis=-1), axis=-1, dtype=np.float64)
 
@@ -94,6 +94,7 @@ def isolate_plateaus(bias, margin=0):
     peak_frames, peak_properties = find_peaks(bias_avg, height=0, distance=guess_plateau_spacing // 2,
                                               width=min_plateau_width, rel_height=0.97)  # 0.97 may be hardcoded
 
+    print(len(peak_frames), "plateaus detected")
     return np.stack((peak_properties['left_ips'].astype(int) + margin // 2, peak_frames - margin // 2))
 
 
@@ -123,7 +124,7 @@ def create_ranged_characteristic(bias, current, start, end):
     return Characteristic(bias[start:end], current[start:end])
 
 
-def get_time_array(plateau_ranges, sample_sec=(100 / 16 * 1e6) ** (-1) * u.s):
+def get_time_array(plateau_ranges, sample_sec):
     # NOTE: MATLAB code stores peak voltage time (end of plateaus), then only uses plateau times for very first position
     # This uses the time of the peak voltage for the average of all shots ("top of the average ramp")
     return plateau_ranges[1] * sample_sec
