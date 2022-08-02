@@ -11,26 +11,72 @@ def get_isweep_vsweep(filename, mar2022):
     :return: bias, current, x, y: the relevant multi-dimensional sweep data and position data
     """
 
+    """
     print("Loading HDF5 data...")
     hdf5_file = open_hdf5(filename)
+    """
     # print("Categorizing shots by x,y position...")
-    x_round, y_round, shot_list = get_xy(hdf5_file)
-    xy_shot_ref, x, y = categorize_shots_xy(x_round, y_round, shot_list)
+    # xy_shot_ref, x, y = categorize_shots_xy(x_round, y_round, shot_list)
 
-    isweep_data_raw, vsweep_data_raw, isweep_headers_raw, vsweep_headers_raw = get_sweep_data_headers(hdf5_file, mar2022)
+    lapd_file = lapd.File(filename)
 
-    # Define: scale is 2nd index, offset is 3rd index
-    isweep_scales, isweep_offsets = get_scales_offsets(isweep_headers_raw, scale_index=1, offset_index=2)
-    vsweep_scales, vsweep_offsets = get_scales_offsets(vsweep_headers_raw, scale_index=1, offset_index=2)
+    isweep_channel = 2  # 2 = port 27, 3 = port 43
+    isweep_receptacles = {2: 1, 3: 2}
+    # if mar2022:  # TODO replace with user menu?
 
-    # print("Decompressing raw data...")
-    isweep_processed = scale_offset_decompress(isweep_data_raw, isweep_scales, isweep_offsets)
-    vsweep_processed = scale_offset_decompress(vsweep_data_raw, vsweep_scales, vsweep_offsets)
+    vsweep_data = lapd_file.read_data(1, 1, silent=True)
+    isweep_data = lapd_file.read_data(1, isweep_channel, silent=True)
+    vsweep_signal = vsweep_data['signal']
+    isweep_signal = isweep_data['signal']
+    signal_length = vsweep_signal.shape[-1]
+
+    motor_data = lapd_file.read_controls([("6K Compumotor", isweep_receptacles[isweep_channel])], silent=True)
+    num_shots = len(motor_data['shotnum'])
+    position_data = np.round(motor_data['xyz'], 1)
+
+    z_positions = position_data[:, 2]
+    if np.amin(z_positions) != np.amax(z_positions):
+        raise ValueError("Varying z-position when only x and/or y variation expected")
+    # save z-position for later?
+
+    positions = np.unique(position_data[:, :2], axis=0)
+    num_positions = len(positions)
+    if num_shots % num_positions != 0:
+        raise ValueError("Number of shots " + str(num_shots) +
+                         " does not evenly divide into " + str(num_positions) + " positions")
+    shots_per_position = int(num_shots // num_positions)
+
+    vsweep_signal = vsweep_signal.reshape((num_positions, shots_per_position, signal_length))
+    isweep_signal = isweep_signal.reshape((num_positions, shots_per_position, signal_length))
+
+    xy_at_positions = position_data[:, :2].reshape((num_positions, shots_per_position, 2))  # 2 for x, y (no z)
+    if not (np.amax(xy_at_positions, axis=1) == np.amin(xy_at_positions, axis=1)).all():
+        raise ValueError("Non-uniform positions values when grouping Langmuir probe data by position")
+
+    vsweep_signal = vsweep_signal.mean(axis=1)
+    isweep_signal = isweep_signal.mean(axis=1)
+
+    # TODO welcome.py
+    """
+    PLAN
+    - Ask user to select NetCDF file to use, or 0 to load HDF5
+        - Ask user to select HDF5 file to use
+        - Ask user if save new NetCDF file
+    - Welcome.py
+        - Search run description for isweep and vsweep
+            - If ambiguous, ask user which to use
+        - Search list of probes for common Langmuir types
+            - If uncertain/ambiguous, ask user which to use
+        ** Ask for HDF5 parameters "Vsweep location" and "List of Isweep locations for user to choose from"
+        - Search for 96 GHz interferometer - first priority in interferometry?
+        ** Ask for HDF5 parameters "preferred interferometer data path" and "interferometer type" (ex. 56 vs. 96 GHz)
+    """
 
     # Note: I may be able to convert isweep/vsweep arrays to real units here, as long as numpy can handle astropy units
 
     # Note: I may take the standard deviation across shots to approximate error for sweep curves, as done in MATLAB code
 
+    """
     # Create 4D array: the first two dimensions correspond to all combinations of unique x and y positions,
     #    the third dimension represents the nth shot taken at that unique positions
     #    and the fourth dimensions lists all the frames in that nth shot.
@@ -43,34 +89,17 @@ def get_isweep_vsweep(filename, mar2022):
     # Creates a 3D array of sweep values for each unique x position, unique y position, and frame number.
     isweep_means = np.mean(isweep_xy_shots_array, 2)
     vsweep_means = np.mean(vsweep_xy_shots_array, 2)
+    """
 
-    hdf5_file.close()
+    # hdf5_file.close()
+    lapd_file.close()
 
     # Note: This function returns the bias values first, then the current
-    bias, current = to_real_sweep_units(vsweep_means, isweep_means, mar2022)
-    return bias, current, x, y
+    # bias, current = to_real_sweep_units(vsweep_means, isweep_means, mar2022)
+    # return bias, current, x, y
 
-
-def get_xy(file):
-    r"""
-    Reads the x, y, and shot data from a file. Returns rounded x and y data for each shot and a list of shots.
-
-    Parameters
-    ----------
-    :param file: file object
-    :return: tuple of three lists
-    """
-    motor_data = structures_at_path(file, '/Raw data + config/6K Compumotor')
-    motion_path = (motor_data["Datasets"])[0]
-    probe_motion = file[motion_path]
-
-    places = 1
-    x_round = np.round(probe_motion['x'], decimals=places)
-    y_round = np.round(probe_motion['y'], decimals=places)
-
-    shot_list = tuple(probe_motion['Shot number'])
-
-    return x_round, y_round, shot_list
+    bias, current = to_real_sweep_units(vsweep_signal, isweep_signal, mar2022)
+    return bias, current, positions
 
 
 def categorize_shots_xy(x_round, y_round, shot_list):
@@ -133,11 +162,11 @@ def get_sweep_data_headers(file, mar2022):
 
     # SIS crate data
     sis_group = structures_at_path(file, '/Raw data + config/SIS crate/')
-    # print("Datasets in sis_data structure: " + str(sis_group["Datasets"]))
+    print("Datasets in sis_data structure: ", *sis_group["Datasets"], sep="\n")
 
     # QUESTION: Can we use string-based Numpy field indexing to access these instead of hard-coding integer indices?
-    isweep_data_path = (sis_group['Datasets'])[4 if mar2022 else 2]
-    isweep_headers_path = (sis_group['Datasets'])[5 if mar2022 else 3]
+    isweep_data_path = (sis_group['Datasets'])[4 if mar2022 else 2]  # t 6 TODO RETURN TO 4 if - else 2
+    isweep_headers_path = (sis_group['Datasets'])[5 if mar2022 else 3]  # t 7 TODO RETURN TO 5 if - else 3
     vsweep_data_path = (sis_group['Datasets'])[2 if mar2022 else 4]
     vsweep_headers_path = (sis_group['Datasets'])[3 if mar2022 else 5]
 
