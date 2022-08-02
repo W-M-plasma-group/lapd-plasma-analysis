@@ -1,22 +1,14 @@
 import numpy as np
 import astropy.units as u
-
-from hdf5reader import *
+from bapsflib import lapd
 
 
 def get_isweep_vsweep(filename, mar2022):
     r"""
     Reads all sweep data (V-sweep and I-sweep) from HDF5 file Langmuir code.
     :param filename: File path of HDF5 file from LAPD
-    :return: bias, current, x, y: the relevant multi-dimensional sweep data and position data
+    :return: bias, current, x, y, dt: the relevant multidimensional sweep, position, and timestep
     """
-
-    """
-    print("Loading HDF5 data...")
-    hdf5_file = open_hdf5(filename)
-    """
-    # print("Categorizing shots by x,y position...")
-    # xy_shot_ref, x, y = categorize_shots_xy(x_round, y_round, shot_list)
 
     lapd_file = lapd.File(filename)
 
@@ -73,33 +65,16 @@ def get_isweep_vsweep(filename, mar2022):
     """
 
     # Note: I may be able to convert isweep/vsweep arrays to real units here, as long as numpy can handle astropy units
-
     # Note: I may take the standard deviation across shots to approximate error for sweep curves, as done in MATLAB code
 
-    """
-    # Create 4D array: the first two dimensions correspond to all combinations of unique x and y positions,
-    #    the third dimension represents the nth shot taken at that unique positions
-    #    and the fourth dimensions lists all the frames in that nth shot.
-    isweep_xy_shots_array = isweep_processed[xy_shot_ref]
-    vsweep_xy_shots_array = vsweep_processed[xy_shot_ref]
-    print("Shape of isweep_xy_shots_array:", isweep_xy_shots_array.shape)  # Verify shape: (x, y, shot, frame)
-
-    # Average all shots taken at same position into one shot. The vsweep and isweep values for each individual frame in
-    #    the new "average shot" are the mean values for the corresponding frame in all other shots at the same position.
-    # Creates a 3D array of sweep values for each unique x position, unique y position, and frame number.
-    isweep_means = np.mean(isweep_xy_shots_array, 2)
-    vsweep_means = np.mean(vsweep_xy_shots_array, 2)
-    """
-
-    # hdf5_file.close()
     lapd_file.close()
 
-    # Note: This function returns the bias values first, then the current
-    # bias, current = to_real_sweep_units(vsweep_means, isweep_means, mar2022)
-    # return bias, current, x, y
-
+    x = np.unique(positions[:, 0])
+    y = np.unique(positions[:, 1])
+    dt = vsweep_data.dt
     bias, current = to_real_sweep_units(vsweep_signal, isweep_signal, mar2022)
-    return bias, current, positions
+
+    return bias, current, x, y, dt
 
 
 def categorize_shots_xy(x_round, y_round, shot_list):
@@ -147,77 +122,9 @@ def categorize_shots_xy(x_round, y_round, shot_list):
 
     # Some x,y position data processing in the MATLAB code was not translated.
 
-
-def get_sweep_data_headers(file, mar2022):
-    r"""
-
-    Function to read raw isweep and vsweep data and headers from a file.
-    Returns four arrays containing isweep and vsweep data and sweep headers in compressed format.
-
-    Parameters
-    ----------
-    :param file: file object
-    :return: arrays of raw isweep and vsweep data and headers
-    """
-
-    # SIS crate data
-    sis_group = structures_at_path(file, '/Raw data + config/SIS crate/')
-    print("Datasets in sis_data structure: ", *sis_group["Datasets"], sep="\n")
-
     # QUESTION: Can we use string-based Numpy field indexing to access these instead of hard-coding integer indices?
-    isweep_data_path = (sis_group['Datasets'])[4 if mar2022 else 2]  # t 6 TODO RETURN TO 4 if - else 2
-    isweep_headers_path = (sis_group['Datasets'])[5 if mar2022 else 3]  # t 7 TODO RETURN TO 5 if - else 3
-    vsweep_data_path = (sis_group['Datasets'])[2 if mar2022 else 4]
-    vsweep_headers_path = (sis_group['Datasets'])[3 if mar2022 else 5]
-
-    isweep_data_raw = np.array(file[isweep_data_path])
-    isweep_headers_raw = file[isweep_headers_path]
-    vsweep_data_raw = np.array(file[vsweep_data_path])
-    vsweep_headers_raw = file[vsweep_headers_path]
-
-    print("Shape of isweep data array:", isweep_data_raw.shape)
-
-    return isweep_data_raw, vsweep_data_raw, isweep_headers_raw, vsweep_headers_raw
-
-
-def get_scales_offsets(headers, scale_index, offset_index):
-    r"""
-    Unpack scales and offsets from headers to use in scale-offset decompression.
-
-    Parameters
-    ----------
-    :param headers:
-    :param scale_index:
-    :param offset_index:
-    :return:
-    """
-
-    # NOTE: We can access scales and offsets using dictionary string indexing
-
-    scales = np.array([header[scale_index] for header in headers])
-    offsets = np.array([header[offset_index] for header in headers])
-    return scales, offsets
-
-
-def scale_offset_decompress(data_raw, scales, offsets):
-    r"""
-    Decompress raw data using the specified arrays of scales and offsets.
-    Scale and offset arrays must have first dimension corresponding to the length of the input data
-    (for example, the number of shots taken).
-
-    Parameters
-    ----------
-    :param data_raw: array
-    :param scales: array
-    :param offsets: array
-    :return: decompressed data array
-    """
-
-    if len(data_raw.shape) > 2:
-        raise ValueError("Only 2D arrays are currently supported for data decompression.")
-    num_shots = data_raw.shape[0]
-
-    return data_raw * scales.reshape(num_shots, 1) + offsets.reshape(num_shots, 1)
+    # isweep_data_path = (sis_group['Datasets'])[4 if mar2022 else 2]  # t 6 TODO RETURN TO 4 if - else 2
+    # isweep_headers_path = (sis_group['Datasets'])[5 if mar2022 else 3]  # t 7 TODO RETURN TO 5 if - else 3
 
 
 def to_real_sweep_units(bias, current, mar2022):
