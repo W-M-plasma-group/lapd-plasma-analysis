@@ -10,7 +10,7 @@ import sys
 from tqdm import tqdm, trange
 
 
-def characterize_sweep_array(unadjusted_bias, unadjusted_current, margin, sample_sec):
+def characterize_sweep_array(raw_bias, raw_current, margin, sample_sec):
     r"""
     Function that processes bias and current data into a DataArray of distinct Characteristics.
     Takes in bias and current arrays, smooths them, divides them into separate ramp sections, 
@@ -18,23 +18,18 @@ def characterize_sweep_array(unadjusted_bias, unadjusted_current, margin, sample
 
     Parameters
     ----------
-    :param y:
-    :param x:
-    :param unadjusted_bias: array
-    :param unadjusted_current: array
+    :param raw_bias: array, units of voltage
+    :param raw_current: array, units of current
     :param margin: int, positive
     :param sample_sec: float, units of time
-    :return: 3D xarray DataArray of Characteristic objects
+    :return: 2D array of Characteristic objects by shot number and plateau number
     """
-    # TODO fix docstring
 
-    dc_current_offset = np.mean(unadjusted_current[..., -1000:], axis=-1, keepdims=True)
-    bias, current = smooth_characteristic(unadjusted_bias, unadjusted_current - dc_current_offset, margin=margin)
+    validate_sweep_units(raw_bias, raw_current)
+    dc_current_offset = np.mean(raw_current[..., -1000:], axis=-1, keepdims=True)
+    bias, current = smooth_characteristic(raw_bias, raw_current - dc_current_offset, margin=margin)
     ramp_bounds = isolate_plateaus(bias, margin=margin)
     ramp_times = get_time_array(ramp_bounds, sample_sec)
-
-    # characteristic_array = get_characteristic_array(bias, current, ramp_bounds, len(x), len(y))
-    # characteristic_xarray = to_characteristic_xarray(characteristic_array, time_array, x, y)
 
     return characteristic_array(bias, current, ramp_bounds), ramp_times
 
@@ -88,7 +83,7 @@ def isolate_plateaus(bias, margin=0):
     """
 
     # Assume strictly that all plateaus start and end at the same time after the start of the shot as in any other shot
-    bias_avg = np.mean(bias, axis=(0, 1))
+    bias_avg = np.mean(bias, axis=0)  # mean across all positions, preserving time
 
     # Report on how dissimilar the vsweep biases are and if they can be averaged together safely
 
@@ -102,23 +97,10 @@ def isolate_plateaus(bias, margin=0):
                                               width=min_plateau_width, rel_height=0.97)  # 0.97 may be hardcoded
 
     print(len(peak_frames), "plateaus detected")
-    return np.stack((peak_properties['left_ips'].astype(int) + margin // 2, peak_frames - margin // 2))
+    return np.stack((peak_properties['left_ips'].astype(int) + margin // 2, peak_frames - margin // 2), axis=-1)
 
 
-def create_ranged_characteristic(bias, current, start, end):
-    # Takes in a one-dimensional bias and current list; returns a Characteristic object for specified index range
-
-    # Error checks for input shapes and indices
-    if len(bias.shape) > 1:
-        raise ValueError("Multidimensional characteristic creation is no longer supported. Pass 1D sweep arrays.")
-    if bias.shape != current.shape:
-        raise ValueError("Bias and current must be of the same dimensions and shape")
-    if start < 0:
-        raise ValueError("Start index must be non-negative")
-    if end > len(bias):
-        raise ValueError("End index", end, "out of range of bias and current arrays of length", len(bias))
-
-    # Check units on input arrays
+def validate_sweep_units(bias, current):
     try:
         assert (bias.unit == u.V)
     except (AttributeError, AssertionError):
@@ -128,51 +110,37 @@ def create_ranged_characteristic(bias, current, start, end):
     except (AttributeError, AssertionError):
         warnings.warn("Input bias array does not have units of Amps. Ensure that current values are in real units.")
 
-    return Characteristic(bias[start:end], current[start:end])
-
 
 def get_time_array(plateau_ranges, sample_sec):
     # NOTE: MATLAB code stores peak voltage time (end of plateaus), then only uses plateau times for very first position
     # This uses the time of the peak voltage for the average of all shots ("top of the average ramp")
-    return plateau_ranges[1] * sample_sec
+    return plateau_ranges[:, 1] * sample_sec
 
 
 def characteristic_array(bias, current, plateau_ranges):  # , positions
-    # 2D: shot_num by plateau
+    # 2D: unique_position by plateau_num
 
-    num_shots = bias.shape[0]
+    num_pos = bias.shape[0]
     # num_plats = plateau_ranges.shape[0]
 
     # MOVE THIS LINE TO PLATEAU RANGES?
     plateau_slices = np.array([slice(plateau[0], plateau[1]) for plateau in plateau_ranges])
 
     # Mixed arbitrary/indexed list comprehension
-    return np.array([[Characteristic(bias[shot, plateau], current[shot, plateau])
+    print("Creating characteristics...")
+    warnings.simplefilter(action='ignore', category=FutureWarning)  # Suppress FutureWarnings to not break loading bar
+    print("(plasmapy.langmuir.diagnostics pending deprecation FutureWarning suppressed)")
+    return np.array([[Characteristic(bias[pos, plateau], current[pos, plateau])
                       for plateau in plateau_slices]
-                     for shot in trange(num_shots)])
-    # TODO: tqdm on every level? also, tqdm(range(_))
+                     for pos in trange(num_pos, unit="position", file=sys.stdout)])
+    # CAN USE NESTED TQDM INSTEAD OF OUTER TQDM?
 
 
 """
-def get_characteristic_array(bias, current, plateau_ranges, num_x, num_y):
-
-    num_plateaus = plateau_ranges.shape[-1]
-    num_shots = len(bias)
-
-    characteristic_array = np.empty((num_shots, num_plateaus), dtype=object)  # dims: shot, plateau
-    print("Forming characteristics...")
-    with tqdm(total=num_shots * num_plateaus, unit="characteristic", file=sys.stdout) as pbar:
-        for s in range(num_shots):
-            for p in range(num_plateaus):
-                characteristic_array[]
-
-
-    num_plateaus = plateau_ranges.shape[-1]
-    characteristic_array = np.empty((num_x, num_y, num_plateaus), dtype=object)  # dims: x, y, plateau
 
     print("Creating characteristics...")  # (May take up to 60 seconds)
-    # warnings.simplefilter(action='ignore', category=FutureWarning)  # Suppress FutureWarnings to not break loading bar
-    # print("    Note: plasmapy.langmuir.diagnostics pending deprecation FutureWarning suppressed")
+    warnings.simplefilter(action='ignore', category=FutureWarning)  # Suppress FutureWarnings to not break loading bar
+    print("    Note: plasmapy.langmuir.diagnostics pending deprecation FutureWarning suppressed")
     num_pos = num_x * num_y * num_plateaus
     # TODO OR just have num_shots * num_plateaus, keep positions as parameters, DONT MAKE characteristic_array x*y!
     with tqdm(total=num_pos, unit="characteristic", file=sys.stdout) as pbar:
