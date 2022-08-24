@@ -26,15 +26,13 @@ bimaxwellian = False
 smoothing_margin = 20                                            # Optimal values in range 0-25
 steady_state_plateaus = (6, 13) if mar2022 else (5, 11)          # TODO detect?
 
+# User file options
+save_diagnostics = True  # Set save_diagnostics to True to save calculated diagnostic data to NetCDF files
 vsweep_board_channel = (1, 1)
 isweep_boards_channels = [(1, 2), (1, 3)]  # tuple or list of tuples; board/channel for interferometer isweep data first
-# TODO can we calibrate both Langmuir probes using an interferometry ratio depending only on one of them?
-port_resistances = {27: 1.25, 43: 2.10}  # TODO hardcoded; change to 11 if 2018
+port_resistances = {27: 1.25, 43: 2.10}  # TODO hardcoded; change to 11 if 2018, get from metadata?
+# QUESTION: can we calibrate both Langmuir probes using an interferometry ratio depending only on one of them?
 # NOTE: Port 27 is near middle and near interferometer
-
-# Set save_diagnostics to True to save any new calculated diagnostic data to NetCDF files.
-save_diagnostics = True
-# End of file options
 
 
 def port_selector(ds):  # TODO allow multiple modified datasets to be returned
@@ -46,11 +44,10 @@ if __name__ == "__main__":
 
     netcdf_folder = ensure_directory(netcdf_folder)  # Create and check folder to save NetCDF files if not yet existing
 
-    # TODO move to separate function
     diagnostic_name_dict = {key: get_title(key)
                             for key in get_diagnostic_keys_units(probe_area, ion_type, bimaxwellian).keys()}
-
     diagnostic_name_list = list(diagnostic_name_dict.values())
+
     print("The following diagnostics are available to plot: ")
     diagnostic_chosen_ints = choose_multiple_list(diagnostic_name_list, "diagnostic")
     diagnostic_chosen_list = [list(diagnostic_name_dict.keys())[choice] for choice in diagnostic_chosen_ints]
@@ -68,14 +65,13 @@ if __name__ == "__main__":
         hdf5_chosen_list = [hdf5_paths[choice] for choice in hdf5_chosen_ints]
 
         datasets = []
-        for hdf5_path in hdf5_chosen_list:  # TODO improve loading bar info/add dataset loading bar if many datasets
+        for hdf5_path in hdf5_chosen_list:  # TODO improve loading bar for many datasets
 
             print("\nOpening file", repr(hdf5_path), "...")
 
             exp_params_names_values = get_exp_params(hdf5_path)
-            bias, currents, positions, sample_sec, run_name, ports = get_isweep_vsweep(hdf5_path, vsweep_board_channel,
-                                                                                       isweep_boards_channels,
-                                                                                       port_resistances, mar2022)
+            bias, currents, positions, sample_sec, ports, run_name = get_isweep_vsweep(
+                hdf5_path, vsweep_board_channel, isweep_boards_channels, port_resistances, orientation=mar2022)
 
             characteristics, ramp_times = characterize_sweep_array(bias, currents, smoothing_margin, sample_sec)
             diagnostics_dataset = langmuir_diagnostics(characteristics, positions, ramp_times, ports, probe_area,
@@ -101,7 +97,6 @@ if __name__ == "__main__":
             if save_diagnostics:
                 write_netcdf(diagnostics_dataset, save_diagnostic_path)
 
-    # TODO debug
     """
     for plot_diagnostic in diagnostic_chosen_list:
         for dataset in datasets:

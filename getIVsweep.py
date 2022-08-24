@@ -10,7 +10,7 @@ def get_isweep_vsweep(filename, vsweep_bc, isweep_bcs, port_resistances, orienta
     Parameters
     ----------
     :param filename: File path of HDF5 file from LAPD
-    :param vsweep_bc:
+    :param vsweep_bc: Board and channel number of vsweep data in HDF5 file
     :param isweep_bcs:
     :param port_resistances:
     :param orientation:
@@ -18,10 +18,8 @@ def get_isweep_vsweep(filename, vsweep_bc, isweep_bcs, port_resistances, orienta
     """
 
     lapd_file = lapd.File(filename)
-
     run_name = lapd_file.info['run name']
 
-    # isweep_channel = 2  # 2 = port 27, 3 = port 43
     isweep_bcs = np.atleast_2d(isweep_bcs)
     isweep_receptacles = {2: 1, 3: 2}  # TODO hardcoded
 
@@ -55,7 +53,7 @@ def get_isweep_vsweep(filename, vsweep_bc, isweep_bcs, port_resistances, orienta
     dt = vsweep_data.dt
     bias, currents = to_real_sweep_units(vsweep_signal, isweep_signal, resistances, orientation)
 
-    return bias, currents, positions, dt, run_name, ports
+    return bias, currents, positions, dt, ports, run_name
 
 
 def get_shot_positions(isweep_motor_data):
@@ -81,14 +79,16 @@ def get_shot_positions(isweep_motor_data):
     return positions, num_positions, shots_per_position
 
 
-def to_real_sweep_units(bias, current, resistances, orientation):
+def to_real_sweep_units(vsweep, isweep, resistances, orientation):
     r"""
+    Convert raw sweep probe data into real bias and current measurements.
+
     Parameters
     ----------
-    :param orientation:
-    :param bias: array
-    :param current: array
-    :param resistances: array
+    :param vsweep: array
+    :param isweep: array
+    :param resistances: array, resistance of each isweep probe
+    :param orientation: bool, determine whether to keep isweep or invert it
     :return: bias and current array in real units
     """
 
@@ -97,7 +97,6 @@ def to_real_sweep_units(bias, current, resistances, orientation):
 
     # Conversion factors taken from MATLAB code: Current = isweep / 11 ohms; Voltage = vsweep * 100
     gain = 100.  # voltage gain                                         # TODO get from HDF5 metadata
-    # resistance = np.array([[[2.10]], [[1.25]]]) if mar2022 else 11.
-    invert = 1 if orientation else -1                                       # TODO get from HDF5 metadata?
+    invert = 1 if orientation else -1                                   # TODO get from HDF5 metadata?
 
-    return bias * gain * u.V, current / resistances * u.A * invert
+    return vsweep * gain * u.V, isweep / resistances * u.A * invert

@@ -2,7 +2,6 @@ import warnings
 
 import astropy.units as u
 import numpy as np
-import xarray as xr
 from scipy.signal import find_peaks
 from plasmapy.diagnostics.langmuir import Characteristic
 
@@ -79,7 +78,10 @@ def smooth_array(array, margin):
 
 def isolate_plateaus(bias, margin=0):
     r"""
+    Find indices corresponding to the beginning and end of every bias ramp.
 
+    Parameters
+    ----------
     :param bias:
     :param margin:
     :return: num_plateaus-by-2 array; start indices in first column, end indices in second
@@ -99,7 +101,6 @@ def isolate_plateaus(bias, margin=0):
     peak_frames, peak_properties = find_peaks(bias_avg, height=0, distance=guess_plateau_spacing // 2,
                                               width=min_plateau_width, rel_height=0.97)  # 0.97 may be hardcoded
 
-    # print(len(peak_frames), "plateaus detected")
     return np.stack((peak_properties['left_ips'].astype(int) + margin // 2, peak_frames - margin // 2), axis=-1)
 
 

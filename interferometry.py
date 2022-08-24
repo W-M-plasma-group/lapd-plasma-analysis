@@ -5,7 +5,6 @@ import astropy.units as u
 import xarray as xr
 from scipy.signal import find_peaks
 
-from hdf5reader import *  # TODO remove
 from bapsflib import lapd
 
 
@@ -28,7 +27,7 @@ def interferometry_calibration(density_da, interferometry_filename, steady_state
     spatial_dimensions = (['x'] if core_density_data.sizes['x'] > 1 else []
                           + ['y'] if core_density_data.sizes['y'] > 1 else [])
 
-    # TODO how to decide to use new 96 GHz interferometry or old 56 GHz interferometry data?
+    # TODO how to decide to use new 96 GHz interferometry or old 56 GHz interferometry data
     inter_file = lapd.File(interferometry_filename)
 
     if "fringes" in inter_file.info['run description']:
@@ -44,12 +43,9 @@ def interferometry_calibration(density_da, interferometry_filename, steady_state
         # print("Using low-frequency interferometer")  # April 2018
 
         # Read in interferometry data ("interferometry" abbreviated as "inter" in variable names)
-        with open_hdf5(interferometry_filename) as inter_file:
-            inter_raw = np.array(
-                item_at_path(inter_file, '/MSI/Interferometer array/Interferometer [0]/Interferometer trace/'))
-
-            density_scale_factor = interferometry_calibration_56ghz(core_density_data, inter_raw, spatial_dimensions
-                                                                    ).expand_dims("port")  # check if needed
+        inter_raw = np.array(inter_file.read_msi("Interferometer array")['signal'][:, 0, :])
+        density_scale_factor = interferometry_calibration_56ghz(core_density_data, inter_raw, spatial_dimensions
+                                                                ).expand_dims("port")
 
         # DENSITY SCALING #
         # _______________ #
@@ -62,6 +58,7 @@ def interferometry_calibration(density_da, interferometry_filename, steady_state
 
         print(f"Average steady-state interferometry calibration factor: {steady_state_scale_factor.mean().item():.2f}")
 
+    inter_file.close()
     return calibrated_density_da
 
 
@@ -141,25 +138,6 @@ def interferometry_calibration_56ghz(core_density_data, interferometry_data, spa
     inter_values, inter_time = to_real_56ghz_interferometry_units(inter_means_abstract, inter_time_abstract)
     inter_data = xr.DataArray(inter_values, coords=(('time', inter_time, {'units': str(u.ms)}),))
 
-    # DEBUG
-    """
-    import matplotlib.pyplot as plt
-    plt.rcParams['figure.figsize'] = (10, 6)
-    plt.plot(inter_raw[0], 'r:', label="Row 1")
-    plt.plot(inter_raw[1], 'b:', label="Row 2")
-    plt.plot(inter_means_abstract, 'm-', label="Average")
-    plt.title("Raw interferometer measurements, May 2018")
-    plt.legend()
-    plt.show()
-    # """
-    # print("Shape of processed inter_data array:", inter_data.shape)
-    """
-    inter_data.plot()
-    plt.title("Data from interferometer, 2022 run")
-    plt.show()
-    # """
-    #
-
     # DENSITY DATA #
     # ____________ #
     # TODO correct interferometry issues for bimaxwellian diagnostics
@@ -206,7 +184,7 @@ def interferometry_calibration_56ghz(core_density_data, interferometry_data, spa
 
 def to_real_56ghz_interferometry_units(interferometry_data_array, interferometry_time_array):
     area_factor = 8e13 / (u.cm ** 2)            # from MATLAB code
-    # TODO find out which correct
+    # TODO scan from HDF5 MSI data (in 'meta' field?)
     time_factor = (4.88e-5 * u.s).to(u.ms)      # from MATLAB code
     # time_factor = (4.0e-5 * u.s).to(u.ms)     # from HDF5 header data
     return interferometry_data_array * area_factor, interferometry_time_array * time_factor
@@ -238,7 +216,7 @@ def crunch_data(data_array, data_coordinate, destination_coordinate, step):
                                            labels=destination_coordinate.data).mean()
 
     # This result has only one dimension, the input data "dimension" + "_bins", labeled with the destination coordinate.
-    #    We want to return an xarray with all the dimensions and coordinates (in this case: time dimension,
+    #    We want to return a DataArray with all the dimensions and coordinates (in this case: time dimension,
     #    time dimension coordinate, plateau non-dimension coordinate) of the destination data.
     #    This involves renaming the "_bins" dimension to match the destination coordinate,
     #    creating a new coordinate identical to the destination coordinate's dimension coordinate,
