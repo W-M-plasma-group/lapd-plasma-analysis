@@ -3,14 +3,17 @@ import warnings
 import numpy as np
 import astropy.units as u
 import xarray as xr
+from scipy.signal import find_peaks
 
-from hdf5reader import *
 from bapsflib import lapd
 
 
-def interferometry_calibration(density_xarray, interferometry_filename, steady_state, core_region=26. * u.cm):
+def interferometry_calibration(density_da, interferometry_filename, steady_state, core_region=26. * u.cm):
 
-    density_data = density_xarray * (1 / u.m ** 3).to(1 / u.cm ** 3).value  # density in 1/cm^3
+    density_data = density_da * (1 / u.m ** 3).to(1 / u.cm ** 3).value  # density in 1/cm^3
+
+    # Use only probe listed first for generating scale factors
+    density_data = density_data[0]
 
     # Select core region in x and y
     x_mask, y_mask = abs(density_data.x) < core_region.value, abs(density_data.y) < core_region.value
@@ -24,43 +27,59 @@ def interferometry_calibration(density_xarray, interferometry_filename, steady_s
     spatial_dimensions = (['x'] if core_density_data.sizes['x'] > 1 else []
                           + ['y'] if core_density_data.sizes['y'] > 1 else [])
 
-    # Open file to decide to use new 96 GHz interferometry or old 56 GHz interferometry data
+    # TODO how to decide to use new 96 GHz interferometry or old 56 GHz interferometry data
     inter_file = lapd.File(interferometry_filename)
-    run_description = inter_file.info['run description']
 
-    if "fringes" in run_description:
-        print("Using high-frequency interferometer")  # March 2022
+    if "fringes" in inter_file.info['run description']:
+        # print("Using high-frequency interferometer")  # March 2022
 
-        num_fringes = find_fringes_metadata(run_description)
-
-        density_scale_factor = interferometry_calibration_96ghz(core_density_data, num_fringes, spatial_dimensions)
-
-        calibrated_density_xarray = density_xarray * density_scale_factor
-
-        print("Interferometry calibration factor:", density_scale_factor.item())
+        num_fringes = find_fringes_uwave(inter_file)
+        density_scale_factor = interferometry_calibration_96ghz(core_density_data, num_fringes,
+                                                                spatial_dimensions, core_region)
+        calibrated_density_da = density_da * density_scale_factor
+        print(f"Interferometry calibration factor: {density_scale_factor.value:.2f}")  # density_scale_factor.item()
 
     else:
-        print("Using low-frequency interferometer")  # April 2018
+        # print("Using low-frequency interferometer")  # April 2018
 
         # Read in interferometry data ("interferometry" abbreviated as "inter" in variable names)
-        with open_hdf5(interferometry_filename) as inter_file:
-            inter_raw = np.array(
-                item_at_path(inter_file, '/MSI/Interferometer array/Interferometer [0]/Interferometer trace/'))
-
-            density_scale_factor = interferometry_calibration_56ghz(core_density_data, inter_raw, spatial_dimensions)
+        inter_raw = np.array(inter_file.read_msi("Interferometer array")['signal'][:, 0, :])
+        density_scale_factor = interferometry_calibration_56ghz(core_density_data, inter_raw, spatial_dimensions
+                                                                ).expand_dims("port")
 
         # DENSITY SCALING #
         # _______________ #
 
         # Return the calibrated electron density data only in the steady state region (given by plateau indices)
-        steady_state_scale_factor = density_scale_factor.where(np.logical_and(density_xarray.plateau >= steady_state[0],
-                                                                              density_xarray.plateau <= steady_state[1]))
+        steady_state_scale_factor = density_scale_factor.where(np.logical_and(density_da.plateau >= steady_state[0],
+                                                                              density_da.plateau <= steady_state[1]))
 
-        calibrated_density_xarray = density_xarray * steady_state_scale_factor
+        calibrated_density_da = density_da * steady_state_scale_factor
 
-        print("Average steady-state interferometry calibration factor:", steady_state_scale_factor.mean().item())
+        print(f"Average steady-state interferometry calibration factor: {steady_state_scale_factor.mean().item():.2f}")
 
-    return calibrated_density_xarray
+    inter_file.close()
+    return calibrated_density_da
+
+
+def find_fringes_uwave(inter_file):
+
+    uwave_data = inter_file.read_data(board=4, channel=1, silent=True)    # TODO hardcoded
+    uwave_signals = uwave_data['signal']
+
+    find_peaks_args = {"prominence": 1.}
+
+    plasma_shutoff = 15 * u.ms  # TODO hardcoded
+    uwave_dt = uwave_data.dt
+    shutoff_frame = int(plasma_shutoff / uwave_dt)
+
+    mean_peaks = np.mean([len(find_peaks(signal[shutoff_frame:], **find_peaks_args)[0]) for signal in uwave_signals])
+    # TODO ignoring dips
+    # mean_dips = np.mean([len(find_peaks(-signal[shutoff_frame:], **find_peaks_args)[0]) for signal in uwave_signals])
+    # mean_fringes = mean_peaks + mean_dips
+    # fringes_std = np.std(fringes_np, axis=-1)
+
+    return 2 * mean_peaks  # not mean_fringes
 
 
 def find_fringes_metadata(run_description: str) -> int:
@@ -71,30 +90,31 @@ def find_fringes_metadata(run_description: str) -> int:
     return int(run_description[num_location:fringe_index - 1])
 
 
-def interferometry_calibration_96ghz(core_density_data, num_fringes, spatial_dimensions):
-    print(num_fringes, "fringes in interferometry measurement")
+def fringes_to_peak_density(num_fringes, core_region):
+    return (num_fringes * 1.88e13 / u.cm ** 2) / (2 * core_region)
 
-    # PEAK INTERFEROMETRY DENSITY #
-    # ___________________________ #
 
-    # n*Diam = Nfringes * 1.88e13/cm^2   (HDF5 run description)
-    peak_inter_line_density = num_fringes * 1.88e13 / u.cm ** 2   # / (2 * core_region) excluded bc already integ across
-    # print("Peak interferometer density:", peak_inter_line_density)
+def interferometry_calibration_96ghz(core_density_data, num_fringes, spatial_dimensions, core_region) -> u.Quantity:
 
-    # PEAK LANGMUIR DENSITY #
-    # _____________________ #
+    # print("{fringes:.1f} fringes in interferometry measurement".format(fringes=num_fringes))
 
-    integral = core_density_data
+    # Peak interferometry density
+    uwave_avg_density_at_peak = fringes_to_peak_density(num_fringes, core_region)
+    # n*Diam = Nfringes * 1.88e13/cm^2   (formula from HDF5 run description)
+
+    # Peak Langmuir density
+    langmuir_avg_density = core_density_data
     for dim in spatial_dimensions:
-        integral = integral.integrate(dim)
+        langmuir_avg_density = langmuir_avg_density.integrate(dim) / (2 * core_region).to(u.cm)  # check on
+    langmuir_avg_density_at_peak = langmuir_avg_density.max('time', skipna=True).item()
 
-    peak_langmuir_line_density = integral.max('time', skipna=True)
+    # print("Peak interferometer density:", peak_inter_line_density)
     # print("Peak Langmuir density:", peak_langmuir_line_density.item() / u.cm ** 3)
 
-    return peak_inter_line_density / peak_langmuir_line_density
+    return uwave_avg_density_at_peak / langmuir_avg_density_at_peak
 
 
-def interferometry_calibration_56ghz(core_density_data, interferometry_data, spatial_dimensions):
+def interferometry_calibration_56ghz(core_density_data, interferometry_data, spatial_dimensions) -> xr.DataArray:
     r"""
     Calibrates density data from sweep probe to measurements from interferometry probe.
 
@@ -117,25 +137,6 @@ def interferometry_calibration_56ghz(core_density_data, interferometry_data, spa
     # Create interferometry DataArray with interferometry time as coordinates
     inter_values, inter_time = to_real_56ghz_interferometry_units(inter_means_abstract, inter_time_abstract)
     inter_data = xr.DataArray(inter_values, coords=(('time', inter_time, {'units': str(u.ms)}),))
-
-    # DEBUG
-    """
-    import matplotlib.pyplot as plt
-    plt.rcParams['figure.figsize'] = (10, 6)
-    plt.plot(inter_raw[0], 'r:', label="Row 1")
-    plt.plot(inter_raw[1], 'b:', label="Row 2")
-    plt.plot(inter_means_abstract, 'm-', label="Average")
-    plt.title("Raw interferometer measurements, May 2018")
-    plt.legend()
-    plt.show()
-    # """
-    # print("Shape of processed inter_data array:", inter_data.shape)
-    """
-    inter_data.plot()
-    plt.title("Data from interferometer, 2022 run")
-    plt.show()
-    # """
-    #
 
     # DENSITY DATA #
     # ____________ #
@@ -178,12 +179,12 @@ def interferometry_calibration_56ghz(core_density_data, interferometry_data, spa
         density_scales[dim] = inter_avg_time / integral
 
     # Average together x and y scale factors, if they exist, to get scale factor array in right number of dimensions
-    return sum(density_scales[dim] for dim in spatial_dimensions) / len(spatial_dimensions)
+    return sum(density_scales[dim] for dim in spatial_dimensions) / len(spatial_dimensions)  # 1D xarray?
 
 
 def to_real_56ghz_interferometry_units(interferometry_data_array, interferometry_time_array):
     area_factor = 8e13 / (u.cm ** 2)            # from MATLAB code
-    # TODO find out which correct
+    # TODO scan from HDF5 MSI data (in 'meta' field?)
     time_factor = (4.88e-5 * u.s).to(u.ms)      # from MATLAB code
     # time_factor = (4.0e-5 * u.s).to(u.ms)     # from HDF5 header data
     return interferometry_data_array * area_factor, interferometry_time_array * time_factor
@@ -215,7 +216,7 @@ def crunch_data(data_array, data_coordinate, destination_coordinate, step):
                                            labels=destination_coordinate.data).mean()
 
     # This result has only one dimension, the input data "dimension" + "_bins", labeled with the destination coordinate.
-    #    We want to return an xarray with all the dimensions and coordinates (in this case: time dimension,
+    #    We want to return a DataArray with all the dimensions and coordinates (in this case: time dimension,
     #    time dimension coordinate, plateau non-dimension coordinate) of the destination data.
     #    This involves renaming the "_bins" dimension to match the destination coordinate,
     #    creating a new coordinate identical to the destination coordinate's dimension coordinate,
