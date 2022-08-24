@@ -3,6 +3,7 @@ The lapd-plasma-analysis repository was written by Leo Murphy based on code
 written in MATLAB by Conor Perks (MIT) and using the PlasmaPy online code library.
 Comments are added inline. A separate documentation page is not yet complete.
 """
+
 from getIVsweep import *
 from characterization import *
 from diagnostics import *
@@ -10,151 +11,112 @@ from plots import *
 from netCDFaccess import *
 from interferometry import *
 from neutrals import *
-from setup import *
-from bapsflib import lapd   # TODO move to getIVsweep.py
+from experimental import *
 
-# TODO remove manual mar2022, detect from bapsflib configurations
-mar2022 = False
+hdf5_folder = "/Users/leo/lapd-data/March_2022/"
+netcdf_folder = hdf5_folder + "netcdf/"
+# TODO remove
+mar2022 = True
 
 # User global parameters
-sample_sec = 12.5e6 ** (-1) * u.s if mar2022 else (100 / 16 * 1e6) ** (-1) * u.s      # Manually reported by SV. - check for each port
 probe_area = (1. * u.mm) ** 2                                    # From MATLAB code
 core_region = 26. * u.cm                                         # From MATLAB code
 ion_type = 'He-4+'
-bimaxwellian = False                                              # TODO rely on metadata to determine if bimaxwellian when opening file; save with different names
-# TODO compare bimaxwellian n_e, n_i, etc. with nonbimaxwellian to determine if need to store under different filenames
-#   or just in same file with different diagnostic names
-smoothing_margin = 15                                            # Optimal values in range 0-25
-steady_state_plateaus = (6, 13) if mar2022 else (5, 11)          # From MATLAB code
-diagnostics_plotted = ['T_e_avg', 'T_e', 'n_e']                  # String or list of strings
-# End of global parameters
+bimaxwellian = False
+smoothing_margin = 20                                            # Optimal values in range 0-25
+steady_state_plateaus = (6, 13) if mar2022 else (5, 11)          # TODO detect?
 
-# User file path names
-# Path of chosen HDF5 file; available under repository Releases
-if mar2022:
-    # hdf5_path = "/data/BAPSF_Data/Particle_Transport/March_2022/01_line_valves85V_7400A.hdf5"
-    # hdf5_path = "/Users/leo/lapd-data/10_line_valves95V_7500A.hdf5"
-    hdf5_path = "/Users/leo/lapd-data/March_2022/01_line_valves85V_7400A.hdf5"
-else:
-    hdf5_path = "/Users/leo/lapd-data/April_2018/10_radial_line_25press_4500A_redo.hdf5"
+vsweep_board_channel = (1, 1)
+isweep_boards_channels = [(1, 2), (1, 3)]  # tuple or list of tuples; board/channel for interferometer isweep data first
+# TODO can we calibrate both Langmuir probes using an interferometry ratio depending only on one of them?
+port_resistances = {27: 1.25, 43: 2.10}  # TODO hardcoded; change to 11 if 2018
+# NOTE: Port 27 is near middle and near interferometer
 
-interferometry_filename = hdf5_path           # Interferometry data stored in same HDF5 file
-netcdf_subfolder_name = "netcdf"              # Subfolder to save and read netcdf files; set to "" to use current folder
-# End of file path names
-
-# User file options
-""" Set the below variable to True to open an existing diagnostic dataset from a NetCDF file
-    or False to create a new diagnostic dataset from the given HDF5 file. """
-use_existing = True
-""" Set the below variable to True to save diagnostic data to a NetCDF file if a new one is created from HDF5 data. """
+# Set save_diagnostics to True to save any new calculated diagnostic data to NetCDF files.
 save_diagnostics = True
 # End of file options
 
+
+def port_selector(ds):  # TODO allow multiple modified datasets to be returned
+    # port_list = dataset.port  # use if switch to dataset.sel
+    return ds.isel(port=0)  # TODO user change for ex. delta-P-parallel
+
+
 if __name__ == "__main__":
-    # Build paths to save and open netcdf files in specified subfolder
-    netcdf_subfolder_path = ensure_netcdf_directory(netcdf_subfolder_name)
 
-    # TODO user prompt file options
-    lapd_file = lapd.File(hdf5_path)
-    full_netcdf_path = netcdf_path(lapd_file.info['file'], netcdf_subfolder_path, bimaxwellian)
-    save_diagnostic_path = open_diagnostic_path = full_netcdf_path
+    netcdf_folder = ensure_directory(netcdf_folder)  # Create and check folder to save NetCDF files if not yet existing
 
-    print("Mar2022 variable is", "ON" if mar2022 else "OFF")
+    # TODO move to separate function
+    diagnostic_name_dict = {key: get_title(key)
+                            for key in get_diagnostic_keys_units(probe_area, ion_type, bimaxwellian).keys()}
 
-    # Check if users want to load saved netCDF or create new
-    new_diagnostics_choice = ''
-    while new_diagnostics_choice not in ('l', 'c'):
-        new_diagnostics_choice = input("Load saved diagnostic data ('l') or calculate new diagnostics ('c')? ").lower()
-    load_diagnostics = (new_diagnostics_choice == 'l')
-    if load_diagnostics:
-        netcdf_files = search_netcdf()
-        file_choice = choose_list(netcdf_files, kind="netCDF file", location="current working directory", add_new=True)
-        if file_choice == 0:
-            # return None
-            pass
-        # dataset = xr.open_dataset(netcdf_files[file_choice - 1])
+    diagnostic_name_list = list(diagnostic_name_dict.values())
+    print("The following diagnostics are available to plot: ")
+    diagnostic_chosen_ints = choose_multiple_list(diagnostic_name_list, "diagnostic")
+    diagnostic_chosen_list = [list(diagnostic_name_dict.keys())[choice] for choice in diagnostic_chosen_ints]
+    print("Diagnostics selected:", diagnostic_chosen_list)
 
-    """
-    Plan 
-    - Check if users want to load a saved netCDF file or create a new one
-    # We want the most common action to be loading a saved netcdf file! 
-    #    - Make processing multiple HDF5 files in the same run without further input is easy
-    #    - Store x, y data with nc files so HDF5 files can be unnecessary
-    - If load
-        - Check available .nc files and ask user to choose or create new 
-    - If create new
-        - User should have specified *hdf5 directory* in code 
-        - Print HDF5 files and ask users to select (can select multiple)
-        - Allow a single bimax/nonbimax/both choice
-    #    - TODO check if bimax/nonbimax density, etc. are different enough to warrant separation!
-    #    - TODO explicitly make .nc file system based on hdf5 file
-    - List possible diagnostics to plot and have user select
-    # For now: keep default plot as contour unless changed
-    """
-
-    """
-    New plan
-    1) Should be able to process and provide graphs for a whole directory of  / a few HDF5 files
-    2) Should be able to allow users to process a few/a directory of HDF5 files into NetCDF files
-    - Ask user to hard-code in HDF5 *directory* 
-    - Allow user to select some or all of HDF5 files to process
-    - - Make NetCDF file an essential/opt-out intermediate step for graph-making?
-    """
-
-    # lapd_file.overview.print()
-
-    print("Diagnostic dataset will be saved to or opened from the path", repr(full_netcdf_path))
-
-    # Read LAPD experimental parameters
-    experimental_parameters, experimental_parameters_rounded = setup_lapd(hdf5_path)
-    print("Experimental parameters:", {key: str(value) for key, value in experimental_parameters_rounded.items()})
-    bias, current, x, y = get_isweep_vsweep(hdf5_path, mar2022)
-    # TODO create position matrix in diagnostic dataset to avoid having to reload and recalculate position data?
-
-    # Create the diagnostics dataset by generating new or opening existing NetCDF file
-    diagnostics_dataset = read_netcdf(open_diagnostic_path) if use_existing else None  # desired dataset or None to use HDF5
-    if not diagnostics_dataset:  # diagnostic dataset not loaded; create new from HDF5 file
-        characteristics = characterize_sweep_array(bias, current, x, y, margin=smoothing_margin, sample_sec=sample_sec)
-        diagnostics_dataset = plasma_diagnostics(characteristics, probe_area, ion_type,
-                                                 experimental_parameters, bimaxwellian=bimaxwellian)
-        # print("Bimaxwellian, main.py: ", diagnostics_dataset.attrs['bimaxwellian'])
-        if save_diagnostics:
-            write_netcdf(diagnostics_dataset, save_diagnostic_path)
+    print("The following NetCDF files were found in the NetCDF folder (specified in main.py): ")
+    nc_paths = sorted(search_folder(netcdf_folder, 'nc', limit=26))
+    nc_chosen_ints = choose_multiple_list(nc_paths, "NetCDF file", null_action="perform diagnostics on HDF5 files")
+    if len(nc_chosen_ints) > 0:
+        datasets = [xr.open_dataset(nc_paths[choice]) for choice in nc_chosen_ints]
     else:
-        print(diagnostics_dataset.attrs['bimaxwellian'])
+        print("The following HDF5 files were found in the HDF5 folder (specified in main.py): ")
+        hdf5_paths = sorted(search_folder(hdf5_folder, "hdf5", limit=26))
+        hdf5_chosen_ints = choose_multiple_list(hdf5_paths, "HDF5 file")
+        hdf5_chosen_list = [hdf5_paths[choice] for choice in hdf5_chosen_ints]
 
-    # Print list of diagnostics generated
-    # print("Plasma diagnostics:", [key for key in diagnostics_dataset.keys()])
+        datasets = []
+        for hdf5_path in hdf5_chosen_list:  # TODO improve loading bar info/add dataset loading bar if many datasets
 
-    # Plot chosen diagnostics by linear position and time, then time-averaged diagnostics for each position
-    linear_diagnostic_plot(diagnostics_dataset, diagnostics_plotted, plot='contour', steady_state=steady_state_plateaus)
-    # linear_diagnostic_plot(diagnostics_dataset, diagnostics_plotted, plot='line', steady_state=steady_state_plateaus)
+            print("\nOpening file", repr(hdf5_path), "...")
 
+            exp_params_names_values = get_exp_params(hdf5_path)
+            bias, currents, positions, sample_sec, run_name, ports = get_isweep_vsweep(hdf5_path, vsweep_board_channel,
+                                                                                       isweep_boards_channels,
+                                                                                       port_resistances, mar2022)
 
-    # print({diagnostic: diagnostics_dataset[diagnostic][(30, 0, 7)].values for diagnostic in diagnostics_dataset.keys()})
-    # print("Done analyzing sample characteristic")
+            characteristics, ramp_times = characterize_sweep_array(bias, currents, smoothing_margin, sample_sec)
+            diagnostics_dataset = langmuir_diagnostics(characteristics, positions, ramp_times, ports, probe_area,
+                                                       ion_type, bimaxwellian=bimaxwellian)
 
-    # Perform interferometry calibration for electron density
-    # TODO mar2022 detected by word "fringes" in HDF5 metadata?
-    calibrated_electron_density = interferometry_calibration(diagnostics_dataset['n_e'], interferometry_filename,
-                                                             steady_state_plateaus, core_region)
+            # Perform interferometry calibration for electron density
+            calibrated_electron_density = interferometry_calibration(diagnostics_dataset['n_e'], hdf5_path,
+                                                                     steady_state_plateaus, core_region)
+            diagnostics_dataset = diagnostics_dataset.assign({"n_e_cal": calibrated_electron_density})
 
-    # Plot electron density data that was calibrated using interferometry data
-    # linear_diagnostic_plot(xr.Dataset({"n_e_cal": calibrated_electron_density}), "n_e_cal", plot="contour")
-    linear_diagnostic_plot(xr.Dataset({"n_e_cal": calibrated_electron_density}), "n_e_cal", plot="line",
-                           steady_state=steady_state_plateaus)
-    if bimaxwellian:
-        linear_diagnostic_plot(xr.Dataset({"n_e_hot": calibrated_electron_density * diagnostics_dataset['hot_fraction']}),
-                               "n_e_hot", plot="line", steady_state=steady_state_plateaus)
+            # Find electron pressure
+            electron_temperature = diagnostics_dataset['T_e_avg'] if bimaxwellian else diagnostics_dataset['T_e']
+            pressure = (3 / 2) * electron_temperature * calibrated_electron_density * (1. * u.eV * u.m ** -3).to(u.Pa)
+            diagnostics_dataset = diagnostics_dataset.assign({'P_e': pressure})
 
-    # Calculation for pressure; in the future, this will consider only the steady-state region
-    # TODO Why is the pressure about twice what is expected as given in Overleaf document?
-    electron_temperature = diagnostics_dataset['T_e_avg'] if bimaxwellian else diagnostics_dataset['T_e']
-    pressure = (3 / 2) * electron_temperature * calibrated_electron_density * (1. * u.eV * u.m ** -3).to(u.Pa)
-    # linear_diagnostic_plot(xr.Dataset({"p_e": pressure}), "p_e", plot="contour", steady_state=steady_state_plateaus)
-    linear_diagnostic_plot(xr.Dataset({"p_e": pressure}), "p_e", plot="line", steady_state=steady_state_plateaus)
+            # Assign experimental parameters to diagnostic data attributes
+            diagnostics_dataset = diagnostics_dataset.assign_attrs(exp_params_names_values)
+            diagnostics_dataset = diagnostics_dataset.assign_attrs({"run name": run_name})
 
-    # Plot neutral ratios (NOTE: INCOMPLETE)
-    # neutral_ratio(diagnostics_dataset['n_e'], experimental_parameters, *steady_state_plateaus)
+            datasets.append(diagnostics_dataset)
 
-    # Note: Plot generation code and neutral fraction analysis is incomplete.
+            save_diagnostic_path = make_path(netcdf_folder, run_name, "nc")
+            if save_diagnostics:
+                write_netcdf(diagnostics_dataset, save_diagnostic_path)
+
+    # TODO debug
+    """
+    for plot_diagnostic in diagnostic_chosen_list:
+        for dataset in datasets:
+            try:
+                line_time_diagnostic_plot(port_selector(dataset), plot_diagnostic, 'contour', steady_state_plateaus)
+            except Exception as e:
+                print(e)
+    # """
+
+    # PLOT radial profiles of diagnostic (steady state time average), in color corresponding to first attribute,
+    #    and in plot position on multiplot corresponding to second attribute
+    for plot_diagnostic in diagnostic_chosen_list:
+        plot_line_diagnostic_by(datasets, plot_diagnostic, port_selector,
+                                attribute=["Nominal discharge",
+                                           "Nominal gas puff"], steady_state=steady_state_plateaus)
+        # TODO user select attribute(s) from menu
+
+# Note: Not all MATLAB code has been transferred (e.g. neutrals, ExB)
