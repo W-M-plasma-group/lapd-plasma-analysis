@@ -99,7 +99,7 @@ def isolate_plateaus(bias, margin=0):
     peak_frames, peak_properties = find_peaks(bias_avg, height=0, distance=guess_plateau_spacing // 2,
                                               width=min_plateau_width, rel_height=0.97)  # 0.97 may be hardcoded
 
-    print(len(peak_frames), "plateaus detected")
+    # print(len(peak_frames), "plateaus detected")
     return np.stack((peak_properties['left_ips'].astype(int) + margin // 2, peak_frames - margin // 2), axis=-1)
 
 
@@ -117,16 +117,18 @@ def validate_sweep_units(bias, current):
 def characteristic_array(bias, current, plateau_ranges):
     # 2D: unique_position by plateau_num
 
+    currents = current  # "currents" has "probe" dimension in front; may have size 1
     num_pos = bias.shape[0]
     # num_plats = plateau_ranges.shape[0]
 
     plateau_slices = np.array([slice(plateau[0], plateau[1]) for plateau in plateau_ranges])
 
     # Mixed arbitrary/indexed list comprehension
-    print("Creating characteristics...")
+    print(f"Creating characteristics ({currents.shape[0]} probes to analyze)...")
     warnings.simplefilter(action='ignore', category=FutureWarning)  # Suppress FutureWarnings to not break loading bar
-    print("(plasmapy.langmuir.diagnostics pending deprecation FutureWarning suppressed)")
-    return np.array([[Characteristic(bias[pos, plateau], current[pos, plateau])
-                      for plateau in plateau_slices]
-                     for pos in trange(num_pos, unit="position", file=sys.stdout)])
+    print("\t(plasmapy.langmuir.diagnostics pending deprecation FutureWarning suppressed)")
+    return np.concatenate([np.array([[Characteristic(bias[pos, plateau], current[pos, plateau])
+                                      for plateau in plateau_slices]
+                                     for pos in trange(num_pos, unit="position", file=sys.stdout)])[np.newaxis, ...]
+                           for current in currents])
     # CAN USE NESTED TQDM INSTEAD OF OUTER TQDM?
