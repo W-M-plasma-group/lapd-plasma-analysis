@@ -38,6 +38,7 @@ port_resistances = {27: 1.25, 43: 2.10}  # TODO hardcoded; change to 11 if 2018,
 def port_selector(ds):  # TODO allow multiple modified datasets to be returned
     # port_list = dataset.port  # use if switch to dataset.sel
     return ds.isel(port=0)  # TODO user change for ex. delta-P-parallel
+    # use the "exec" function to prompt user to input desired transformation? Or ask for a linear transformation
 
 
 if __name__ == "__main__":
@@ -97,6 +98,7 @@ if __name__ == "__main__":
             if save_diagnostics:
                 write_netcdf(diagnostics_dataset, save_diagnostic_path)
 
+    # Plot chosen diagnostics for each individual dataset
     """
     for plot_diagnostic in diagnostic_chosen_list:
         for dataset in datasets:
