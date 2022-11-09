@@ -104,4 +104,5 @@ def to_real_sweep_units(vsweep, isweep, resistances):
     gain = 100.  # voltage gain                                         # TODO get from HDF5 metadata
     # TODO get from HDF5 metadata?
 
-    return vsweep * gain * u.V, isweep / resistances * u.A  # * orientation
+    return vsweep * gain * u.V, isweep / resistances * u.A
+
