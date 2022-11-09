@@ -3,23 +3,21 @@ import astropy.units as u
 from bapsflib import lapd
 
 
-def get_isweep_vsweep(filename, vsweep_bc, isweep_bcs, isweep_receptacles, port_resistances):
+def get_isweep_vsweep(filename, vsweep_bc, langmuir_probes):
     r"""
     Reads all sweep data (V-sweep and I-sweep) from HDF5 file Langmuir code.
 
     Parameters
     ----------
-    :param isweep_receptacles:
     :param filename: File path of HDF5 file from LAPD
     :param vsweep_bc: Board and channel number of vsweep data in HDF5 file
-    :param isweep_bcs:
-    :param port_resistances:
     :return: bias, current, x, y, dt: the relevant multidimensional sweep, position, and timestep
     """
 
     lapd_file = lapd.File(filename)
 
-    isweep_bcs = np.atleast_2d(isweep_bcs)
+    # isweep_bcs = np.atleast_2d(isweep_bcs)
+    isweep_bcs = np.atleast_1d(langmuir_probes[['board', 'channel']])
 
     vsweep_data = lapd_file.read_data(*vsweep_bc, silent=True)
     isweep_datas = [lapd_file.read_data(*isweep_bc, silent=True) for isweep_bc in isweep_bcs]
@@ -28,8 +26,8 @@ def get_isweep_vsweep(filename, vsweep_bc, isweep_bcs, isweep_receptacles, port_
     signal_length = vsweep_signal.shape[-1]
     # Above: isweep_signal has one extra dimension "in front" than vsweep signal, to represent different *probes*
 
-    motor_datas = [lapd_file.read_controls([("6K Compumotor", isweep_receptacles[isweep_channel])], silent=True)
-                   for _, isweep_channel in isweep_bcs]
+    motor_datas = [lapd_file.read_controls([("6K Compumotor", langmuir_probe['receptacle'])], silent=True)
+                   for langmuir_probe in langmuir_probes]
     # TODO allow isweep motor datas to be different or check; for now, assume identical, and use only first motor data
     # for isweep_motor_data in motor_datas:
     positions, num_positions, shots_per_position = get_shot_positions(motor_datas[0])
@@ -45,7 +43,7 @@ def get_isweep_vsweep(filename, vsweep_bc, isweep_bcs, isweep_receptacles, port_
 
     ports = np.array([motor_data.info['controls']['6K Compumotor']['probe']['port'] for motor_data in motor_datas])
     resistances_shape = [len(ports)] + [1 for _ in range(len(isweep_signal.shape) - 1)]
-    resistances = np.reshape([port_resistances[port] for port in ports], resistances_shape)
+    resistances = np.reshape([langmuir_probes['resistance'][langmuir_probes['port'] == port] for port in ports], resistances_shape)
 
     bias, currents = to_real_sweep_units(vsweep_signal, isweep_signal, resistances)
     currents_dc_offset = np.mean(currents[..., -1000:], axis=-1, keepdims=True)

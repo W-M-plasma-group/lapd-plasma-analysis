@@ -13,7 +13,7 @@ from interferometry import *
 from neutrals import *
 from experimental import *
 
-hdf5_folder = "/Users/leo/lapd-data/March_2022/"
+hdf5_folder = "/Users/leo/lapd-data/November_2022/"
 langmuir_nc_folder = hdf5_folder + "lang_nc/"
 
 # User global parameters
@@ -22,16 +22,32 @@ core_radius = 26. * u.cm                                         # From MATLAB c
 ion_type = 'He-4+'
 bimaxwellian = False
 smoothing_margin = 20                                            # Optimal values in range 0-25
-# steady_state_plateaus = (6, 13) if True else (5, 11)          # TODO automatically detect!!
 
 # User file options
 save_diagnostics = True  # Set save_diagnostics to True to save calculated diagnostic data to NetCDF files
-vsweep_board_channel = (1, 1)  # (1, 3)
+"""
 isweep_boards_channels = [(1, 2), (1, 3)]  # tuple or list of tuples; board/channel for interferometer isweep data first  (1, 2)
 port_resistances = {29: 2.20, 35: 2.20}  # TODO hardcoded; change to 11 if 2018, get from metadata! {25: 11}
-isweep_receptacles = {2: 1, 3: 2}  # TODO hardcoded  {2: 1}
+isweep_receptacles = {2: 2, 3: 4}  # TODO hardcoded  {2: 1}
+# TODO make named probe arrays with attribute rows? ex.
+"""
+# TODO for user: change these to match your run!
+# November 2022 configuration
+vsweep_board_channel = (1, 1)  # (1, 3)
+langmuir_probes = np.array([(1, 2, 1, 29, 2.20),
+                            (1, 3, 4, 35, 2.20)],
+                           dtype=[('board', int), ('channel', int), ('receptacle', int), ('port', int),
+                                  ('resistance', float)])
+"""
+# March 2022 configuration
+vsweep_board_channel = (1, 1)  # (1, 3)
+langmuir_probes = np.array([(1, 2, 1, 27, 1.25),
+                            (1, 3, 2, 43, 2.10)],
+                           dtype=[('board', int), ('channel', int), ('receptacle', int), ('port', int),
+                                  ('resistance', float)])
+"""
 # QUESTION: can we calibrate both Langmuir probes using an interferometry ratio depending only on one of them?
-# NOTE: Port 27 is near middle and near interferometer
+# NOTE: Port 27 is near middle, near interferometer
 
 
 def port_selector(ds):  # TODO allow multiple modified datasets to be returned
@@ -74,7 +90,7 @@ if __name__ == "__main__":
 
             exp_params_dict = get_exp_params(hdf5_path)
             bias, currents, positions, sample_sec, ports = get_isweep_vsweep(
-                hdf5_path, vsweep_board_channel, isweep_boards_channels, isweep_receptacles, port_resistances)
+                hdf5_path, vsweep_board_channel, langmuir_probes)
 
             characteristics, ramp_times = characterize_sweep_array(bias, currents, smoothing_margin, sample_sec)
             diagnostics_dataset = langmuir_diagnostics(characteristics, positions, ramp_times, ports, probe_area,
