@@ -26,13 +26,6 @@ smoothing_margin = 20                                            # Optimal value
 save_diagnostics = True  # Set save_diagnostics to True to save calculated diagnostic data to NetCDF files
 interferometry_calibrate = False  # TODO make automatic
 
-"""
-isweep_boards_channels = [(1, 2), (1, 3)]  # tuple or list of tuples; board/channel for interferometer isweep data first  (1, 2)
-port_resistances = {29: 2.20, 35: 2.20}  # TODO hardcoded; change to 11 if 2018, get from metadata! {25: 11}
-isweep_receptacles = {2: 2, 3: 4}  # TODO hardcoded  {2: 1}
-# TODO make named probe arrays with attribute rows? ex.
-"""
-
 # TODO for user: change these to match your run!
 # November 2022 configuration
 vsweep_board_channel = (1, 1)  # (1, 3)
