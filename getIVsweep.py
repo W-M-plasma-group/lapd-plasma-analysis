@@ -3,25 +3,23 @@ import astropy.units as u
 from bapsflib import lapd
 
 
-def get_isweep_vsweep(filename, vsweep_bc, isweep_bcs, port_resistances, orientation):
+def get_isweep_vsweep(filename, vsweep_bc, isweep_bcs, isweep_receptacles, port_resistances):
     r"""
     Reads all sweep data (V-sweep and I-sweep) from HDF5 file Langmuir code.
 
     Parameters
     ----------
+    :param isweep_receptacles:
     :param filename: File path of HDF5 file from LAPD
     :param vsweep_bc: Board and channel number of vsweep data in HDF5 file
     :param isweep_bcs:
     :param port_resistances:
-    :param orientation:
     :return: bias, current, x, y, dt: the relevant multidimensional sweep, position, and timestep
     """
 
     lapd_file = lapd.File(filename)
-    run_name = lapd_file.info['run name']
 
     isweep_bcs = np.atleast_2d(isweep_bcs)
-    isweep_receptacles = {2: 1, 3: 2}  # TODO hardcoded
 
     vsweep_data = lapd_file.read_data(*vsweep_bc, silent=True)
     isweep_datas = [lapd_file.read_data(*isweep_bc, silent=True) for isweep_bc in isweep_bcs]
@@ -35,6 +33,7 @@ def get_isweep_vsweep(filename, vsweep_bc, isweep_bcs, port_resistances, orienta
     # TODO allow isweep motor datas to be different or check; for now, assume identical, and use only first motor data
     # for isweep_motor_data in motor_datas:
     positions, num_positions, shots_per_position = get_shot_positions(motor_datas[0])
+    lapd_file.close()
 
     vsweep_signal = vsweep_signal.reshape(num_positions, shots_per_position, signal_length)
     isweep_signal = isweep_signal.reshape((-1, num_positions, shots_per_position, signal_length))
@@ -44,16 +43,24 @@ def get_isweep_vsweep(filename, vsweep_bc, isweep_bcs, port_resistances, orienta
     isweep_signal = isweep_signal.mean(axis=-2)
     # Note: I may take the standard deviation across shots to approximate error for sweep curves, as done in MATLAB code
 
-    lapd_file.close()
-
     ports = np.array([motor_data.info['controls']['6K Compumotor']['probe']['port'] for motor_data in motor_datas])
     resistances_shape = [len(ports)] + [1 for _ in range(len(isweep_signal.shape) - 1)]
     resistances = np.reshape([port_resistances[port] for port in ports], resistances_shape)
 
-    dt = vsweep_data.dt
-    bias, currents = to_real_sweep_units(vsweep_signal, isweep_signal, resistances, orientation)
+    bias, currents = to_real_sweep_units(vsweep_signal, isweep_signal, resistances)
+    currents_dc_offset = np.mean(currents[..., -1000:], axis=-1, keepdims=True)
+    currents -= currents_dc_offset
 
-    return bias, currents, positions, dt, ports, run_name
+    # Determine up/down orientation of sweep by finding median current at a central shot; should be negative
+    invert = np.sign(np.median(currents[:, int(num_positions / 2), :]))
+    currents *= -invert
+
+    dt = vsweep_data.dt
+    return bias, currents, positions, dt, ports
+
+
+def detect_shot_orientation(mid_shot_currents):
+    return np.mean(mid_shot_currents) < 0
 
 
 def get_shot_positions(isweep_motor_data):
@@ -79,7 +86,7 @@ def get_shot_positions(isweep_motor_data):
     return positions, num_positions, shots_per_position
 
 
-def to_real_sweep_units(vsweep, isweep, resistances, orientation):
+def to_real_sweep_units(vsweep, isweep, resistances):
     r"""
     Convert raw sweep probe data into real bias and current measurements.
 
@@ -97,6 +104,6 @@ def to_real_sweep_units(vsweep, isweep, resistances, orientation):
 
     # Conversion factors taken from MATLAB code: Current = isweep / 11 ohms; Voltage = vsweep * 100
     gain = 100.  # voltage gain                                         # TODO get from HDF5 metadata
-    invert = 1 if orientation else -1                                   # TODO get from HDF5 metadata?
+    # TODO get from HDF5 metadata?
 
-    return vsweep * gain * u.V, isweep / resistances * u.A * invert
+    return vsweep * gain * u.V, isweep / resistances * u.A  # * orientation

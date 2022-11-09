@@ -7,21 +7,27 @@ from bapsflib import lapd
 def get_exp_params(hdf5_path):
 
     # The user can define these experimental control parameter functions
-    exp_params_functions = [get_nominal_discharge,
-                            get_nominal_gas_puff,
+    exp_params_functions = [get_run_name,
                             get_discharge,
                             get_gas_pressure,
                             get_magnetic_field]
+    exp_params_functions_optional = [get_nominal_discharge,
+                                     get_nominal_gas_puff]
     # Units are given in MATLAB code
     exp_params_names_values = {}
     with lapd.File(hdf5_path) as hdf5_file:
         for exp_param_function in exp_params_functions:
-            # try:
             exp_params_names_values.update(exp_param_function(hdf5_file))
-            # except (ValueError, KeyError):
-            #    print("Error with obtaining experimental parameter through", str(exp_param_function))
-            #    pass
+        for exp_param_function in exp_params_functions_optional:
+            try:
+                exp_params_names_values.update(exp_param_function(hdf5_file))
+            except ValueError as e:
+                print(e)
     return exp_params_names_values
+
+
+def get_run_name(file):
+    return {"Run name": file.info['run name']}
 
 
 def get_nominal_discharge(file):
