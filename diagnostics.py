@@ -8,6 +8,7 @@ from plasmapy.diagnostics.langmuir import swept_probe_analysis, reduce_bimaxwell
 import sys
 import warnings
 from tqdm import tqdm
+from bapsflib.lapd.tools import portnum_to_z
 
 
 def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, ports, probe_area, ion_type, bimaxwellian=False):
@@ -16,6 +17,7 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, ports, pr
 
     Parameters
     ----------
+    :param ports:
     :param ramp_times:
     :param positions:
     :param characteristic_arrays: 3D NumPy array of Characteristics
@@ -31,6 +33,7 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, ports, pr
     y = np.unique(positions[:, 1])
     num_plateaus = characteristic_arrays.shape[-1]
     num_ports = characteristic_arrays.shape[0]
+    port_z = np.array([portnum_to_z(port).to(u.cm).value for port in ports])
 
     # num_x * num_y * num_plateaus template numpy_array
     templates = {key: np.full(shape=(num_ports, len(x), len(y), num_plateaus), fill_value=np.nan, dtype=float)
@@ -40,8 +43,9 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, ports, pr
                                                    coords=(('port', ports),
                                                            ('x', x, {"units": str(u.cm)}),
                                                            ('y', y, {"units": str(u.cm)}),
-                                                           ('time', ramp_times.to(u.ms), {"units": str(u.ms)}))
-                                                   ).assign_coords({'plateau': ('time', np.arange(num_plateaus) + 1)}
+                                                           ('time', ramp_times.to(u.ms).value, {"units": str(u.ms)}))
+                                                   ).assign_coords({'plateau': ('time', np.arange(num_plateaus) + 1),
+                                                                    'z': ('port', port_z, {"units": str(u.cm)})}
                                                                    ).assign_attrs({"units": keys_units[key]})
                                  for key in keys_units.keys()})
 
@@ -63,7 +67,7 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, ports, pr
                     if bimaxwellian:
                         diagnostics = unpack_bimaxwellian(diagnostics)
                     for key in diagnostics.keys():
-                        # Need to validate diagnostics with "T_e" in name because otherwise skew averages, pressure data
+                        # Crop diagnostics with "T_e" in name because otherwise skew averages, pressure data
                         val = value_safe(diagnostics[key]) if "T_e" not in key else crop_diagnostic(diagnostics[key], 0, 10)
                         diagnostics_ds[key].loc[port, positions[l, 0], positions[l, 1], ramp_times[r]] = val
                     # pbar.update(1)
@@ -71,6 +75,20 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, ports, pr
     warnings.simplefilter(action='default')  # Restore warnings to default handling
 
     return diagnostics_ds
+
+
+def in_core(pos_list, core_radius):
+    return [abs(pos) < core_radius.to(u.cm).value for pos in pos_list]
+
+
+def detect_steady_state_ramps(density: xr.DataArray, core_radius):
+    core_density = density.where(np.logical_and(*in_core([density.x, density.y], core_radius)), drop=True)
+    core_density_time = core_density.isel(port=0).mean(['x', 'y']).squeeze()
+    threshold = 0.9 * core_density_time.max()
+    start_index = (core_density_time > threshold).argmax().item() + 1
+    end_index = core_density_time.sizes['time'] - np.nanargmax(
+            core_density_time.reindex(time=core_density_time.time[::-1]) > threshold).item()
+    return start_index, end_index
 
 
 def diagnose_char(characteristic, probe_area, ion_type, bimaxwellian):
@@ -95,7 +113,7 @@ def unpack_bimaxwellian(diagnostics):
 
 
 def get_diagnostic_keys_units(probe_area, ion_type, bimaxwellian=False):
-    # Perform diagnostic on test data to get all diagnostic names and units as dictionary of strings
+    # Perform diagnostic on some sample data to get all diagnostic names and units as dictionary of strings
 
     bias = np.arange(-20, 20, 2) * u.V
     current = ((bias.value / 100 + 0.2) ** 2 - 0.01) * u.A
@@ -104,12 +122,13 @@ def get_diagnostic_keys_units(probe_area, ion_type, bimaxwellian=False):
     if bimaxwellian:
         diagnostics = unpack_bimaxwellian(diagnostics)
     keys_units = {key: str(unit_safe(value)) for key, value in diagnostics.items()}
-    keys_units.update({"n_e_cal": u.m ** -3})   # TODO hardcoded?
-    keys_units.update({"P_e": u.Pa})            # TODO hardcoded?
+    keys_units.update({"n_e_cal": u.m ** -3})
+    keys_units.update({"P_e": u.Pa})
     return keys_units
 
 
 def debug_char(characteristic, error_code, *pos):
+    # A debug function to plot plateaus that cause errors
     # tqdm.write(str(max(characteristic.current)))
     # tqdm.write(f"Pos: {pos}")
     if 5 < pos[-1] < 13 and 0.3 < pos[-2] / 71 < 0.7:  # max(characteristic.current) > 20 * u.mA

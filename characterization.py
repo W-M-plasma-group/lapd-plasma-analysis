@@ -25,11 +25,10 @@ def characterize_sweep_array(raw_bias, raw_current, margin, sample_sec):
     """
 
     validate_sweep_units(raw_bias, raw_current)
-    dc_current_offset = np.mean(raw_current[..., -1000:], axis=-1, keepdims=True)
-    bias, current = smooth_characteristic(raw_bias, raw_current - dc_current_offset, margin=margin)
+    bias, current = smooth_characteristic(raw_bias, raw_current, margin=margin)
     ramp_bounds = isolate_plateaus(bias, margin=margin)
 
-    ramp_times = ramp_bounds[:, 1] * sample_sec
+    ramp_times = ramp_bounds[:, 1] * sample_sec.to(u.ms)
     # NOTE: MATLAB code stores peak voltage time (end of plateaus), then only uses plateau times for very first position
     # This uses the time of the peak voltage for the average of all shots ("top of the average ramp")
 

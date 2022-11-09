@@ -7,6 +7,7 @@ import xarray as xr
 
 
 # Return a dataset opened from a NetCDF file, or None if no file was found
+"""
 def read_netcdf(filename, netcdf_subdirectory):
     if check_netcdf(filename):
         return open_netcdf(filename)
@@ -18,6 +19,7 @@ def read_netcdf(filename, netcdf_subdirectory):
             return None
         dataset = xr.open_dataset(netcdf_files[file_choice - 1])
     return dataset
+"""
 
 
 def choose_list(choices, kind, location, add_new):
@@ -59,7 +61,6 @@ def check_netcdf(filename):
 
 
 def open_netcdf(filename):
-    # print("Opening NetCDF dataset file...")
     return xr.open_dataset(filename)
 
 
@@ -79,18 +80,6 @@ def search_folder(directory, ext, limit=None) -> list:
                 if type(limit) == int and len(netcdf_files) >= limit:
                     return netcdf_files
     return netcdf_files
-
-
-"""
-# Check that the specified NetCDF directory exists, and if not, create it
-def ensure_netcdf_directory(directory_path):  
-    if not os.path.isdir(directory_path):  # directory does not exist and should be created
-        if os.path.split(directory_path)[0] != "" and not os.path.isabs(directory_path):
-            warnings.warn("The NetCDF subfolder pathname " + repr(directory_path) + " has a leading head path "
-                          "and is not an absolute pathname. It will be treated as a series of nested directories.")
-        os.makedirs(directory_path)  # create the given directory if it does not yet already exist
-    return directory_path
-"""
 
 
 def ensure_directory(directory_path: str):
