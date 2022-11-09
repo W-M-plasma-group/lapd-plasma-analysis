@@ -16,8 +16,7 @@ from experimental import *
 hdf5_folder = "/Users/leo/lapd-data/November_2022/"
 langmuir_nc_folder = hdf5_folder + "lang_nc/"
 
-# User global parameters
-probe_area = 2. * u.mm ** 2                                      # From MATLAB code
+# User global parameters                                 # From MATLAB code
 core_radius = 26. * u.cm                                         # From MATLAB code
 ion_type = 'He-4+'
 bimaxwellian = False
@@ -25,26 +24,29 @@ smoothing_margin = 20                                            # Optimal value
 
 # User file options
 save_diagnostics = True  # Set save_diagnostics to True to save calculated diagnostic data to NetCDF files
+interferometry_calibrate = False  # TODO make automatic
+
 """
 isweep_boards_channels = [(1, 2), (1, 3)]  # tuple or list of tuples; board/channel for interferometer isweep data first  (1, 2)
 port_resistances = {29: 2.20, 35: 2.20}  # TODO hardcoded; change to 11 if 2018, get from metadata! {25: 11}
 isweep_receptacles = {2: 2, 3: 4}  # TODO hardcoded  {2: 1}
 # TODO make named probe arrays with attribute rows? ex.
 """
+
 # TODO for user: change these to match your run!
 # November 2022 configuration
 vsweep_board_channel = (1, 1)  # (1, 3)
-langmuir_probes = np.array([(1, 2, 1, 29, 2.20),
-                            (1, 3, 4, 35, 2.20)],
+langmuir_probes = np.array([(1, 2, 1, 29, 2.20, 2 * u.mm ** 2),
+                            (1, 3, 4, 35, 2.20, 2 * u.mm ** 2)],
                            dtype=[('board', int), ('channel', int), ('receptacle', int), ('port', int),
-                                  ('resistance', float)])
+                                  ('resistance', float), ('area', u.Quantity)])
 """
 # March 2022 configuration
 vsweep_board_channel = (1, 1)  # (1, 3)
-langmuir_probes = np.array([(1, 2, 1, 27, 1.25),
-                            (1, 3, 2, 43, 2.10)],
+langmuir_probes = np.array([(1, 2, 1, 27, 1.25, 1 * u.mm ** 2),
+                            (1, 3, 2, 43, 2.10, 1 * u.mm ** 2)],
                            dtype=[('board', int), ('channel', int), ('receptacle', int), ('port', int),
-                                  ('resistance', float)])
+                                  ('resistance', float), ('area', u.Quantity)])
 """
 # QUESTION: can we calibrate both Langmuir probes using an interferometry ratio depending only on one of them?
 # NOTE: Port 27 is near middle, near interferometer
@@ -61,10 +63,14 @@ def port_selector(ds):  # TODO allow multiple modified datasets to be returned
 
 if __name__ == "__main__":
 
+    if not interferometry_calibrate:
+        print("Interferometry calibration is OFF. "
+              "Interferometry-calibrated electron density ('n_e_cal') is not available.")
+
     netcdf_folder = ensure_directory(langmuir_nc_folder)  # Create folder to save NetCDF files if not yet existing
 
     diagnostic_name_dict = {key: get_title(key)
-                            for key in get_diagnostic_keys_units(probe_area, ion_type, bimaxwellian).keys()}
+                            for key in get_diagnostic_keys_units(langmuir_probes['area'][0], ion_type, bimaxwellian).keys()}
     diagnostic_name_list = list(diagnostic_name_dict.values())
 
     print("The following diagnostics are available to plot: ")
@@ -93,16 +99,20 @@ if __name__ == "__main__":
                 hdf5_path, vsweep_board_channel, langmuir_probes)
 
             characteristics, ramp_times = characterize_sweep_array(bias, currents, smoothing_margin, sample_sec)
-            diagnostics_dataset = langmuir_diagnostics(characteristics, positions, ramp_times, ports, probe_area,
+            diagnostics_dataset = langmuir_diagnostics(characteristics, positions, ramp_times, ports, langmuir_probes['area'][0],
                                                        ion_type, bimaxwellian=bimaxwellian)
+            # TODO change the above! Probes can have different areas!
 
             # Detect beginning and end of steady state period
             steady_state_plateaus = detect_steady_state_ramps(diagnostics_dataset['n_e'], core_radius)
 
             # Perform interferometry calibration for electron density
-            calibrated_electron_density = interferometry_calibration(diagnostics_dataset['n_e'], hdf5_path,
-                                                                     steady_state_plateaus, core_radius)
-            diagnostics_dataset = diagnostics_dataset.assign({"n_e_cal": calibrated_electron_density})
+            if interferometry_calibrate:
+                calibrated_electron_density = interferometry_calibration(diagnostics_dataset['n_e'], hdf5_path,
+                                                                         steady_state_plateaus, core_radius)
+                diagnostics_dataset = diagnostics_dataset.assign({"n_e_cal": calibrated_electron_density})
+            else:
+                calibrated_electron_density = diagnostics_dataset['n_e']
 
             # Find electron pressure
             electron_temperature = diagnostics_dataset['T_e_avg'] if bimaxwellian else diagnostics_dataset['T_e']
