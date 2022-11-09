@@ -17,7 +17,7 @@ hdf5_folder = "/Users/leo/lapd-data/March_2022/"
 langmuir_nc_folder = hdf5_folder + "lang_nc/"
 
 # User global parameters
-probe_area = (2. * u.mm) ** 2                                    # From MATLAB code
+probe_area = 2. * u.mm ** 2                                      # From MATLAB code
 core_radius = 26. * u.cm                                         # From MATLAB code
 ion_type = 'He-4+'
 bimaxwellian = False
