@@ -8,7 +8,8 @@ from scipy.signal import find_peaks
 from bapsflib import lapd
 
 
-def interferometry_calibration(density_da, interferometry_filename, steady_state, core_region=26. * u.cm):
+def interferometry_calibration(density_da, interferometry_filename, steady_state, interferometry_288GHz_filenames=None,
+                               core_region=26. * u.cm):
 
     density_data = density_da * (1 / u.m ** 3).to(1 / u.cm ** 3).value  # density in 1/cm^3
 
@@ -27,10 +28,14 @@ def interferometry_calibration(density_da, interferometry_filename, steady_state
     spatial_dimensions = (['x'] if core_density_data.sizes['x'] > 1 else []
                           + ['y'] if core_density_data.sizes['y'] > 1 else [])
 
-    # TODO how to decide to use new 96 GHz interferometry or old 56 GHz interferometry data
+    # TODO how to decide to use new 96 GHz interferometry or old 56 GHz interferometry data - OR new 288 GHz external?
     inter_file = lapd.File(interferometry_filename)
 
-    if "fringes" in inter_file.info['run description']:
+    if interferometry_288GHz_filenames is not None:
+        interferometry_scale_factor = interferometry_calibration_288ghz(interferometry_288GHz_filenames)
+        calibrated_density_da = density_da  # TODO not done
+
+    elif "fringes" in inter_file.info['run description']:
         # print("Using high-frequency interferometer")  # March 2022
 
         num_fringes = find_fringes_uwave(inter_file)
@@ -234,3 +239,69 @@ def crunch_data(data_array, data_coordinate, destination_coordinate, step):
     named_mean = named_mean.swap_dims({destination_coordinate_name: destination_dimension})
 
     return named_mean
+
+
+def interferometry_calibration_288ghz(interferometry_288ghz_filenames):
+    # !/usr/bin/env python3
+    # -*- coding: utf-8 -*-
+    """
+    Created on Wed Sep 14 15:55:57 2022
+
+    @author: vincena
+    """
+
+    import numpy as np
+    from scipy.signal import hilbert
+    import pandas as pd
+    from scipy import constants as const
+
+    f_uwave = 288e9
+    e = const.elementary_charge
+    m_e = const.electron_mass
+    eps0 = const.epsilon_0
+    c = const.speed_of_light
+
+    Npass = 2.0
+    diameter = 0.35  # m
+
+    calibration = 1. / ((Npass / 4. / np.pi / f_uwave) * (e ** 2 / m_e / c / eps0))
+
+    # Filenames for reference and 'signal'
+    ref_fname, sig_fname = interferometry_288ghz_filenames
+
+    # read data from csv files via pandas dataframes
+    ref_df = pd.read_csv(ref_fname, names=["time", "reference"],
+                         dtype=np.float64, skiprows=5)
+
+    sig_df = pd.read_csv(sig_fname, names=["time", "signal"],
+                         dtype=np.float64, skiprows=5)
+
+    # the traces are saved together, so the time is redundant
+    # convert a named series in dataframes to numpy arrays
+    t = ref_df["time"].to_numpy()
+    r = ref_df["reference"].to_numpy()
+    s = sig_df["signal"].to_numpy()
+    tms = t * 1e3
+
+    # Construct analytic function versions of the reference and the plasma signal
+    # Note: scipy's hilbert funcdtion actually creates an analytic function using the Hilbert transform,
+    #    which is what we want in the end anyway
+    # So, given real X(t): analytic functdion = X(t) + i * HX(t), where H is the actual Hilbert transform
+    # https://en.wikipedia.org/wiki/Hilbert_transform
+
+    aref = hilbert(r)
+    asig = hilbert(s)
+    aref -= np.mean(aref)
+    asig -= np.mean(asig)
+
+    pref = np.unwrap(np.angle(aref))
+    psig = np.unwrap(np.angle(asig))
+
+    dphi = (pref - psig)
+    dphi -= dphi[0]
+
+    density = dphi * calibration / diameter
+
+    import matplotlib.pyplot as plt
+    plt.plot(density)
+    plt.show()

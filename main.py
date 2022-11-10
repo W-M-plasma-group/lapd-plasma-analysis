@@ -13,10 +13,10 @@ from interferometry import *
 from neutrals import *
 from experimental import *
 
-hdf5_folder = "/Users/leo/lapd-data/November_2022/"
+hdf5_folder = "/Users/leo/lapd-data/November_2022/"                 # end this with slash
 langmuir_nc_folder = hdf5_folder + "lang_nc/"
 
-# User global parameters                                 # From MATLAB code
+# User global parameters                                         # From MATLAB code
 core_radius = 26. * u.cm                                         # From MATLAB code
 ion_type = 'He-4+'
 bimaxwellian = False
@@ -122,24 +122,27 @@ if __name__ == "__main__":
                 write_netcdf(diagnostics_dataset, save_diagnostic_path)
 
     # Plot chosen diagnostics for each individual dataset
-    # """
+    steady_state_plateaus_runs = [detect_steady_state_ramps(dataset['n_e'], core_radius) for dataset in datasets]
+    print(steady_state_plateaus_runs)
+    """
     for plot_diagnostic in diagnostic_chosen_list:
-        for dataset in datasets:
-            try:
-                steady_state_plateaus = detect_steady_state_ramps(dataset['n_e'], core_radius)
-                line_time_diagnostic_plot(port_selector(dataset), plot_diagnostic, 'contour', steady_state_plateaus)
-            except Exception as e:
-                print(e)
+        for i in range(len(datasets)):  # dataset in datasets:
+            # try:
+                # steady_state_plateaus = detect_steady_state_ramps(dataset['n_e'], core_radius)
+            line_time_diagnostic_plot(port_selector(dataset), plot_diagnostic, 'contour', steady_state_plateaus_runs[i])
+            # except Exception as e:
+            #     print(e)
     # """
 
     # PLOT radial profiles of diagnostic (steady state time average), in color corresponding to first attribute,
     #    and in plot position on multiplot corresponding to second attribute
-    """
+    # """
     for plot_diagnostic in diagnostic_chosen_list:
         plot_line_diagnostic_by(datasets, plot_diagnostic, port_selector,
                                 attribute=["Nominal discharge",
-                                           "Nominal gas puff"], steady_state=steady_state_plateaus)
+                                           "Nominal gas puff"], steady_state_by_runs=steady_state_plateaus_runs,
+                                tolerance=1)  # TODO adjust tolerance as desired
         # TODO user select attribute(s) from menu
-    """
+    # """
 
 # Note: Not all MATLAB code has been transferred (e.g. neutrals, ExB)
