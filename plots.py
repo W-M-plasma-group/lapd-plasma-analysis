@@ -11,7 +11,7 @@ from diagnostics import value_safe, unit_safe
 matplotlib.use('TkAgg')
 
 
-def plot_line_diagnostic_by(diagnostics_datasets: list, plot_diagnostic, port_selector, attribute, steady_state,
+def plot_line_diagnostic_by(diagnostics_datasets: list, plot_diagnostic, port_selector, attribute, steady_state_by_runs,
                             tolerance=1/2, share_y=True):
     # diagnostics_datasets is a list of different HDF5 datasets
 
@@ -53,13 +53,13 @@ def plot_line_diagnostic_by(diagnostics_datasets: list, plot_diagnostic, port_se
             linear_da = dataset.squeeze()[plot_diagnostic]
 
             line_diagnostic = steady_state_only(linear_da,
-                                                steady_state_plateaus=steady_state)
+                                                steady_state_plateaus=steady_state_by_runs[0])  # TODO finish this!
             line_diagnostic_mean = line_diagnostic.mean('time', keep_attrs=True)
             line_diagnostic_std = line_diagnostic.std('time', ddof=1)
 
-            line_diagnostic_points = line_diagnostic_mean.where(line_diagnostic_std < line_diagnostic_mean.mean()
-                                                                * tolerance)
-            # TODO incorporate tolerance
+            line_diagnostic_points = line_diagnostic_mean.where(
+                line_diagnostic_std < np.abs(line_diagnostic_mean).mean() * tolerance)
+            # TODO incorporate tolerance - maybe compare std to (std if you find two-element moving ave. over time)?
 
             ax.plot(line_diagnostic.coords[linear_dimension], line_diagnostic_points,
                     color=color_map[inner_index], label=str(inner_val))
