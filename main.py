@@ -28,21 +28,42 @@ interferometry_calibrate = False  # TODO make automatic
 
 # TODO for user: change these to match your run!
 # November 2022 configuration
-vsweep_board_channel = (1, 1)  # (1, 3)
+vsweep_board_channel = (1, 1)
+# """
 langmuir_probes = np.array([(1, 2, 1, 29, 2.20, 2 * u.mm ** 2),
                             (1, 3, 4, 35, 2.20, 2 * u.mm ** 2)],
-                           dtype=[('board', int), ('channel', int), ('receptacle', int), ('port', int),
-                                  ('resistance', float), ('area', u.Quantity)])
-"""
+                           dtype=[('board', int),
+                                  ('channel', int),
+                                  ('receptacle', int),
+                                  ('port', int),
+                                  ('resistance', float),
+                                  ('area', u.Quantity)])
+# """
 # March 2022 configuration
+"""
 vsweep_board_channel = (1, 1)  # (1, 3)
 langmuir_probes = np.array([(1, 2, 1, 27, 1.25, 1 * u.mm ** 2),
                             (1, 3, 2, 43, 2.10, 1 * u.mm ** 2)],
-                           dtype=[('board', int), ('channel', int), ('receptacle', int), ('port', int),
-                                  ('resistance', float), ('area', u.Quantity)])
+                           dtype=[('board', int), 
+                                  ('channel', int), 
+                                  ('receptacle', int), 
+                                  ('port', int),
+                                  ('resistance', float), 
+                                  ('area', u.Quantity)])
+# """
+# April 2018 configuration
 """
+vsweep_board_channel = (1, 3)
+langmuir_probes = np.array([(1, 2, 1, 25, 11, 1 * u.mm ** 2)],
+                           dtype=[('board', int), 
+                                  ('channel', int), 
+                                  ('receptacle', int), 
+                                  ('port', int),
+                                  ('resistance', float), 
+                                  ('area', u.Quantity)])
+# """
 # QUESTION: can we calibrate both Langmuir probes using an interferometry ratio depending only on one of them?
-# NOTE: Port 27 is near middle, near interferometer
+# Insert diagram of LAPD
 
 
 def port_selector(ds):  # TODO allow multiple modified datasets to be returned
@@ -83,9 +104,20 @@ if __name__ == "__main__":
         hdf5_chosen_list = [hdf5_paths[choice] for choice in hdf5_chosen_ints]
 
         datasets = []
+        show_receptacles = True  # TODO elaborate on this. This prints out a list of probes and their receptacles
         for hdf5_path in hdf5_chosen_list:  # TODO improve loading bar for many datasets
 
             print("\nOpening file", repr(hdf5_path), "...")
+
+            if show_receptacles:
+                print("List of Compumotor receptacles and their respective ports and probes "
+                      "(check this in main.py!):")
+                with lapd.File(hdf5_path) as f:
+                    for probe in f.controls['6K Compumotor'].configs:
+                        print(f"\t{f.controls['6K Compumotor'].configs[probe]['receptacle']}: "
+                              f"Port {f.controls['6K Compumotor'].configs[probe]['probe']['port']}, "
+                              f"{f.controls['6K Compumotor'].configs[probe]['probe']['probe name']}")
+                show_receptacles = False
 
             exp_params_dict = get_exp_params(hdf5_path)
             bias, currents, positions, sample_sec, ports = get_isweep_vsweep(
