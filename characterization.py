@@ -9,7 +9,7 @@ import sys
 from tqdm import tqdm, trange
 
 
-def characterize_sweep_array(raw_bias, raw_current, margin, sample_sec):
+def characterize_sweep_array(bias, current, margin, sample_sec):
     r"""
     Function that processes bias and current data into a DataArray of distinct Characteristics.
     Takes in bias and current arrays, smooths them, divides them into separate ramp sections, 
@@ -17,16 +17,18 @@ def characterize_sweep_array(raw_bias, raw_current, margin, sample_sec):
 
     Parameters
     ----------
-    :param raw_bias: array, units of voltage
-    :param raw_current: array, units of current
+    :param bias: array, units of voltage
+    :param current: array, units of current
     :param margin: int, positive
     :param sample_sec: float, units of time
     :return: 2D array of Characteristic objects by shot number and plateau number
     """
 
-    validate_sweep_units(raw_bias, raw_current)
-    bias, current = smooth_characteristic(raw_bias, raw_current, margin=margin)
-    ramp_bounds = isolate_plateaus(bias, margin=margin)
+    validate_sweep_units(bias, current)
+    bias, current = smooth(bias, current, margin=margin)
+    ramp_bounds = isolate_plateaus(bias)
+    # Need to trim off edges of sweep distorted by smoothing function (contaminated by quench time!); margin/2 each side
+    ramp_bounds + [margin // 2, -margin // 2]
 
     ramp_times = ramp_bounds[:, 1] * sample_sec.to(u.ms)
     # NOTE: MATLAB code stores peak voltage time (end of plateaus), then only uses plateau times for very first position
@@ -35,54 +37,41 @@ def characterize_sweep_array(raw_bias, raw_current, margin, sample_sec):
     return characteristic_array(bias, current, ramp_bounds), ramp_times
 
 
-def smooth_characteristic(bias, current, margin):
-    r"""
-    Simple moving-average smoothing function for bias and current.
-
-    Parameters
-    ----------
-    :param bias: ndarray
-    :param current: ndarray
-    :param margin: int, window length for moving average
-    :return: smoothed bias, smoothed current
-    """
-
-    if margin < 0:
-        raise ValueError("Cannot smooth over negative number", margin, "of points")
-    if margin == 0:
-        return bias, current
-    if current.shape[-1] <= margin:
-        raise ValueError("Last dimension length", current.shape[-1], "is too short to take", margin, "-point mean over")
-
-    return smooth_array(bias, margin), smooth_array(current, margin)
-
-
-def smooth_array(array, margin):
+def smooth(*arrays, margin=0):
     r"""
     Utility function to smooth ndarray using moving average along last dimension.
 
     Parameters
     ----------
-    :param array: ndarray to be smoothed
+    :param arrays: ndarray(s) to be smoothed
     :param margin: width of moving average window
-    :return: smoothed ndarray with last dimension length decreased by margin
+    :return: smoothed ndarray(s) with last dimension length decreased by margin
     """
 
-    # Find cumulative mean of each consecutive block of (margin + 1) elements per row
-    array_sum = np.cumsum(np.insert(array, 0, 0, axis=-1), axis=-1, dtype=np.float64)
-    smoothed_array = (array_sum[..., margin:] - array_sum[..., :-margin]) / margin
+    if margin < 0:
+        raise ValueError("Cannot smooth over negative number", margin, "of points")
+    if margin == 0:
+        return arrays
 
-    return smoothed_array.astype(float)
+    smoothed_arrays = []
+    for array in arrays:
+        if array.shape[-1] <= margin:
+            raise ValueError(f"Final dimension of size {array.shape[-1]} is too short to take {margin}-point mean over")
+        # Find cumulative mean of each consecutive block of (margin + 1) elements per row
+        array_sum = np.cumsum(np.insert(array, 0, 0, axis=-1), axis=-1, dtype=np.float64)
+        smoothed_array = (array_sum[..., margin:] - array_sum[..., :-margin]) / margin
+        smoothed_arrays.append(smoothed_array.astype(float))
+
+    return smoothed_arrays
 
 
-def isolate_plateaus(bias, margin=0):
+def isolate_plateaus(bias):
     r"""
     Find indices corresponding to the beginning and end of every bias ramp.
 
     Parameters
     ----------
     :param bias:
-    :param margin:
     :return: num_plateaus-by-2 array; start indices in first column, end indices in second
     """
 
@@ -100,7 +89,8 @@ def isolate_plateaus(bias, margin=0):
     peak_frames, peak_properties = find_peaks(bias_avg, height=0, distance=guess_plateau_spacing // 2,
                                               width=min_plateau_width, rel_height=0.97)  # 0.97 may be hardcoded
 
-    return np.stack((peak_properties['left_ips'].astype(int) + margin // 2, peak_frames - margin // 2), axis=-1)
+    # return np.stack((peak_properties['left_ips'].astype(int) + margin // 2, peak_frames - margin // 2), axis=-1)
+    return np.stack((peak_properties['left_ips'].astype(int), peak_frames), axis=-1)
 
 
 def validate_sweep_units(bias, current):
