@@ -3,7 +3,7 @@ import astropy.units as u
 from bapsflib import lapd
 
 
-def get_isweep_vsweep(filename, vsweep_bc, langmuir_probes):
+def get_isweep_vsweep(filename, vsweep_bc, langmuir_probes):  # TODO get voltage_gain from metadata?
     r"""
     Reads all sweep data (V-sweep and I-sweep) from HDF5 file Langmuir code.
 
@@ -35,11 +35,6 @@ def get_isweep_vsweep(filename, vsweep_bc, langmuir_probes):
 
     vsweep_signal = vsweep_signal.reshape(num_positions, shots_per_position, signal_length)
     isweep_signal = isweep_signal.reshape((-1, num_positions, shots_per_position, signal_length))
-
-    # average bias and current for all shots at same position; TODO: don't do this! Calc error on diagnostics at end
-    # vsweep_signal = vsweep_signal.mean(axis=-2)
-    # isweep_signal = isweep_signal.mean(axis=-2)
-    # Note: I may take the standard deviation across shots to approximate error for sweep curves, as done in MATLAB code
 
     ports = np.array([motor_data.info['controls']['6K Compumotor']['probe']['port'] for motor_data in motor_datas])
     resistances_shape = [len(ports)] + [1 for _ in range(len(isweep_signal.shape) - 1)]
