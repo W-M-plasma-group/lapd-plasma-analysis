@@ -27,7 +27,13 @@ def characterize_sweep_array(unsmooth_bias, unsmooth_current, margin, sample_sec
     validate_sweep_units(unsmooth_bias, unsmooth_current)
     bias, current = smooth_characteristic(unsmooth_bias, unsmooth_current, margin=margin)
     ramp_bounds = isolate_plateaus(bias, margin=margin)
-
+    
+    # trim bad, distorted averaged ends in isolate plateaus
+    """
+    # Need to trim off edges of sweep distorted by smoothing function (contaminated by quench time!); margin/2 each side
+    ramp_bounds + [margin // 2, -margin // 2]
+    """
+    
     ramp_times = ramp_bounds[:, 1] * sample_sec.to(u.ms)
     # NOTE: MATLAB code stores peak voltage time (end of plateaus), then only uses plateau times for very first position
     # This uses the time of the peak voltage for the average of all shots ("top of the average ramp")
@@ -87,10 +93,10 @@ def isolate_plateaus(bias, margin=0):
     """
 
     # Assume strictly that all plateaus start and end at the same time after the start of the shot as in any other shot
-    axes_to_average = tuple(np.arange(bias.ndim)[:-1])
-    bias_avg = np.mean(bias, axis=axes_to_average)  # mean across all positions and shots, preserving time
+    bias_axes_to_average = tuple(np.arange(bias.ndim)[:-1])
+    bias_avg = np.mean(bias, axis=bias_axes_to_average)  # mean of bias across all positions and shots, preserving time
 
-    # Report on how dissimilar the vsweep biases are and if they can be averaged together safely
+    # Report on how dissimilar the vsweep biases are and if they can be averaged together safely?
 
     # Initial fit to guess number of peaks
     min_plateau_width = 500  # change as necessary
