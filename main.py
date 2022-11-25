@@ -4,6 +4,8 @@ written in MATLAB by Conor Perks (MIT) and using the PlasmaPy library.
 Comments are added inline. A separate documentation page is not yet complete.
 """
 
+# ONE PROBE PER PORT
+
 from getIVsweep import *
 from characterization import *
 from diagnostics import *
@@ -13,7 +15,7 @@ from interferometry import *
 from neutrals import *
 from experimental import *
 
-hdf5_folder = "/Users/leo/lapd-data/November_2022/"                 # end this with slash
+hdf5_folder = "/Users/leo/lapd-data/November_2022/"                 # end this with a slash
 langmuir_nc_folder = hdf5_folder + "lang_nc/"
 
 # User global parameters                                         # From MATLAB code
