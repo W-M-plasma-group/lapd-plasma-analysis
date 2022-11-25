@@ -11,7 +11,7 @@ from tqdm import tqdm
 from bapsflib.lapd.tools import portnum_to_z
 
 
-standard_deviation_suffix = "st. dev."
+standard_deviation_suffix = "(st. dev.)"
 
 
 def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, ports, probe_area, ion_type, bimaxwellian=False):

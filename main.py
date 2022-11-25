@@ -112,8 +112,8 @@ if __name__ == "__main__":
             print("\nOpening file", repr(hdf5_path), "...")
 
             if show_receptacles:
-                print("List of Compumotor receptacles and their respective ports and probes "
-                      "(check this in main.py!):")
+                print("List of detected Compumotor receptacles and their respective ports and probes "
+                      "(check this in main.py):")
                 with lapd.File(hdf5_path) as f:
                     for probe in f.controls['6K Compumotor'].configs:
                         print(f"\t{f.controls['6K Compumotor'].configs[probe]['receptacle']}: "

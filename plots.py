@@ -164,7 +164,7 @@ def check_diagnostic(diagnostic_dataset, choice):
         return False
 
 
-def get_title(diagnostic):
+def get_title(diagnostic: str) -> str:
 
     full_names = {'V_P': "Plasma potential",
                   'V_F': "Floating potential",
@@ -181,10 +181,10 @@ def get_title(diagnostic):
                   'P_e': "Electron pressure",
                   'n_e_cal': "Calibrated electron density"}
 
-    if diagnostic in full_names:
-        return full_names[diagnostic]
-    else:
-        return diagnostic
+    for key in sorted(list(full_names.keys()), key=len, reverse=True):
+        diagnostic = diagnostic.replace(key, full_names[key])
+
+    return diagnostic
 
 
 # TODO remove?
