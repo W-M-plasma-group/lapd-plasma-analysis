@@ -27,15 +27,17 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, ports, pr
     :return: Dataset object containing diagnostic values at each position
     """
 
-    probe_areas = np.atleast_1d(probe_area)
-    keys_units = get_diagnostic_keys_units(probe_areas[0], ion_type, bimaxwellian=bimaxwellian)
-
     x = np.unique(positions[:, 0])
     y = np.unique(positions[:, 1])
     num_plateaus = characteristic_arrays.shape[-1]
     num_shots = characteristic_arrays.shape[2]
     num_ports = characteristic_arrays.shape[0]
-    port_z = np.array([portnum_to_z(port).to(u.cm).value for port in ports])
+    ports_z = np.array([portnum_to_z(port).to(u.cm).value for port in ports])
+
+    probe_areas = np.atleast_1d(probe_area)
+    if len(probe_areas) == 1:
+        probe_areas = np.repeat(probe_areas, num_ports)
+    keys_units = get_diagnostic_keys_units(probe_areas[0], ion_type, bimaxwellian=bimaxwellian)
 
     # num_x * num_y * num_shots * num_plateaus template numpy_array
     templates = {key: np.full(shape=(num_ports, len(x), len(y), num_shots, num_plateaus),
@@ -49,7 +51,7 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, ports, pr
                                                            ('shot', np.arange(num_shots)),
                                                            ('time', ramp_times.to(u.ms).value, {"units": str(u.ms)}))
                                                    ).assign_coords({'plateau': ('time', np.arange(num_plateaus) + 1),
-                                                                    'z': ('port', port_z, {"units": str(u.cm)})}
+                                                                    'z': ('port', ports_z, {"units": str(u.cm)})}
                                                                    ).assign_attrs({"units": keys_units[key]})
                                  for key in keys_units.keys()})
 
@@ -58,12 +60,12 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, ports, pr
     print(f"Calculating langmuir diagnostics ({len(ports)} probe(s) to analyze) ...")
 
     warnings.simplefilter(action='ignore')  # Suppress warnings to not break progress bar
-    for p in range(characteristic_arrays.shape[0]):
+    for p in range(characteristic_arrays.shape[0]):  # probe
         port = ports[p]
         with tqdm(total=num_positions, unit="characteristic", file=sys.stdout) as pbar:
-            for l in range(characteristic_arrays.shape[1]):  # noqa
-                for s in range(characteristic_arrays.shape[2]):
-                    for r in range(characteristic_arrays.shape[3]):
+            for l in range(characteristic_arrays.shape[1]):  # location  # noqa
+                for s in range(characteristic_arrays.shape[2]):  # shot
+                    for r in range(characteristic_arrays.shape[3]):  # ramp
                         characteristic = characteristic_arrays[p, l, s, r]
                         diagnostics = diagnose_char(characteristic, probe_areas[p], ion_type, bimaxwellian=bimaxwellian)
                         pbar.update(1)
@@ -118,7 +120,7 @@ def unpack_bimaxwellian(diagnostics):
                               ).pop('T_e')
 
 
-def get_diagnostic_keys_units(probe_area=1.*u.mm**2, ion_type="He-4+", bimaxwellian=False):
+def get_diagnostic_keys_units(probe_area, ion_type, bimaxwellian=False):
     # Perform diagnostic on some sample data to get all diagnostic names and units as dictionary of strings
 
     bias = np.arange(-20, 20, 2) * u.V
