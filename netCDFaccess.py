@@ -1,6 +1,7 @@
 import os
 import warnings
 
+import numpy as np
 import xarray as xr
 
 # TODO rename file-acccess.py or similar
@@ -34,21 +35,40 @@ def choose_list(choices, kind, location, add_new):
 
 def choose_multiple_list(choices, name, null_action=None):
 
-    if len(choices) > 26:
-        warnings.warn("More than 26 " + name + "s found. Only the first 26 are displayed.")
-    print(*["  " + chr(97 + i) + ": " + choices[i] for i in range(len(choices[:26]))], sep="\n")
+    if len(choices) > 52:
+        warnings.warn("More than 52 " + name + "s found. Only the first 52 are displayed.")
+    print(*["  " + int_to_char(i) + ": " + choices[i] for i in range(len(choices[:52]))], sep="\n")
     prompt = "Input a string of letters to select the corresponding " + name + "s"
     if null_action is not None:
         prompt += ", \n\tor the empty string to " + null_action
     prompt += ": "
-    selection_str = input(prompt).lower()
+    selection_str = input(prompt)
 
     if selection_str == "" and null_action is not None:
         return []
     if not selection_str.isalpha():
         raise ValueError("Selection " + repr(selection_str) + " is not only letters")
 
-    return [ord(letter) - 97 for letter in selection_str if 0 <= ord(letter) - 97 < len(choices)]
+    return [char_to_int(letter) for letter in selection_str if 0 <= char_to_int(letter) < len(choices)]
+
+
+def char_to_int(char):
+    char_num = ord(char)
+    if 97 <= char_num <= 122:
+        return char_num - 97
+    elif 65 <= char_num <= 90:
+        return char_num - 65 + 26
+    else:
+        raise ValueError(f"Invalid character choice {repr(char_num)}")
+
+
+def int_to_char(num):
+    if 0 <= num <= 25:
+        return chr(num + 97)
+    elif 26 <= num <= 51:
+        return chr(num - 26 + 65)
+    else:
+        raise ValueError(f"Invalid integer choice {repr(num)}")
 
 
 # Ensure that the file path contains a Dataset

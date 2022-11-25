@@ -11,6 +11,9 @@ from tqdm import tqdm
 from bapsflib.lapd.tools import portnum_to_z
 
 
+standard_deviation_suffix = "st. dev."
+
+
 def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, ports, probe_area, ion_type, bimaxwellian=False):
     r"""
     Performs plasma diagnostics on a DataArray of Characteristic objects and returns the diagnostics as a Dataset.
@@ -84,7 +87,7 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, ports, pr
     diagnostics_ds = diagnostics_ds.mean(dim="shot")
 
     for key in diagnostics_ds_std:
-        diagnostics_ds.update({str(key) + " standard deviation": diagnostics_ds_std[key]})
+        diagnostics_ds.update({str(key) + f" {standard_deviation_suffix}": diagnostics_ds_std[key]})
 
     return diagnostics_ds
 
@@ -136,9 +139,9 @@ def get_diagnostic_keys_units(probe_area, ion_type, bimaxwellian=False):
     keys_units = {key: str(unit_safe(value)) for key, value in diagnostics.items()}
     keys_units.update({"n_e_cal": str(u.m ** -3)})
     keys_units.update({"P_e": str(u.Pa)})
-    keys = keys_units.keys()
+    keys = list(keys_units.keys())
     for key in keys:
-        keys_units.update({str(key) + " standard deviation": keys_units[key]})
+        keys_units.update({str(key) + f" {standard_deviation_suffix}": keys_units[key]})
     return keys_units
 
 
