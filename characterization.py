@@ -75,8 +75,8 @@ def isolate_plateaus(bias):
     :return: num_plateaus-by-2 array; start indices in first column, end indices in second
     """
 
-    # Assume strictly that all plateaus start and end at the same time after the start of the shot as in any other shot
-    bias_avg = np.mean(bias, axis=0)  # mean across all positions, preserving time
+    # Assume strictly that all bias ramps start and end at the same time after the start of the shot
+    bias_avg = np.mean(bias, axis=[0, 1])  # mean across all positions and shots, preserving time
 
     # Report on how dissimilar the vsweep biases are and if they can be averaged together safely
 
@@ -105,7 +105,7 @@ def validate_sweep_units(bias, current):
 
 
 def characteristic_array(bias, current, plateau_ranges):
-    # 2D: unique_position by plateau_num
+    # 4D: langmuir_probe by unique_position by shot_at_position by plateau_number
 
     currents = current  # "currents" has "probe" dimension in front; may have size 1
     num_pos = bias.shape[0]
@@ -117,8 +117,9 @@ def characteristic_array(bias, current, plateau_ranges):
     print(f"Creating characteristics ({currents.shape[0]} probes to analyze)...")
     warnings.simplefilter(action='ignore', category=FutureWarning)  # Suppress FutureWarnings to not break loading bar
     print("\t(plasmapy.langmuir.diagnostics pending deprecation FutureWarning suppressed)")
-    return np.concatenate([np.array([[Characteristic(bias[pos, plateau], current[pos, plateau])
-                                      for plateau in plateau_slices]
+    return np.concatenate([np.array([[[Characteristic(bias[pos, shot, plateau], current[pos, shot, plateau])
+                                       for plateau in plateau_slices]
+                                      for shot in range(bias.shape[0])]
                                      for pos in trange(num_pos, unit="position", file=sys.stdout)])[np.newaxis, ...]
                            for current in currents])
-    # CAN USE NESTED TQDM INSTEAD OF OUTER TQDM?
+    # TODO: use nested tqdm instead of outer tqdm only?
