@@ -26,8 +26,14 @@ def get_isweep_vsweep(filename, vsweep_bc, langmuir_probes, voltage_gain=100):  
     signal_length = vsweep_signal.shape[-1]
     # Above: isweep_signal has one extra dimension "in front" than vsweep signal, to represent different *probes*
 
-    motor_datas = [lapd_file.read_controls([("6K Compumotor", langmuir_probe['receptacle'])], silent=True)
-                   for langmuir_probe in langmuir_probes]
+    # Detect digitizer receptacle for each probe (based on physical port window on LAPD)
+    probe_configs = lapd_file.controls['6K Compumotor'].configs
+    port_receptacles = {probe_configs[probe]['probe']['port']:
+                        probe_configs[probe]['receptacle']
+                        for probe in probe_configs}
+    motor_datas = [lapd_file.read_controls([("6K Compumotor", port_receptacles[port])], silent=True)
+                   for port in langmuir_probes['port']]
+
     # TODO allow isweep motor datas to be different or check; for now, assume identical, and use only first motor data
     # for isweep_motor_data in motor_datas:
     positions, num_positions, shots_per_position = get_shot_positions(motor_datas[0])
@@ -61,7 +67,6 @@ def get_isweep_vsweep(filename, vsweep_bc, langmuir_probes, voltage_gain=100):  
 
 
 def get_shot_positions(isweep_motor_data):
-
     num_shots = len(isweep_motor_data['shotnum'])
     shot_positions = np.round(isweep_motor_data['xyz'], 1)
 
@@ -81,4 +86,3 @@ def get_shot_positions(isweep_motor_data):
         raise ValueError("Non-uniform position values when grouping Langmuir probe data by position")
 
     return positions, num_positions, shots_per_position
-

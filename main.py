@@ -32,11 +32,11 @@ interferometry_calibrate = False  # TODO make automatic
 # November 2022 configuration
 vsweep_board_channel = (1, 1)
 # """
-langmuir_probes = np.array([(1, 2, 1, 29, 2.20, 2 * u.mm ** 2),
-                            (1, 3, 4, 35, 2.20, 2 * u.mm ** 2)],
+langmuir_probes = np.array([(1, 2, 29, 2.20, 2. * u.mm ** 2),   # receptacle 1
+                            (1, 3, 35, 2.20, 2. * u.mm ** 2)],  # receptacle 4
                            dtype=[('board', int),
                                   ('channel', int),
-                                  ('receptacle', int),
+                                  # ('receptacle', int),
                                   ('port', int),
                                   ('resistance', float),
                                   ('area', u.Quantity)])
@@ -44,11 +44,11 @@ langmuir_probes = np.array([(1, 2, 1, 29, 2.20, 2 * u.mm ** 2),
 # March 2022 configuration
 """
 vsweep_board_channel = (1, 1)  # (1, 3)
-langmuir_probes = np.array([(1, 2, 1, 27, 1.25, 1 * u.mm ** 2),
-                            (1, 3, 2, 43, 2.10, 1 * u.mm ** 2)],
+langmuir_probes = np.array([(1, 2, 27, 1.25, 1. * u.mm ** 2),   # receptacle 1
+                            (1, 3, 43, 2.10, 1. * u.mm ** 2)],  # receptacle 2
                            dtype=[('board', int), 
                                   ('channel', int), 
-                                  ('receptacle', int), 
+                                  # ('receptacle', int), 
                                   ('port', int),
                                   ('resistance', float), 
                                   ('area', u.Quantity)])
@@ -56,10 +56,10 @@ langmuir_probes = np.array([(1, 2, 1, 27, 1.25, 1 * u.mm ** 2),
 # April 2018 configuration
 """
 vsweep_board_channel = (1, 3)
-langmuir_probes = np.array([(1, 2, 1, 25, 11, 1 * u.mm ** 2)],
+langmuir_probes = np.array([(1, 2, 25, 11., 1. * u.mm ** 2)],  # receptacle 1
                            dtype=[('board', int), 
                                   ('channel', int), 
-                                  ('receptacle', int), 
+                                  # ('receptacle', int), 
                                   ('port', int),
                                   ('resistance', float), 
                                   ('area', u.Quantity)])
