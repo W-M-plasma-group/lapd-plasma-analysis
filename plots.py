@@ -8,7 +8,9 @@ import numpy as np
 import astropy.units as u
 from astropy import visualization
 from diagnostics import value_safe, unit_safe
-matplotlib.use('TkAgg')
+# matplotlib.use('TkAgg')
+# TODO investigate
+matplotlib.use('QtAgg')
 
 
 def plot_line_diagnostic_by(diagnostics_datasets: list, plot_diagnostic, port_selector, attribute, steady_state_by_runs,
@@ -44,7 +46,7 @@ def plot_line_diagnostic_by(diagnostics_datasets: list, plot_diagnostic, port_se
         datasets = diagnostics_datasets_sorted[outer_bounds[outer_index]:outer_bounds[outer_index + 1]]
         num_datasets = outer_bounds[outer_index + 1] - outer_bounds[outer_index]
 
-        color_map = plt.cm.get_cmap("plasma")(np.linspace(0, 1, num_datasets))
+        color_map = matplotlib.colormaps["plasma"](np.linspace(0, 1, num_datasets))
         for inner_index in range(num_datasets):
             dataset = port_selector(datasets[inner_index])  # TODO allow looping through multiple datasets returned
             inner_val = dataset.attrs[attributes[0]]
