@@ -13,7 +13,7 @@ from interferometry import *
 from neutrals import *
 from experimental import *
 
-hdf5_folder = "/Users/leo/lapd-data/November_2022/"                 # end this with slash
+hdf5_folder = "/Users/leomurphy/lapd-data/November_2022/"                 # end this with slash
 langmuir_nc_folder = hdf5_folder + "lang_nc/"
 
 # User global parameters                                         # From MATLAB code
@@ -83,25 +83,33 @@ if __name__ == "__main__":
 
     netcdf_folder = ensure_directory(langmuir_nc_folder)  # Create folder to save NetCDF files if not yet existing
 
+    # list possible diagnostics and their full names, e.g. "n_e" and "Electron density"
     diagnostic_name_dict = {key: get_title(key)
                             for key in get_diagnostic_keys_units(langmuir_probes['area'][0], ion_type, bimaxwellian).keys()}
     diagnostic_name_list = list(diagnostic_name_dict.values())
 
     print("The following diagnostics are available to plot: ")
-    diagnostic_chosen_ints = choose_multiple_list(diagnostic_name_list, "diagnostic")
-    diagnostic_chosen_list = [list(diagnostic_name_dict.keys())[choice] for choice in diagnostic_chosen_ints]
-    print("Diagnostics selected:", diagnostic_chosen_list)
+    diagnostics_to_plot_ints = choose_multiple_list(diagnostic_name_list, "diagnostic")
+    diagnostic_to_plot_list = [list(diagnostic_name_dict.keys())[choice] for choice in diagnostics_to_plot_ints]
+    print("Diagnostics selected:", diagnostic_to_plot_list)
 
     print("The following NetCDF files were found in the NetCDF folder (specified in main.py): ")
     nc_paths = sorted(search_folder(netcdf_folder, 'nc', limit=26))
-    nc_chosen_ints = choose_multiple_list(nc_paths, "NetCDF file", null_action="perform diagnostics on HDF5 files")
-    if len(nc_chosen_ints) > 0:
-        datasets = [xr.open_dataset(nc_paths[choice]) for choice in nc_chosen_ints]
+    nc_paths_to_open_ints = choose_multiple_list(nc_paths, "NetCDF file", null_action="perform diagnostics on HDF5 files")
+
+    if len(nc_paths_to_open_ints) > 0:
+        datasets = [xr.open_dataset(nc_paths[choice]) for choice in nc_paths_to_open_ints]
     else:
         print("The following HDF5 files were found in the HDF5 folder (specified in main.py): ")
         hdf5_paths = sorted(search_folder(hdf5_folder, "hdf5", limit=26))
         hdf5_chosen_ints = choose_multiple_list(hdf5_paths, "HDF5 file")
         hdf5_chosen_list = [hdf5_paths[choice] for choice in hdf5_chosen_ints]
+
+        chara_view_mode = ""
+        if len(hdf5_chosen_list) == 1:
+            while chara_view_mode not in ["y", "n"]:
+                chara_view_mode = input("Use characteristic plotting mode? (y/n) ").lower()
+            chara_view_mode = (chara_view_mode == "y")
 
         datasets = []
         show_receptacles = True  # TODO elaborate on this. This prints out a list of probes and their receptacles
@@ -119,11 +127,48 @@ if __name__ == "__main__":
                               f"{f.controls['6K Compumotor'].configs[probe]['probe']['probe name']}")
                 show_receptacles = False
 
-            exp_params_dict = get_exp_params(hdf5_path)
+            exp_params_dict = get_exp_params(hdf5_path)  # list of machine parameters
             bias, currents, positions, sample_sec, ports = get_isweep_vsweep(
-                hdf5_path, vsweep_board_channel, langmuir_probes)
-
+                hdf5_path, vsweep_board_channel, langmuir_probes)  # get current and bias data from Langmuir probe
             characteristics, ramp_times = characterize_sweep_array(bias, currents, smoothing_margin, sample_sec)
+
+            if chara_view_mode:
+                x = np.unique(positions[:, 0])
+                y = np.unique(positions[:, 1])
+                print(f"\nDimensions of plateaus array: {characteristics.shape[0]} probes, {len(x)} x-positions, "
+                      f"{len(y)} y-positions, and {characteristics.shape[-1]} ramps.")
+                print(f"Probe ports are {ports}; \n"
+                      f"x positions range from {min(x)} to {max(x)}; \n"
+                      f"y positions range from {min(y)} to {max(y)}; \n"
+                      f"ramp times range from {min(ramp_times):.2f} to {max(ramp_times):.2f}.")
+                probe_x_y_ramp_to_plot = [0, 0, 0, 0]
+                variables_to_enter = ["probe", "x position", "y position", "ramp"]
+                print("Note: Enter a non-integer below to terminate characteristics plotting mode.\n")
+                while chara_view_mode:
+                    for i in range(len(probe_x_y_ramp_to_plot)):
+                        try:
+                            index_given = int(input(f"Enter a zero-based index for {variables_to_enter[i]}: "))
+                        except ValueError:
+                            chara_view_mode = False
+                            break
+                        probe_x_y_ramp_to_plot[i] = index_given
+                    if not chara_view_mode:
+                        break
+                    print()
+                    loc_x, loc_y = x[probe_x_y_ramp_to_plot[1]], y[probe_x_y_ramp_to_plot[2]]
+                    loc = (positions == [loc_x, loc_y]).all(axis=1).nonzero()[0][0]
+                    characteristics[probe_x_y_ramp_to_plot[0], loc, probe_x_y_ramp_to_plot[3]].plot()
+                    """ while chara_view_mode not in ["s", "a"]:
+                        chara_view_mode = input("(S)how current plot or (a)dd another Characteristic?").lower()
+                    if chara_view_mode == "s": """
+                    plt.title(f"Run: {exp_params_dict['Run name']}\n"
+                              f"Port: {ports[probe_x_y_ramp_to_plot[0]]}, x: {loc_x}, y: {loc_y}, "
+                              f"time: {ramp_times[probe_x_y_ramp_to_plot[3]]:.2f}")
+                    plt.show()
+
+            # characteristic = characteristic_arrays[p, l, r]
+            # diagnostics_ds[key].loc[port, positions[l, 0], positions[l, 1], ramp_times[r]] = val
+
             diagnostics_dataset = langmuir_diagnostics(characteristics, positions, ramp_times, ports, langmuir_probes['area'][0],
                                                        ion_type, bimaxwellian=bimaxwellian)
             # TODO change the above! Probes can have different areas!
@@ -155,13 +200,13 @@ if __name__ == "__main__":
 
     # Plot chosen diagnostics for each individual dataset
     steady_state_plateaus_runs = [detect_steady_state_ramps(dataset['n_e'], core_radius) for dataset in datasets]
-    print(steady_state_plateaus_runs)
-    """
-    for plot_diagnostic in diagnostic_chosen_list:
+    print(f"Steady-state ramp range: {steady_state_plateaus_runs}")
+    # """
+    for plot_diagnostic in diagnostic_to_plot_list:
         for i in range(len(datasets)):  # dataset in datasets:
             # try:
                 # steady_state_plateaus = detect_steady_state_ramps(dataset['n_e'], core_radius)
-            line_time_diagnostic_plot(port_selector(dataset), plot_diagnostic, 'contour', steady_state_plateaus_runs[i])
+            line_time_diagnostic_plot(port_selector(datasets[i]), plot_diagnostic, 'contour', steady_state_plateaus_runs[i])
             # except Exception as e:
             #     print(e)
     # """
@@ -169,7 +214,7 @@ if __name__ == "__main__":
     # PLOT radial profiles of diagnostic (steady state time average), in color corresponding to first attribute,
     #    and in plot position on multiplot corresponding to second attribute
     # """
-    for plot_diagnostic in diagnostic_chosen_list:
+    for plot_diagnostic in diagnostic_to_plot_list:
         plot_line_diagnostic_by(datasets, plot_diagnostic, port_selector,
                                 attribute=["Nominal discharge",
                                            "Nominal gas puff"], steady_state_by_runs=steady_state_plateaus_runs,
