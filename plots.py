@@ -73,11 +73,11 @@ def plot_line_diagnostic_by(diagnostics_datasets: list, plot_diagnostic, port_se
     plt.show()
 
 
-def line_time_diagnostic_plot(diagnostics_dataset, diagnostic, plot, steady_state, show=True, **kwargs):
+def line_time_diagnostic_plot(diagnostics_dataset, diagnostic, plot_type, steady_state, show=True, **kwargs):
     # Plots the given diagnostic(s) from the dataset in the given style
 
     try:
-        run_name = diagnostics_dataset.attrs['run name'] + "\n"
+        run_name = diagnostics_dataset.attrs['Run name'] + "\n"
     except KeyError:
         run_name = ""
 
@@ -96,26 +96,26 @@ def line_time_diagnostic_plot(diagnostics_dataset, diagnostic, plot, steady_stat
     plot_types_2d = {'contour', 'surface'}
 
     # Unsupported plot type
-    if plot not in plot_types_1d and plot not in plot_types_2d:
-        warn("The type of plot " + repr(plot) + " is not in the supported plot type list "
+    if plot_type not in plot_types_1d and plot_type not in plot_types_2d:
+        warn("The type of plot " + repr(plot_type) + " is not in the supported plot type list "
              + repr(plot_types_1d | plot_types_2d) + ". Defaulting to contour plot.")
-        plot = 'contour'
+        plot_type = 'contour'
     # 1D plot type
-    if plot in plot_types_1d:
+    if plot_type in plot_types_1d:
         linear_diagnostics_dataset_1d = steady_state_only(linear_diagnostics_dataset,
                                                           steady_state_plateaus=steady_state).mean('time')
         for choice in diagnostic_list:
             if check_diagnostic(linear_diagnostics_dataset_1d, choice):
                 linear_plot_1d(linear_diagnostics_dataset_1d[choice], linear_dimension)
-                plt.title(run_name + get_title(choice) + " " + plot + " plot")
+                plt.title(run_name + get_title(choice) + " " + plot_type + " plot")
                 if show:
                     plt.show()
     # 2D plot type
-    elif plot in plot_types_2d:
+    elif plot_type in plot_types_2d:
         for choice in diagnostic_list:
             if check_diagnostic(linear_diagnostics_dataset, choice):
-                linear_plot_2d(linear_diagnostics_dataset[choice], plot, linear_dimension)
-                plt.title(run_name + get_title(choice) + " " + plot + " plot (2D)")
+                linear_plot_2d(linear_diagnostics_dataset[choice], plot_type, linear_dimension)
+                plt.title(run_name + get_title(choice) + " " + plot_type + " plot (2D)")
                 if show:
                     plt.show()
 
