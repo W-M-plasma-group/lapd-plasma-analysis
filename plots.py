@@ -13,10 +13,12 @@ from diagnostics import value_safe, unit_safe
 matplotlib.use('QtAgg')
 
 
-def plot_line_diagnostic_by(diagnostics_datasets: list, plot_diagnostic, port_selector, attribute, steady_state_by_runs,
-                            tolerance=1/2, share_y=True):
+def plot_line_diagnostic_by(diagnostics_datasets: list, plot_diagnostic, port_selector, steady_state_by_runs,
+                            attribute=None, tolerance=1/2, share_y=True):
     # diagnostics_datasets is a list of different HDF5 datasets
 
+    if attribute is None:
+        attribute = [attr for attr in diagnostics_datasets[0].attrs if "Nominal" in attr]
     attributes = np.atleast_1d(attribute)
     if len(attributes) > 2:
         raise ValueError("Cannot categorize line plots by more than two attributes")
@@ -28,7 +30,7 @@ def plot_line_diagnostic_by(diagnostics_datasets: list, plot_diagnostic, port_se
         try:
             diagnostics_datasets_sorted.sort(key=lambda d: d.attrs[attr])
         except KeyError:
-            raise KeyError("Key error for key", repr(attr))
+            raise KeyError("Key error for key " + repr(attr))
     outer_values = [dataset.attrs[attributes[1]] for dataset in diagnostics_datasets_sorted]
     outer_quants = u.Quantity([value_safe(value) for value in outer_values], unit_safe(outer_values[0]))
     outer_unique, outer_indexes = np.unique(outer_quants, return_index=True) if len(attributes) == 2 else ([None], [0])
@@ -51,13 +53,13 @@ def plot_line_diagnostic_by(diagnostics_datasets: list, plot_diagnostic, port_se
             dataset = port_selector(datasets[inner_index])  # TODO allow looping through multiple datasets returned
             inner_val = dataset.attrs[attributes[0]]
 
-            linear_dimension = validate_dataset_dims(dataset.sizes)
+            linear_dimension = get_valid_linear_dimension(dataset.sizes)
             linear_da = dataset.squeeze()[plot_diagnostic]
 
             line_diagnostic = steady_state_only(linear_da,
                                                 steady_state_plateaus=steady_state_by_runs[0])  # TODO finish this!
             line_diagnostic_mean = line_diagnostic.mean('time', keep_attrs=True)
-            line_diagnostic_std = line_diagnostic.std('time', ddof=1)
+            line_diagnostic_std = line_diagnostic.std('time', ddof=1, keep_attrs=True)
 
             line_diagnostic_points = line_diagnostic_mean.where(
                 line_diagnostic_std < np.abs(line_diagnostic_mean).mean() * tolerance)
@@ -65,7 +67,9 @@ def plot_line_diagnostic_by(diagnostics_datasets: list, plot_diagnostic, port_se
 
             ax.plot(line_diagnostic.coords[linear_dimension], line_diagnostic_points,
                     color=color_map[inner_index], label=str(inner_val))
-            ax.tick_params(axis="y", left=True, labelleft=True)
+            ax.set_xlabel(line_diagnostic.coords[linear_dimension].attrs['units'])
+            ax.set_ylabel(line_diagnostic.attrs['units'])
+        ax.tick_params(axis="y", left=True, labelleft=True)
         ax.title.set_text((attribute[1] + ": " + str(outer_val) if len(attribute) == 2 else "")
                           + "\nColor: " + attribute[0])
         ax.legend()
@@ -81,7 +85,7 @@ def line_time_diagnostic_plot(diagnostics_dataset, diagnostic, plot_type, steady
     except KeyError:
         run_name = ""
 
-    linear_dimension = validate_dataset_dims(diagnostics_dataset.sizes)
+    linear_dimension = get_valid_linear_dimension(diagnostics_dataset.sizes)
     linear_diagnostics_dataset = diagnostics_dataset.squeeze()
 
     diagnostic_list = np.atleast_1d(diagnostic)
@@ -120,7 +124,7 @@ def line_time_diagnostic_plot(diagnostics_dataset, diagnostic, plot_type, steady
                     plt.show()
 
 
-def validate_dataset_dims(diagnostics_dataset_sizes):
+def get_valid_linear_dimension(diagnostics_dataset_sizes):
 
     if diagnostics_dataset_sizes['y'] == 1:
         linear_dimension = 'x'

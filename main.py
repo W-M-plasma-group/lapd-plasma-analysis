@@ -12,8 +12,10 @@ from netCDFaccess import *
 from interferometry import *
 from neutrals import *
 from experimental import *
+from preconfiguration import *
 
-hdf5_folder = "/Users/leomurphy/lapd-data/November_2022/"                 # end this with slash
+hdf5_folder = "/Users/leomurphy/lapd-data/April_2018/"
+# hdf5_folder = "/Users/leomurphy/lapd-data/November_2022/"                 # end this with slash
 langmuir_nc_folder = hdf5_folder + "lang_nc/"
 
 # User global parameters                                         # From MATLAB code
@@ -26,44 +28,9 @@ smoothing_margin = 20                                            # Optimal value
 save_diagnostics = True  # Set save_diagnostics to True to save calculated diagnostic data to NetCDF files
 interferometry_calibrate = False  # TODO make automatic
 
-# TODO for user: change these to match your run!
-# November 2022 configuration
-vsweep_board_channel = (1, 1)
-# """
-langmuir_probes = np.array([(1, 2, 1, 29, 2.20, 2 * u.mm ** 2),
-                            (1, 3, 4, 35, 2.20, 2 * u.mm ** 2)],
-                           dtype=[('board', int),
-                                  ('channel', int),
-                                  ('receptacle', int),
-                                  ('port', int),
-                                  ('resistance', float),
-                                  ('area', u.Quantity)])
-# """
-# March 2022 configuration
-"""
-vsweep_board_channel = (1, 1)  # (1, 3)
-langmuir_probes = np.array([(1, 2, 1, 27, 1.25, 1 * u.mm ** 2),
-                            (1, 3, 2, 43, 2.10, 1 * u.mm ** 2)],
-                           dtype=[('board', int), 
-                                  ('channel', int), 
-                                  ('receptacle', int), 
-                                  ('port', int),
-                                  ('resistance', float), 
-                                  ('area', u.Quantity)])
-# """
-# April 2018 configuration
-"""
-vsweep_board_channel = (1, 3)
-langmuir_probes = np.array([(1, 2, 1, 25, 11, 1 * u.mm ** 2)],
-                           dtype=[('board', int), 
-                                  ('channel', int), 
-                                  ('receptacle', int), 
-                                  ('port', int),
-                                  ('resistance', float), 
-                                  ('area', u.Quantity)])
 # """
 # QUESTION: can we calibrate both Langmuir probes using an interferometry ratio depending only on one of them?
-# Insert diagram of LAPD
+# TODO Insert diagram of LAPD
 
 
 def port_selector(ds):  # TODO allow multiple modified datasets to be returned
@@ -85,7 +52,7 @@ if __name__ == "__main__":
 
     # list possible diagnostics and their full names, e.g. "n_e" and "Electron density"
     diagnostic_name_dict = {key: get_title(key)
-                            for key in get_diagnostic_keys_units(langmuir_probes['area'][0], ion_type, bimaxwellian).keys()}
+                            for key in get_diagnostic_keys_units(bimaxwellian=bimaxwellian).keys()}
     diagnostic_name_list = list(diagnostic_name_dict.values())
 
     print("The following diagnostics are available to plot: ")
@@ -112,22 +79,15 @@ if __name__ == "__main__":
             chara_view_mode = (chara_view_mode == "y")
 
         datasets = []
-        show_receptacles = True  # TODO elaborate on this. This prints out a list of probes and their receptacles
         for hdf5_path in hdf5_chosen_list:  # TODO improve loading bar for many datasets
 
             print("\nOpening file", repr(hdf5_path), "...")
 
-            if show_receptacles:
-                print("List of Compumotor receptacles and their respective ports and probes "
-                      "(check this in main.py!):")
-                with lapd.File(hdf5_path) as f:
-                    for probe in f.controls['6K Compumotor'].configs:
-                        print(f"\t{f.controls['6K Compumotor'].configs[probe]['receptacle']}: "
-                              f"Port {f.controls['6K Compumotor'].configs[probe]['probe']['port']}, "
-                              f"{f.controls['6K Compumotor'].configs[probe]['probe']['probe name']}")
-                show_receptacles = False
+            exp_params_dict = get_exp_params(hdf5_path)  # list of experimental parameters
+            config_id = get_config_id(exp_params_dict['Exp name'])
+            vsweep_board_channel = get_vsweep_bc(config_id)
+            langmuir_probes = get_probe_config(hdf5_path, config_id)
 
-            exp_params_dict = get_exp_params(hdf5_path)  # list of machine parameters
             bias, currents, positions, sample_sec, ports = get_isweep_vsweep(
                 hdf5_path, vsweep_board_channel, langmuir_probes)  # get current and bias data from Langmuir probe
             characteristics, ramp_times = characterize_sweep_array(bias, currents, smoothing_margin, sample_sec)
@@ -204,11 +164,8 @@ if __name__ == "__main__":
     # """
     for plot_diagnostic in diagnostic_to_plot_list:
         for i in range(len(datasets)):  # dataset in datasets:
-            # try:
-                # steady_state_plateaus = detect_steady_state_ramps(dataset['n_e'], core_radius)
-            line_time_diagnostic_plot(port_selector(datasets[i]), plot_diagnostic, 'contour', steady_state_plateaus_runs[i])
-            # except Exception as e:
-            #     print(e)
+            line_time_diagnostic_plot(port_selector(datasets[i]), plot_diagnostic, 'contour',
+                                      steady_state_plateaus_runs[i])
     # """
 
     # PLOT radial profiles of diagnostic (steady state time average), in color corresponding to first attribute,
@@ -216,8 +173,7 @@ if __name__ == "__main__":
     # """
     for plot_diagnostic in diagnostic_to_plot_list:
         plot_line_diagnostic_by(datasets, plot_diagnostic, port_selector,
-                                attribute=["Nominal discharge",
-                                           "Nominal gas puff"], steady_state_by_runs=steady_state_plateaus_runs,
+                                steady_state_by_runs=steady_state_plateaus_runs,  # "attribute" list left blank (automatic)
                                 tolerance=1)  # TODO adjust tolerance as desired
         # TODO user select attribute(s) from menu
     # """

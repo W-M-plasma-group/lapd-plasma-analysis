@@ -95,9 +95,9 @@ def diagnose_char(characteristic, probe_area, ion_type, bimaxwellian):
     # TODO save error messages/optionally print to separate log file
     try:
         diagnostics = swept_probe_analysis(characteristic, probe_area, ion_type, bimaxwellian=bimaxwellian)
-    except ValueError as e:
+    except ValueError:
         return 1
-    except (TypeError, RuntimeError) as e:
+    except (TypeError, RuntimeError):
         return 2
     return diagnostics
 
@@ -112,7 +112,7 @@ def unpack_bimaxwellian(diagnostics):
                               ).pop('T_e')
 
 
-def get_diagnostic_keys_units(probe_area, ion_type, bimaxwellian=False):
+def get_diagnostic_keys_units(probe_area=1.*u.mm**2, ion_type="He-4+", bimaxwellian=False):
     # Perform diagnostic on some sample data to get all diagnostic names and units as dictionary of strings
 
     bias = np.arange(-20, 20, 2) * u.V
