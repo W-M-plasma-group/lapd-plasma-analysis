@@ -11,7 +11,8 @@ def get_isweep_vsweep(filename, vsweep_bc, langmuir_probes):
     ----------
     :param filename: File path of HDF5 file from LAPD
     :param vsweep_bc: Board and channel number of vsweep data in HDF5 file
-    :return: bias, current, x, y, dt: the relevant multidimensional sweep, position, and timestep
+    :param langmuir_probes: structure array of board, channel, receptacle, port, resistance, and area for each probe
+    :return: bias, currents, x, y, dt: the relevant multidimensional v_sweep, i_sweeps, position, and timestep
     """
 
     lapd_file = lapd.File(filename)
