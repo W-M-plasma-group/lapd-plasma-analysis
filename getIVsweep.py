@@ -17,7 +17,6 @@ def get_isweep_vsweep(filename, vsweep_bc, langmuir_probes):
 
     lapd_file = lapd.File(filename)
 
-    # isweep_bcs = np.atleast_2d(isweep_bcs)
     isweep_bcs = np.atleast_1d(langmuir_probes[['board', 'channel']])
 
     vsweep_data = lapd_file.read_data(*vsweep_bc, silent=True)
@@ -25,7 +24,7 @@ def get_isweep_vsweep(filename, vsweep_bc, langmuir_probes):
     vsweep_signal = vsweep_data['signal']
     isweep_signal = np.concatenate([isweep_data['signal'][np.newaxis, ...] for isweep_data in isweep_datas], axis=0)
     signal_length = vsweep_signal.shape[-1]
-    # Above: isweep_signal has one extra dimension "in front" than vsweep signal, to represent different *probes*
+    # Above: isweep_signal has one extra dimension "in front" compared to vsweep signal, to represent different *probes*
 
     motor_datas = [lapd_file.read_controls([("6K Compumotor", langmuir_probe['receptacle'])], silent=True)
                    for langmuir_probe in langmuir_probes]
@@ -37,9 +36,9 @@ def get_isweep_vsweep(filename, vsweep_bc, langmuir_probes):
     vsweep_signal = vsweep_signal.reshape(num_positions, shots_per_position, signal_length)
     isweep_signal = isweep_signal.reshape((-1, num_positions, shots_per_position, signal_length))
 
-    # average bias and current for all shots at same position
-    vsweep_signal = vsweep_signal.mean(axis=-2)
-    isweep_signal = isweep_signal.mean(axis=-2)
+    # average bias and current for all shots at same position; TODO: don't do this! Calc error on diagnostics at end
+    # vsweep_signal = vsweep_signal.mean(axis=-2)
+    # isweep_signal = isweep_signal.mean(axis=-2)
     # Note: I may take the standard deviation across shots to approximate error for sweep curves, as done in MATLAB code
 
     ports = np.array([motor_data.info['controls']['6K Compumotor']['probe']['port'] for motor_data in motor_datas])
@@ -50,8 +49,11 @@ def get_isweep_vsweep(filename, vsweep_bc, langmuir_probes):
     currents_dc_offset = np.mean(currents[..., -1000:], axis=-1, keepdims=True)
     currents -= currents_dc_offset
 
+    # bias dimensions:            position, shot, frame  (e.g.    (71, 15, 55296))
+    # currents dimensions:  port, position, shot, frame  (e.g. (1, 71, 15, 55296))
+
     # Determine up/down orientation of sweep by finding median current at a central shot; should be negative
-    invert = np.sign(np.median(currents[:, int(num_positions / 2), :]))
+    invert = np.sign(np.median(currents[:, int(num_positions / 2), :, :]))
     currents *= -invert
 
     dt = vsweep_data.dt
@@ -94,16 +96,14 @@ def to_real_sweep_units(vsweep, isweep, resistances):
     :param vsweep: array
     :param isweep: array
     :param resistances: array, resistance of each isweep probe
-    :param orientation: bool, determine whether to keep isweep or invert it
     :return: bias and current array in real units
     """
 
-    # The conversion factors from abstract units to real bias (V) and current values (A) are hard-coded in here.
+    # The conversion factors from abstract units to real bias (V) are hard-coded in here.
     # NOTE: 2018 current data is inverted, while 2022 data is not.
 
     # Conversion factors taken from MATLAB code: Current = isweep / 11 ohms; Voltage = vsweep * 100
     gain = 100.  # voltage gain                                         # TODO get from HDF5 metadata
-    # TODO get from HDF5 metadata?
 
     return vsweep * gain * u.V, isweep / resistances * u.A
 

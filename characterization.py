@@ -9,7 +9,7 @@ import sys
 from tqdm import tqdm, trange
 
 
-def characterize_sweep_array(raw_bias, raw_current, margin, sample_sec):
+def characterize_sweep_array(unsmooth_bias, unsmooth_current, margin, sample_sec):
     r"""
     Function that processes bias and current data into a DataArray of distinct Characteristics.
     Takes in bias and current arrays, smooths them, divides them into separate ramp sections, 
@@ -17,15 +17,15 @@ def characterize_sweep_array(raw_bias, raw_current, margin, sample_sec):
 
     Parameters
     ----------
-    :param raw_bias: array, units of voltage
-    :param raw_current: array, units of current
+    :param unsmooth_bias: array, units of voltage
+    :param unsmooth_current: array, units of current
     :param margin: int, positive
     :param sample_sec: float, units of time
     :return: 2D array of Characteristic objects by shot number and plateau number
     """
 
-    validate_sweep_units(raw_bias, raw_current)
-    bias, current = smooth_characteristic(raw_bias, raw_current, margin=margin)
+    validate_sweep_units(unsmooth_bias, unsmooth_current)
+    bias, current = smooth_characteristic(unsmooth_bias, unsmooth_current, margin=margin)
     ramp_bounds = isolate_plateaus(bias, margin=margin)
 
     ramp_times = ramp_bounds[:, 1] * sample_sec.to(u.ms)
@@ -87,7 +87,8 @@ def isolate_plateaus(bias, margin=0):
     """
 
     # Assume strictly that all plateaus start and end at the same time after the start of the shot as in any other shot
-    bias_avg = np.mean(bias, axis=0)  # mean across all positions, preserving time
+    axes_to_average = tuple(np.arange(bias.ndim)[:-1])
+    bias_avg = np.mean(bias, axis=axes_to_average)  # mean across all positions and shots, preserving time
 
     # Report on how dissimilar the vsweep biases are and if they can be averaged together safely
 
@@ -115,11 +116,11 @@ def validate_sweep_units(bias, current):
 
 
 def characteristic_array(bias, current, plateau_ranges):
-    # 2D: unique_position by plateau_num
+    # 3D: unique_position by shot by plateau_num
 
     currents = current  # "currents" has "probe" dimension in front; may have size 1
     num_pos = bias.shape[0]
-    # num_plats = plateau_ranges.shape[0]
+    num_shot = bias.shape[1]
 
     plateau_slices = np.array([slice(plateau[0], plateau[1]) for plateau in plateau_ranges])
 
@@ -127,8 +128,9 @@ def characteristic_array(bias, current, plateau_ranges):
     print(f"Creating characteristics ({currents.shape[0]} probes to analyze)...")
     warnings.simplefilter(action='ignore', category=FutureWarning)  # Suppress FutureWarnings to not break loading bar
     print("\t(plasmapy.langmuir.diagnostics pending deprecation FutureWarning suppressed)")
-    return np.concatenate([np.array([[Characteristic(bias[pos, plateau], current[pos, plateau])
-                                      for plateau in plateau_slices]
-                                     for pos in trange(num_pos, unit="position", file=sys.stdout)])[np.newaxis, ...]
+    return np.concatenate([np.array([[[Characteristic(bias[pos, shot, plateau_slice], current[pos, shot, plateau_slice])
+                                       for plateau_slice in plateau_slices]
+                                      for shot in range(num_shot)]
+                                     for pos in range(num_pos)])[np.newaxis, ...]
                            for current in currents])
-    # CAN USE NESTED TQDM INSTEAD OF OUTER TQDM?
+    # for pos in trange(num_pos, unit="position", file=sys.stdout)])[np.newaxis, ...]
