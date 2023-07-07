@@ -18,23 +18,25 @@ hdf5_folder = "/Users/leomurphy/lapd-data/April_2018/"
 # hdf5_folder = "/Users/leomurphy/lapd-data/November_2022/"                 # end this with slash
 langmuir_nc_folder = hdf5_folder + "lang_nc/"
 
-# User global parameters                                         # From MATLAB code
-core_radius = 26. * u.cm                                         # From MATLAB code
-ion_type = 'He-4+'
-bimaxwellian = False
-smoothing_margin = 20                                            # Optimal values in range 0-25
-
 # User file options
 save_diagnostics = True  # Set save_diagnostics to True to save calculated diagnostic data to NetCDF files
 interferometry_calibrate = False  # TODO make automatic
 
-# """
+# User global parameters                                         # From MATLAB code  # TODO move to preconfig?
+ion_type = 'He-4+'
+bimaxwellian = False
+
+smoothing_margin = 20                                            # Optimal values in range 0-25
+plot_tolerance = 0.25  # TODO user adjust plot_tolerance; np.nan = keep all data points; ~0.2-0.5 works well
+
 # QUESTION: can we calibrate both Langmuir probes using an interferometry ratio depending only on one of them?
+core_radius = 26. * u.cm                                         # From MATLAB code
 # TODO Insert diagram of LAPD
 
 
 def port_selector(ds):  # TODO allow multiple modified datasets to be returned
     # port_list = dataset.port  # use if switch to dataset.sel
+
     manual_attrs = ds.attrs  # TODO raise xarray issue about losing attrs even with xr.set_options(keep_attrs=True):
     ds_port_selected = ds.isel(port=0)  # - ds.isel(port=1)  # TODO user change for ex. delta-P-parallel
     return ds_port_selected.assign_attrs(manual_attrs)
@@ -129,15 +131,12 @@ if __name__ == "__main__":
             # characteristic = characteristic_arrays[p, l, r]
             # diagnostics_ds[key].loc[port, positions[l, 0], positions[l, 1], ramp_times[r]] = val
 
-            diagnostics_dataset = langmuir_diagnostics(characteristics, positions, ramp_times, ports, langmuir_probes['area'][0],
-                                                       ion_type, bimaxwellian=bimaxwellian)
-            # TODO change the above! Probes can have different areas!
-
-            # Detect beginning and end of steady state period
-            steady_state_plateaus = detect_steady_state_ramps(diagnostics_dataset['n_e'], core_radius)
+            diagnostics_dataset = langmuir_diagnostics(characteristics, positions, ramp_times, ports,
+                                                       langmuir_probes['area'], ion_type, bimaxwellian=bimaxwellian)
 
             # Perform interferometry calibration for electron density
             if interferometry_calibrate:
+                steady_state_plateaus = detect_steady_state_ramps(diagnostics_dataset['n_e'], core_radius)
                 calibrated_electron_density = interferometry_calibration(diagnostics_dataset['n_e'], hdf5_path,
                                                                          steady_state_plateaus, core_radius)
                 diagnostics_dataset = diagnostics_dataset.assign({"n_e_cal": calibrated_electron_density})
@@ -151,6 +150,8 @@ if __name__ == "__main__":
 
             # Assign experimental parameters to diagnostic data attributes
             diagnostics_dataset = diagnostics_dataset.assign_attrs(exp_params_dict)
+            diagnostics_dataset = diagnostics_dataset.assign_attrs({"Interferometry calibrated":
+                                                                    interferometry_calibrate})
 
             datasets.append(diagnostics_dataset)
 
@@ -158,24 +159,26 @@ if __name__ == "__main__":
             if save_diagnostics:
                 write_netcdf(diagnostics_dataset, save_diagnostic_path)
 
-    # Plot chosen diagnostics for each individual dataset
     steady_state_plateaus_runs = [detect_steady_state_ramps(dataset['n_e'], core_radius) for dataset in datasets]
-    print(f"Steady-state ramp range: {steady_state_plateaus_runs}")
+
     # """
+    # Plot chosen diagnostics for each individual dataset
     for plot_diagnostic in diagnostic_to_plot_list:
-        for i in range(len(datasets)):  # dataset in datasets:
-            line_time_diagnostic_plot(port_selector(datasets[i]), plot_diagnostic, 'contour',
-                                      steady_state_plateaus_runs[i])
+        for i in range(len(datasets)):
+            plot_line_diagnostic(port_selector(datasets[i]), plot_diagnostic, 'contour', steady_state_plateaus_runs[i],
+                                 tolerance=plot_tolerance)
     # """
 
-    # PLOT radial profiles of diagnostic (steady state time average), in color corresponding to first attribute,
-    #    and in plot position on multiplot corresponding to second attribute
+    """
+    Plot radial profiles of diagnostic (steady-state time average), with color corresponding to first attribute
+        and plot position on multiplot corresponding to second attribute
+    """
     # """
+
     for plot_diagnostic in diagnostic_to_plot_list:
-        plot_line_diagnostic_by(datasets, plot_diagnostic, port_selector,
-                                steady_state_by_runs=steady_state_plateaus_runs,  # "attribute" list left blank (automatic)
-                                tolerance=1)  # TODO adjust tolerance as desired
-        # TODO user select attribute(s) from menu
+        multiplot_line_diagnostic(datasets, plot_diagnostic, port_selector,
+                                  steady_state_plateaus_runs, tolerance=plot_tolerance)
+
     # """
 
 # Note: Not all MATLAB code has been transferred (e.g. neutrals, ExB)

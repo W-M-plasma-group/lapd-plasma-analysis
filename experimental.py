@@ -54,6 +54,7 @@ def get_magnetic_field(file):
 
 
 def get_nominal_discharge_2022(file):
+    # TODO convert to regex
     description = str(file.info['run description'])
 
     dis_ind = description.index("Idis")
@@ -64,6 +65,7 @@ def get_nominal_discharge_2022(file):
 
 
 def get_nominal_gas_puff_2022(file):
+    # TODO convert to regex
     description = str(file.info['run description']).lower()
 
     puff_ind = description.index("puffing")
@@ -83,14 +85,6 @@ def get_nominal_discharge_2018(hdf5_file):
         nominal_discharge = float(current_digit) * 1000
     else:
         nominal_discharge = float(re.search("[0-9]+", current_phrase).group(0))
-
-    """
-    dis_ind = description.index("kA")
-    start_ind = dis_ind - description[dis_ind:].index(next(filter(str.isnumeric, description[dis_ind::-1])))
-    end_ind = description[start_ind:].index(next(filter(lambda c: c in ("A", "k", " ", ","), description[start_ind:]))
-                                            ) + start_ind
-    return {"Nominal discharge": float(description[start_ind:end_ind]) * u.A}
-    """
 
     return {"Nominal discharge": np.round(nominal_discharge, 0) * u.A}
 
