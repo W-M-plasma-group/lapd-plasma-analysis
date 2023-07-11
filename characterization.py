@@ -3,11 +3,13 @@ import warnings
 import astropy.units as u
 import numpy as np
 from scipy.signal import find_peaks
+from scipy.ndimage import uniform_filter1d
 from plasmapy.diagnostics.langmuir import Characteristic
 
 import sys
 from tqdm import tqdm, trange
 
+from helper import *
 
 def characterize_sweep_array(unsmooth_bias, unsmooth_current, margin, sample_sec):
     r"""
@@ -78,6 +80,8 @@ def smooth_array(array, margin):
     array_sum = np.cumsum(np.insert(array, 0, 0, axis=-1), axis=-1, dtype=np.float64)
     smoothed_array = (array_sum[..., margin:] - array_sum[..., :-margin]) / margin
 
+    # TODO consider following!
+    """smoothed_arrays.append(uniform_filter1d(array, size=margin, mode='nearest', axis=-1) * unit)"""
     return smoothed_array.astype(float)
 
 

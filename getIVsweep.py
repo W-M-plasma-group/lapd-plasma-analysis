@@ -39,7 +39,8 @@ def get_isweep_vsweep(filename, vsweep_bc, langmuir_probes):  # TODO get voltage
     ports = np.array([motor_data.info['controls']['6K Compumotor']['probe']['port'] for motor_data in motor_datas])
     resistances_shape = [len(ports)] + [1 for _ in range(len(isweep_signal.shape) - 1)]
     resistances = np.reshape([langmuir_probes['resistance'][langmuir_probes['port'] == port] for port in ports], resistances_shape)
-    
+
+    # TODO remove unnecessary to_real_sweep_units
     """# Convert to real units (not abstract) 
     bias = vsweep_signal * voltage_gain * u.V
     currents = isweep_signal / resistances * u.A"""

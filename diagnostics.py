@@ -10,6 +10,7 @@ import warnings
 from tqdm import tqdm
 from bapsflib.lapd.tools import portnum_to_z
 
+from helper import *
 
 def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, ports, probe_area, ion_type, bimaxwellian=False):
     r"""
@@ -17,7 +18,7 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, ports, pr
 
     Parameters
     ----------
-    :param characteristic_arrays: 3D NumPy array of Characteristics (dims: position #, shot, plateau)
+    :param characteristic_arrays: list of 3D NumPy arrays of Characteristics (dims: position #, shot, plateau)
     :param positions: list of coordinates for position of each shot
     :param ramp_times: list of time-based Quantities corresponding to time of each shot (peak vsweep)
     :param ports: list of port numbers corresponding to each probe
@@ -77,7 +78,7 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, ports, pr
                         for key in diagnostics.keys():
                             # Crop diagnostics with "T_e" in name because otherwise skew averages, pressure data
                             val = value_safe(diagnostics[key]) if "T_e" not in key \
-                                else crop_diagnostic(diagnostics[key], 0, 10)
+                                else crop_value(diagnostics[key], 0, 10)
                             diagnostics_ds[key].loc[port, positions[l, 0], positions[l, 1], s, ramp_times[r]] = val
 
     warnings.simplefilter(action='default')  # Restore warnings to default handling
@@ -123,7 +124,7 @@ def unpack_bimaxwellian(diagnostics):
 def get_diagnostic_keys_units(probe_area, ion_type, bimaxwellian=False):
     # Perform diagnostic on some sample data to get all diagnostic names and units as dictionary of strings
 
-    bias = np.arange(-20, 20, 2) * u.V
+    bias = np.arange(-20, 20, 1) * u.V
     current = ((bias.value / 100 + 0.2) ** 2 - 0.01) * u.A
     chara = Characteristic(bias, current)
     diagnostics = swept_probe_analysis(chara, probe_area, ion_type, bimaxwellian)
@@ -148,7 +149,7 @@ def debug_char(characteristic, error_code, *pos):
         plt.show()
 
 
-def crop_diagnostic(diagnostic, minimum, maximum):  # discard diagnostic values (e.g. T_e) outside specified range
+def crop_value(diagnostic, minimum, maximum):  # discard diagnostic values (e.g. T_e) outside specified range
 
     value = value_safe(diagnostic)
     return value if minimum <= value <= maximum else np.nan

@@ -8,7 +8,9 @@ import xarray as xr
 
 import astropy.units as u
 from astropy import visualization
-from diagnostics import value_safe, unit_safe
+
+from helper import *
+
 # matplotlib.use('TkAgg')
 matplotlib.use('QtAgg')
 
@@ -61,6 +63,7 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
                                                             ).mean('time', keep_attrs=True)
             linear_da_mean = linear_da_steady_state_mean.mean('shot', keep_attrs=True)
             linear_da_std = linear_da_steady_state_mean.std('shot', ddof=1, keep_attrs=True)
+            # TODO but incorporate variation between means along the *time* axis too!
 
             # Filter out certain points due to inconsistent data (likely random noise that skews average higher)
             if np.isfinite(tolerance):
@@ -152,12 +155,11 @@ def linear_plot_1d(diagnostic_array_1d, linear_dimension):
 
 
 def linear_plot_2d(diagnostic_array, plot_type, linear_dimension, trim_colormap=True):
-    # q1, q3, reasonable_max = np.nanpercentile(diagnostic_array, [25, 75, 98])
-    q1, q3 = np.nanpercentile(diagnostic_array, [25, 75])
-    # trim_max = min(reasonable_max, q3 + 1.5 * (q3 - q1))
+    q1, q3, reasonable_max = np.nanpercentile(diagnostic_array, [25, 75, 98])
+    trim_max = min(reasonable_max, q3 + 1.5 * (q3 - q1))
     plot_params = {'x': 'time', 'y': linear_dimension}
     if trim_colormap:
-        plot_params = {**plot_params, 'vmax': q3 + 1.5 * (q3 - q1)}  # trim_max
+        plot_params = {**plot_params, 'vmax': trim_max}
     if plot_type == "contour":
         diagnostic_array.plot.contourf(**plot_params, robust=True)
     elif plot_type == "surface":
