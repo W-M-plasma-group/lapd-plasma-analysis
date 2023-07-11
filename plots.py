@@ -7,8 +7,10 @@ import numpy as np
 
 import astropy.units as u
 from astropy import visualization
-from diagnostics import value_safe, unit_safe
-matplotlib.use('TkAgg')
+
+from helper import *
+
+# matplotlib.use('TkAgg')
 
 
 def plot_line_diagnostic_by(diagnostics_datasets: list, plot_diagnostic, port_selector, attribute, steady_state_by_runs,

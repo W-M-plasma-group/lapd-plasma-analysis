@@ -32,14 +32,13 @@ interferometry_calibrate = False  # TODO make automatic
 # November 2022 configuration
 vsweep_board_channel = (1, 1)
 # """
-langmuir_probes = np.array([(1, 2, 29, 2.20, 2. * u.mm ** 2),   # receptacle 1
-                            (1, 3, 35, 2.20, 2. * u.mm ** 2)],  # receptacle 4
-                           dtype=[('board', int),
-                                  ('channel', int),
-                                  # ('receptacle', int),
-                                  ('port', int),
-                                  ('resistance', float),
-                                  ('area', u.Quantity)])
+langmuir_probes = np.array([(1, 2, 29, 2.20, 2. * u.mm ** 2),  # receptacle 1
+                            # (1, 3, 35, 2.20, 2. * u.mm ** 2)   # receptacle 4
+                            ], dtype=[('board', int),
+                                      ('channel', int),
+                                      ('port', int),
+                                      ('resistance', float),
+                                      ('area', u.Quantity)])
 # """
 # March 2022 configuration
 """
@@ -48,7 +47,6 @@ langmuir_probes = np.array([(1, 2, 27, 1.25, 1. * u.mm ** 2),   # receptacle 1
                             (1, 3, 43, 2.10, 1. * u.mm ** 2)],  # receptacle 2
                            dtype=[('board', int), 
                                   ('channel', int), 
-                                  # ('receptacle', int), 
                                   ('port', int),
                                   ('resistance', float), 
                                   ('area', u.Quantity)])
@@ -59,7 +57,6 @@ vsweep_board_channel = (1, 3)
 langmuir_probes = np.array([(1, 2, 25, 11., 1. * u.mm ** 2)],  # receptacle 1
                            dtype=[('board', int), 
                                   ('channel', int), 
-                                  # ('receptacle', int), 
                                   ('port', int),
                                   ('resistance', float), 
                                   ('area', u.Quantity)])
@@ -106,11 +103,13 @@ if __name__ == "__main__":
         hdf5_chosen_list = [hdf5_paths[choice] for choice in hdf5_chosen_ints]
 
         datasets = []
-        show_receptacles = True  # TODO elaborate on this. This prints out a list of probes and their receptacles
+        # show_receptacles = True  # TODO elaborate on this. This prints out a list of probes and their receptacles
         for hdf5_path in hdf5_chosen_list:  # TODO improve loading bar for many datasets
+            # TODO ALLOW INNER PEEKING into what going on in diagnostics
 
             print("\nOpening file", repr(hdf5_path), "...")
 
+            """
             if show_receptacles:
                 print("List of detected Compumotor receptacles and their respective ports and probes "
                       "(check this in main.py):")
@@ -120,15 +119,37 @@ if __name__ == "__main__":
                               f"Port {f.controls['6K Compumotor'].configs[probe]['probe']['port']}, "
                               f"{f.controls['6K Compumotor'].configs[probe]['probe']['probe name']}")
                 show_receptacles = False
+            """
 
             exp_params_dict = get_exp_params(hdf5_path)
+
+            print("before ivsweep")
             bias, currents, positions, sample_sec, ports = get_isweep_vsweep(
                 hdf5_path, vsweep_board_channel, langmuir_probes)
+            print("got ivsweep")
 
-            characteristics, ramp_times = characterize_sweep_array(bias, currents, smoothing_margin, sample_sec)
-            diagnostics_dataset = langmuir_diagnostics(characteristics, positions, ramp_times, ports, langmuir_probes['area'][0],
+            # PLOT STACKED CURRENTS
+            """Sanity-check sample of sweep data"""
+            # Recall dimensions of currents are p; l, s, r
+            # """
+            alpha = np.prod(bias.shape[:2]) ** -0.5
+            num_frames = currents.shape[-1]
+            color_map_loc = plt.cm.get_cmap("plasma")(np.linspace(0, 1, currents.shape[1]))
+            for current_probe in currents[..., int(0.46 * num_frames):int(0.54 * num_frames):100]:
+                for l in range(len(current_probe)):
+                    for current_shot in current_probe[l]:
+                        plt.plot(current_shot, color=color_map_loc[l], alpha=alpha)
+                plt.show()
+            # """
+            # END PLOT STACKED CURRENTS
+
+            # TODO loc_bounds is a debug option; otherwise, set to None
+            loc_bounds = (30, 34)
+            if loc_bounds is not None:
+                positions = positions[min(loc_bounds):max(loc_bounds)]
+            characteristics, ramp_times = characterize_sweep_array(bias, currents, smoothing_margin, sample_sec, loc_bounds)
+            diagnostics_dataset = langmuir_diagnostics(characteristics, positions, ramp_times, ports, langmuir_probes['area'],
                                                        ion_type, bimaxwellian=bimaxwellian)
-            # TODO change the above! Probes can have different areas!
 
             # Detect beginning and end of steady state period
             steady_state_plateaus = detect_steady_state_ramps(diagnostics_dataset['n_e'], core_radius)
@@ -157,13 +178,13 @@ if __name__ == "__main__":
 
     # Plot chosen diagnostics for each individual dataset
     steady_state_plateaus_runs = [detect_steady_state_ramps(dataset['n_e'], core_radius) for dataset in datasets]
-    print(steady_state_plateaus_runs)
-    """
+    print("Steady state period for each run:", steady_state_plateaus_runs)
+    # """
     for plot_diagnostic in diagnostic_chosen_list:
         for i in range(len(datasets)):  # dataset in datasets:
             # try:
                 # steady_state_plateaus = detect_steady_state_ramps(dataset['n_e'], core_radius)
-            line_time_diagnostic_plot(port_selector(dataset), plot_diagnostic, 'contour', steady_state_plateaus_runs[i])
+            line_time_diagnostic_plot(port_selector(datasets[i]), plot_diagnostic, 'contour', steady_state_plateaus_runs[i])
             # except Exception as e:
             #     print(e)
     # """
@@ -175,7 +196,7 @@ if __name__ == "__main__":
         plot_line_diagnostic_by(datasets, plot_diagnostic, port_selector,
                                 attribute=["Nominal discharge",
                                            "Nominal gas puff"], steady_state_by_runs=steady_state_plateaus_runs,
-                                tolerance=1)  # TODO adjust tolerance as desired
+                                tolerance=1)  # TODO redefine tolerance to take advantage of multiple shots per plateau
         # TODO user select attribute(s) from menu
     # """
 

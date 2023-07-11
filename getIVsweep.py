@@ -11,14 +11,17 @@ def get_isweep_vsweep(filename, vsweep_bc, langmuir_probes, voltage_gain=100):  
     ----------
     :param filename: File path of HDF5 file from LAPD
     :param vsweep_bc: Board and channel number of vsweep data in HDF5 file
+    :param langmuir_probes: structure numpy array of probe data; fields: "board", "channel", "port", "resistance", "area"
+    :param voltage_gain:
     :return: bias, current, x, y, dt: the relevant multidimensional sweep, position, and timestep
+
     """
 
     lapd_file = lapd.File(filename)
 
-    # isweep_bcs = np.atleast_2d(isweep_bcs)
     isweep_bcs = np.atleast_1d(langmuir_probes[['board', 'channel']])
 
+    print("Reading sweep data...")
     vsweep_data = lapd_file.read_data(*vsweep_bc, silent=True)
     isweep_datas = [lapd_file.read_data(*isweep_bc, silent=True) for isweep_bc in isweep_bcs]
     vsweep_signal = vsweep_data['signal']
@@ -27,6 +30,7 @@ def get_isweep_vsweep(filename, vsweep_bc, langmuir_probes, voltage_gain=100):  
     # Above: isweep_signal has one extra dimension "in front" than vsweep signal, to represent different *probes*
 
     # Detect digitizer receptacle for each probe (based on physical port window on LAPD)
+    print("Reading probe position data...")
     probe_configs = lapd_file.controls['6K Compumotor'].configs
     port_receptacles = {probe_configs[probe]['probe']['port']:
                         probe_configs[probe]['receptacle']
@@ -35,6 +39,7 @@ def get_isweep_vsweep(filename, vsweep_bc, langmuir_probes, voltage_gain=100):  
                    for port in langmuir_probes['port']]
 
     # TODO allow isweep motor datas to be different or check; for now, assume identical, and use only first motor data
+    print("Classifying shots by position...")
     # for isweep_motor_data in motor_datas:
     positions, num_positions, shots_per_position = get_shot_positions(motor_datas[0])
     lapd_file.close()
@@ -55,6 +60,7 @@ def get_isweep_vsweep(filename, vsweep_bc, langmuir_probes, voltage_gain=100):  
     bias = vsweep_signal * voltage_gain * u.V
     currents = isweep_signal / resistances * u.A
 
+    # Subtract out DC probe current offset (sample at end of shot, when should be no plasma left so current should be 0)
     currents_dc_offset = np.mean(currents[..., -1000:], axis=-1, keepdims=True)
     currents -= currents_dc_offset
 

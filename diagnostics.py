@@ -10,11 +10,12 @@ import warnings
 from tqdm import tqdm
 from bapsflib.lapd.tools import portnum_to_z
 
+from helper import *
 
 standard_deviation_suffix = "(st. dev.)"
 
 
-def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, ports, probe_area, ion_type, bimaxwellian=False):
+def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, ports, probe_areas, ion_type, bimaxwellian=False):
     r"""
     Performs plasma diagnostics on a DataArray of Characteristic objects and returns the diagnostics as a Dataset.
 
@@ -24,22 +25,23 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, ports, pr
     :param ramp_times:
     :param positions:
     :param characteristic_arrays: 3D NumPy array of Characteristics
-    :param probe_area: units of area
+    :param probe_areas: 1D Quantity array, units of area
     :param ion_type: string corresponding to a Particle
     :param bimaxwellian: boolean
     :return: Dataset object containing diagnostic values at each position
     """
 
-    keys_units = get_diagnostic_keys_units(probe_area, ion_type, bimaxwellian=bimaxwellian)
+    keys_units = get_diagnostic_keys_units(probe_areas[0], ion_type, bimaxwellian=bimaxwellian)
 
     x = np.unique(positions[:, 0])
     y = np.unique(positions[:, 1])
-    num_plateaus = characteristic_arrays.shape[-1]
     num_ports = characteristic_arrays.shape[0]
-    num_shots = characteristic_arrays.shape[1]
+    num_shots = characteristic_arrays.shape[2]
+    num_plateaus = characteristic_arrays.shape[-1]
+
     ports_z = np.array([portnum_to_z(port).to(u.cm).value for port in ports])
 
-    # num_x * num_y * num_plateaus template numpy_array
+    # num_ports * num_x * num_y * num_shots * num_plateaus template numpy_array
     templates = {key: np.full(shape=(num_ports, len(x), len(y), num_shots, num_plateaus),
                               fill_value=np.nan, dtype=float)
                  for key in keys_units.keys()}
@@ -48,9 +50,9 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, ports, pr
                                                    coords=(('port', ports),
                                                            ('x', x, {"units": str(u.cm)}),
                                                            ('y', y, {"units": str(u.cm)}),
-                                                           ('shot', np.range(num_shots), {"units": "shot"}),
+                                                           ('shot', list(np.arange(num_shots)), {"units": "shot"}),
                                                            ('time', ramp_times.to(u.ms).value, {"units": str(u.ms)}))
-                                                   ).assign_coords({'plateau': ('time', np.arange(num_plateaus) + 1),
+                                                   ).assign_coords({'plateau': ('time', list(np.arange(num_plateaus) + 1)),
                                                                     'z': ('port', ports_z, {"units": str(u.cm)})}
                                                                    ).assign_attrs({"units": keys_units[key]})
                                  for key in keys_units.keys()})
@@ -61,24 +63,38 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, ports, pr
 
     warnings.simplefilter(action='ignore')  # Suppress warnings to not break progress bar
     for p in range(characteristic_arrays.shape[0]):  # probe
-        port = ports[p]
+        probe_area = probe_areas[0]
         with tqdm(total=num_positions, unit="characteristic", file=sys.stdout) as pbar:
             for l in range(characteristic_arrays.shape[1]):  # location  # noqa
                 for s in range(characteristic_arrays.shape[2]):  # shot
                     for r in range(characteristic_arrays.shape[3]):  # ramp
                         characteristic = characteristic_arrays[p, l, s, r]
-                        diagnostics = diagnose_char(characteristic, probe_area, ion_type, bimaxwellian=bimaxwellian)
+                        # TODO LEO DEBUG ZONE
+                        status, diagnostics = diagnose_char(characteristic, probe_area, ion_type, bimaxwellian=bimaxwellian)
                         pbar.update(1)
-                        if diagnostics in (1, 2):  # otherwise diagnostics successful
-                            # debug_char(characteristic, diagnostics, p, l, s, r)  # DEBUG
+                        # if diagnostics in (1, 2):  # otherwise diagnostics successful
+                        #     debug_char(characteristic, diagnostics, p, l, s, r)  # DEBUG
+                        #     continue
+                        # TODO LEO DEBUG ZONE
+                        if 5 < r < 14 and 0.3 < l / characteristic_arrays.shape[1] < 0.7:
+                            if status == 0:  # diagnostics successfulin (1, 2):  # otherwise diagnostics successful
+                                characteristic.plot()
+                                plt.plot(diagnostics['V_F'], 0, 'g|')
+                                plt.plot(diagnostics['V_P'], 0, 'r|')
+                                plt.title(f"T_e: {diagnostics['T_e']:.2f}, n_e: {diagnostics['n_e']:.2e}")
+                                plt.show()
+                            else:
+                                print(f"Error {status}. loc = {l}, shot = {s}, ramp = {r}")
+                                debug_char(characteristic, status, diagnostics, p, l, s, r)  # DEBUG
+                        if status != 0:
                             continue
+
                         if bimaxwellian:
                             diagnostics = unpack_bimaxwellian(diagnostics)
                         for key in diagnostics.keys():
                             # Crop diagnostics with "T_e" in name because otherwise skew averages, pressure data
-                            val = value_safe(diagnostics[key]) if "T_e" not in key else crop_diagnostic(diagnostics[key], 0, 10)
-                            diagnostics_ds[key].loc[port, positions[l, 0], positions[l, 1], s, ramp_times[r]] = val
-                        # pbar.update(1)
+                            val = value_safe(diagnostics[key]) if "T_e" not in key else crop_value(diagnostics[key], 0, 10)
+                            diagnostics_ds[key].loc[ports[p], positions[l, 0], positions[l, 1], s, ramp_times[r]] = val
 
     warnings.simplefilter(action='default')  # Restore warnings to default handling
 
@@ -102,7 +118,7 @@ def detect_steady_state_ramps(density: xr.DataArray, core_radius):
     threshold = 0.9 * core_density_time.max()
     start_index = (core_density_time > threshold).argmax().item() + 1
     end_index = core_density_time.sizes['time'] - np.nanargmax(
-            core_density_time.reindex(time=core_density_time.time[::-1]) > threshold).item()
+        core_density_time.reindex(time=core_density_time.time[::-1]) > threshold).item()
     return start_index, end_index
 
 
@@ -111,10 +127,10 @@ def diagnose_char(characteristic, probe_area, ion_type, bimaxwellian):
     try:
         diagnostics = swept_probe_analysis(characteristic, probe_area, ion_type, bimaxwellian=bimaxwellian)
     except ValueError as e:
-        return 1
+        return 1, e
     except (TypeError, RuntimeError) as e:
-        return 2
-    return diagnostics
+        return 2, e
+    return 0, diagnostics
 
 
 def unpack_bimaxwellian(diagnostics):
@@ -130,7 +146,7 @@ def unpack_bimaxwellian(diagnostics):
 def get_diagnostic_keys_units(probe_area, ion_type, bimaxwellian=False):
     # Perform diagnostic on some sample data to get all diagnostic names and units as dictionary of strings
 
-    bias = np.arange(-20, 20, 2) * u.V
+    bias = np.arange(-20, 20, .2) * u.V
     current = ((bias.value / 100 + 0.2) ** 2 - 0.01) * u.A
     chara = Characteristic(bias, current)
     diagnostics = swept_probe_analysis(chara, probe_area, ion_type, bimaxwellian)
@@ -145,38 +161,19 @@ def get_diagnostic_keys_units(probe_area, ion_type, bimaxwellian=False):
     return keys_units
 
 
-def debug_char(characteristic, error_code, *pos):
+def debug_char(characteristic, status, error_message, *pos):
     # A debug function to plot plateaus that cause errors
     # tqdm.write(str(max(characteristic.current)))
     # tqdm.write(f"Pos: {pos}")
-    if 5 < pos[-1] < 13 and 0.3 < pos[-2] / 71 < 0.7:  # max(characteristic.current) > 20 * u.mA
-        pass
-        # tqdm.write("Plateau at position " + str(pos) + " is unusable")
-        characteristic.plot()
-        plt.title(f"Plateau at position {pos} is unusable" if error_code == 1
-                  else f"Unknown error at position {pos}")
-        plt.show()
+    # if 5 < pos[-1] < 13 and 0.3 < pos[-2] / 71 < 0.7:  # max(characteristic.current) > 20 * u.mA
+    pass
+    # tqdm.write("Plateau at position " + str(pos) + " is unusable")
+    characteristic.plot()
+    plt.title(f"Error {status}: {error_message} \nat position {pos}")
+    plt.show()
 
 
-def crop_diagnostic(diagnostic, minimum, maximum):  # discard diagnostic values (e.g. T_e) outside specified range
+def crop_value(diagnostic, minimum, maximum):  # discard diagnostic values (e.g. T_e) outside specified range
 
     value = value_safe(diagnostic)
     return value if minimum <= value <= maximum else np.nan
-
-
-def value_safe(quantity_or_scalar):  # Get value of quantity or scalar, depending on type
-
-    try:
-        val = quantity_or_scalar.value  # input is a quantity with dimension and value
-    except AttributeError:
-        val = quantity_or_scalar  # input is a dimensionless scalar with no value
-    return val
-
-
-def unit_safe(quantity_or_scalar):  # Get unit of quantity or scalar, if possible
-
-    try:
-        unit = quantity_or_scalar.unit
-    except AttributeError:
-        unit = None  # The input data is dimensionless
-    return unit
