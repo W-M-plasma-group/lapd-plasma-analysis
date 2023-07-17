@@ -17,60 +17,66 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, ports, pr
 
     Parameters
     ----------
-    :param ports:
-    :param ramp_times:
-    :param positions:
-    :param characteristic_arrays: 3D NumPy array of Characteristics
-    :param probe_area: units of area
+    :param characteristic_arrays: 3D NumPy array of Characteristics (dims: position #, shot, plateau)
+    :param positions: list of coordinates for position of each shot
+    :param ramp_times: list of time-based Quantities corresponding to time of each shot (peak vsweep)
+    :param ports: list of port numbers corresponding to each probe
+    :param probe_area: area Quantity or list of area Quantities
     :param ion_type: string corresponding to a Particle
     :param bimaxwellian: boolean
     :return: Dataset object containing diagnostic values at each position
     """
 
-    keys_units = get_diagnostic_keys_units(probe_area, ion_type, bimaxwellian=bimaxwellian)
+    probe_areas = np.atleast_1d(probe_area)
+    keys_units = get_diagnostic_keys_units(probe_areas[0], ion_type, bimaxwellian=bimaxwellian)
 
     x = np.unique(positions[:, 0])
     y = np.unique(positions[:, 1])
     num_plateaus = characteristic_arrays.shape[-1]
+    num_shots = characteristic_arrays.shape[2]
     num_ports = characteristic_arrays.shape[0]
     port_z = np.array([portnum_to_z(port).to(u.cm).value for port in ports])
 
-    # num_x * num_y * num_plateaus template numpy_array
-    templates = {key: np.full(shape=(num_ports, len(x), len(y), num_plateaus), fill_value=np.nan, dtype=float)
+    # num_x * num_y * num_shots * num_plateaus template numpy_array
+    templates = {key: np.full(shape=(num_ports, len(x), len(y), num_shots, num_plateaus),
+                              fill_value=np.nan, dtype=float)
                  for key in keys_units.keys()}
     diagnostics_ds = xr.Dataset({key: xr.DataArray(data=templates[key],
-                                                   dims=['port', 'x', 'y', 'time'],
+                                                   dims=['port', 'x', 'y', 'shot', 'time'],
                                                    coords=(('port', ports),
                                                            ('x', x, {"units": str(u.cm)}),
                                                            ('y', y, {"units": str(u.cm)}),
+                                                           ('shot', np.arange(num_shots)),
                                                            ('time', ramp_times.to(u.ms).value, {"units": str(u.ms)}))
                                                    ).assign_coords({'plateau': ('time', np.arange(num_plateaus) + 1),
                                                                     'z': ('port', port_z, {"units": str(u.cm)})}
                                                                    ).assign_attrs({"units": keys_units[key]})
                                  for key in keys_units.keys()})
 
-    num_positions = diagnostics_ds.sizes['x'] * diagnostics_ds.sizes['y'] * diagnostics_ds.sizes['time']
-    print(f"Calculating langmuir diagnostics ({len(ports)} probes to analyze) ...")
+    num_positions = (diagnostics_ds.sizes['x'] * diagnostics_ds.sizes['y']
+                     * diagnostics_ds.sizes['shot'] * diagnostics_ds.sizes['time'])
+    print(f"Calculating langmuir diagnostics ({len(ports)} probe(s) to analyze) ...")
 
     warnings.simplefilter(action='ignore')  # Suppress warnings to not break progress bar
     for p in range(characteristic_arrays.shape[0]):
         port = ports[p]
         with tqdm(total=num_positions, unit="characteristic", file=sys.stdout) as pbar:
             for l in range(characteristic_arrays.shape[1]):  # noqa
-                for r in range(characteristic_arrays.shape[2]):
-                    characteristic = characteristic_arrays[p, l, r]
-                    diagnostics = diagnose_char(characteristic, probe_area, ion_type, bimaxwellian=bimaxwellian)
-                    pbar.update(1)
-                    if diagnostics in (1, 2):  # otherwise diagnostics successful
-                        # debug_char(characteristic, diagnostics, p, l, r)  # DEBUG
-                        continue
-                    if bimaxwellian:
-                        diagnostics = unpack_bimaxwellian(diagnostics)
-                    for key in diagnostics.keys():
-                        # Crop diagnostics with "T_e" in name because otherwise skew averages, pressure data
-                        val = value_safe(diagnostics[key]) if "T_e" not in key else crop_diagnostic(diagnostics[key], 0, 10)
-                        diagnostics_ds[key].loc[port, positions[l, 0], positions[l, 1], ramp_times[r]] = val
-                    # pbar.update(1)
+                for s in range(characteristic_arrays.shape[2]):
+                    for r in range(characteristic_arrays.shape[3]):
+                        characteristic = characteristic_arrays[p, l, s, r]
+                        diagnostics = diagnose_char(characteristic, probe_areas[p], ion_type, bimaxwellian=bimaxwellian)
+                        pbar.update(1)
+                        if diagnostics in (1, 2):  # problem with diagnostics; otherwise diagnostics successful
+                            # debug_char(characteristic, diagnostics, p, l, r)  # DEBUG
+                            continue
+                        if bimaxwellian:
+                            diagnostics = unpack_bimaxwellian(diagnostics)
+                        for key in diagnostics.keys():
+                            # Crop diagnostics with "T_e" in name because otherwise skew averages, pressure data
+                            val = value_safe(diagnostics[key]) if "T_e" not in key \
+                                else crop_diagnostic(diagnostics[key], 0, 10)
+                            diagnostics_ds[key].loc[port, positions[l, 0], positions[l, 1], s, ramp_times[r]] = val
 
     warnings.simplefilter(action='default')  # Restore warnings to default handling
 

@@ -6,49 +6,42 @@ import xarray as xr
 # TODO rename file-acccess.py or similar
 
 
-# Return a dataset opened from a NetCDF file, or None if no file was found
-"""
-def read_netcdf(filename, netcdf_subdirectory):
-    if check_netcdf(filename):
-        return open_netcdf(filename)
-    else:
-        netcdf_files = search_folder(netcdf_subdirectory, "nc")
-        print("The file at the specified location", repr(filename), "does not exist.")
-        file_choice = choose_list(netcdf_files, kind="netCDF file", location="current working directory", add_new=True)
-        if file_choice == 0:
-            return None
-        dataset = xr.open_dataset(netcdf_files[file_choice - 1])
-    return dataset
-"""
-
-
-def choose_list(choices, kind, location, add_new):
-    print("The following " + kind + "s were found in the " + location + ":")
-    print(*["  " + str(i + 1) + ":\t " + str(choices[i]) for i in range(len(choices))], sep="\n")
-    prompt = "Type a number to select the corresponding " + kind
-    if add_new:
-        prompt += ", \n\tor 0 to create a new " + kind
-    prompt += ": "
-    return int(input(prompt))
-
-
 def choose_multiple_list(choices, name, null_action=None):
 
-    if len(choices) > 26:
-        warnings.warn("More than 26 " + name + "s found. Only the first 26 are displayed.")
-    print(*["  " + chr(97 + i) + ": " + choices[i] for i in range(len(choices[:26]))], sep="\n")
+    if len(choices) > 52:
+        warnings.warn("More than 52 " + name + "s found. Only the first 52 are displayed.")
+    print(*["  " + num_to_chr(i) + ": " + choices[i] for i in range(len(choices[:52]))], sep="\n")
     prompt = "Input a string of letters to select the corresponding " + name + "s"
     if null_action is not None:
         prompt += ", \n\tor the empty string to " + null_action
     prompt += ": "
-    selection_str = input(prompt).lower()
+    selection_str = input(prompt)
 
     if selection_str == "" and null_action is not None:
         return []
     if not selection_str.isalpha():
         raise ValueError("Selection " + repr(selection_str) + " is not only letters")
 
-    return [ord(letter) - 97 for letter in selection_str if 0 <= ord(letter) - 97 < len(choices)]
+    return [chr_to_num(letter) for letter in selection_str]
+
+
+def chr_to_num(car):
+    code = ord(car)
+    if 97 <= code <= 122:
+        return code - 97
+    elif 65 <= code <= 90:
+        return code - 65 + 26
+    else:
+        raise ValueError("Cannot convert char " + repr(car) + " to number")
+
+
+def num_to_chr(num):
+    if 0 <= num <= 25:
+        return chr(num + 97)
+    elif 26 <= num <= 52:
+        return chr(num - 26 + 65)
+    else:
+        raise ValueError("Cannot convert number " + str(num) + " to char")
 
 
 # Ensure that the file path contains a Dataset
@@ -65,13 +58,13 @@ def open_netcdf(filename):
 
 
 def write_netcdf(dataset, path):
-    # print("Saving diagnostic dataset...")
     save_mode = 'a' if check_netcdf(path) else 'w'
     dataset.to_netcdf(path=path, mode=save_mode)
 
 
-# Search the given directory and all subfolders for files of desired extension
 def search_folder(directory, ext, limit=None) -> list:
+    r"""Searches the given directory and all subdirectories for files of a desired extension,
+    stopping when it reaches 'limit' number of files."""
     netcdf_files = []
     for path, dirs, files in os.walk(directory):
         for filename in files:
@@ -83,6 +76,11 @@ def search_folder(directory, ext, limit=None) -> list:
 
 
 def ensure_directory(directory_path: str):
+    r"""
+    Ensures that the path to the directory of saved NetCDF files is properly formatted
+    and creates the directory if it does not currently exist.
+    :return:
+    """
     head, tail = os.path.split(directory_path)
     if tail != "":
         name, ext = os.path.splitext(tail)
@@ -98,10 +96,12 @@ def ensure_directory(directory_path: str):
     return directory_path
 
 
-# Generate a file path from a folder, a filename (not a path), and an extension
 def make_path(folder: str, name: str, ext: str) -> str:
+    r"""
+    Generates an absolute file path from a folder, a filename (not a path), and an extension.
+    :return:
+    """
     # path, extension = os.path.splitext(name)
     # full_netcdf_path = os.path.join(netcdf_folder, bimaxwellian_filename + ".nc")
-    # print("Diagnostic dataset filename:", repr(full_netcdf_path))
     extension = ext if ext.startswith(".") else "." + ext
     return os.path.join(folder, name + extension)
