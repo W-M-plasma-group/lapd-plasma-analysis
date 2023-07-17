@@ -14,6 +14,7 @@ from neutrals import *
 from experimental import *
 from preconfiguration import *
 from helper import *
+from characteristic_view import *
 
 # TODO prompt user to change these?
 # hdf5_folder = "/Users/leomurphy/lapd-data/April_2018/"                      # end this with slash
@@ -26,7 +27,6 @@ save_diagnostics = True  # Set save_diagnostics to True to save calculated diagn
 interferometry_calibrate = False  # TODO make automatic
 
 # User global parameters                                         # From MATLAB code  # TODO move to preconfig?
-ion_type = 'He-4+'
 bimaxwellian = False
 
 smoothing_margin = 20                                            # Optimal values in range 0-25
@@ -85,55 +85,22 @@ if __name__ == "__main__":
             chara_view_mode = (chara_view_mode == "y")
 
         datasets = []
-        for hdf5_path in hdf5_chosen_list:  # TODO improve loading bar for many datasets
+        for hdf5_path in hdf5_chosen_list:
 
             print("\nOpening file", repr(hdf5_path), "...")
 
             exp_params_dict = get_exp_params(hdf5_path)  # list of experimental parameters
             config_id = get_config_id(exp_params_dict['Exp name'])
             vsweep_board_channel = get_vsweep_bc(config_id)
+            ion_type = get_ion(config_id)
             langmuir_probes = get_probe_config(hdf5_path, config_id)
 
             bias, currents, positions, sample_sec, ports = get_isweep_vsweep(
                 hdf5_path, vsweep_board_channel, langmuir_probes)  # get current and bias data from Langmuir probe
             characteristics, ramp_times = characterize_sweep_array(bias, currents, smoothing_margin, sample_sec)
 
-            # TODO move to separate file
             if chara_view_mode:
-                x = np.unique(positions[:, 0])
-                y = np.unique(positions[:, 1])
-                print(f"\nDimensions of plateaus array: {characteristics.shape[0]} probes, {len(x)} x-positions, "
-                      f"{len(y)} y-positions, {characteristics.shape[2]} shots, and {characteristics.shape[-1]} ramps.")
-                print(f"  * probe ports are {ports}",
-                      f"  * x positions range from {min(x)} to {max(x)}",
-                      f"  * y positions range from {min(y)} to {max(y)}",
-                      f"  * shot indices range from 0 to {characteristics.shape[2]}",
-                      f"  * ramp times range from {min(ramp_times):.2f} to {max(ramp_times):.2f}.", sep="\n")
-                probe_x_y_ramp_to_plot = [0, 0, 0, 0, 0]
-                variables_to_enter = ["probe", "x position", "y position", "shot", "ramp"]
-                print("\nNote: Enter a non-integer below to terminate characteristics plotting mode.")
-                while chara_view_mode:
-                    for i in range(len(probe_x_y_ramp_to_plot)):
-                        try:
-                            index_given = int(input(f"Enter a zero-based index for {variables_to_enter[i]}: "))
-                        except ValueError:
-                            chara_view_mode = False
-                            break
-                        probe_x_y_ramp_to_plot[i] = index_given
-                    if not chara_view_mode:
-                        break
-                    print()
-                    loc_x, loc_y = x[probe_x_y_ramp_to_plot[1]], y[probe_x_y_ramp_to_plot[2]]
-                    loc = (positions == [loc_x, loc_y]).all(axis=1).nonzero()[0][0]
-                    indices_to_plot = (probe_x_y_ramp_to_plot[0], loc) + tuple(probe_x_y_ramp_to_plot[3:])
-                    characteristics[indices_to_plot].plot()
-                    """ while chara_view_mode not in ["s", "a"]:
-                        chara_view_mode = input("(S)how current plot or (a)dd another Characteristic?").lower()
-                    if chara_view_mode == "s": """
-                    plt.title(f"Run: {exp_params_dict['Run name']}\n"
-                              f"Port: {ports[probe_x_y_ramp_to_plot[0]]}, x: {loc_x}, y: {loc_y}, "
-                              f"shot: {probe_x_y_ramp_to_plot[3]}, time: {ramp_times[probe_x_y_ramp_to_plot[4]]:.2f}")
-                    plt.show()
+                display_characteristics(characteristics, positions, ports, ramp_times, exp_params_dict)
 
             # characteristic = characteristic_arrays[p, l, r]
             # diagnostics_ds[key].loc[port, positions[l, 0], positions[l, 1], ramp_times[r]] = val

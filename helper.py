@@ -1,6 +1,8 @@
 import matplotlib.pyplot as plt
+import astropy.units as u
 
 plt.rcParams["figure.dpi"] = 160
+core_radius = 26. * u.cm
 
 
 def value_safe(quantity_or_scalar):  # Get value of quantity or scalar, depending on type

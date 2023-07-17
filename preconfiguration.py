@@ -55,3 +55,7 @@ def get_ports_receptacles(hdf5_path):
         configs = fi.controls['6K Compumotor'].configs
         return {configs[probe]['probe']['port']: configs[probe]['receptacle'] for probe in configs}
         # f"{f.controls['6K Compumotor'].configs[probe]['probe']['probe name']}")
+
+
+def get_ion(config_id):
+    return "He-4+"
