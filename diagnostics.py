@@ -12,6 +12,7 @@ from bapsflib.lapd.tools import portnum_to_z
 
 from helper import *
 
+
 def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, ports, probe_area, ion_type, bimaxwellian=False):
     r"""
     Performs plasma diagnostics on a DataArray of Characteristic objects and returns the diagnostics as a Dataset.
@@ -121,7 +122,7 @@ def unpack_bimaxwellian(diagnostics):
                               ).pop('T_e')
 
 
-def get_diagnostic_keys_units(probe_area, ion_type, bimaxwellian=False):
+def get_diagnostic_keys_units(probe_area=1.*u.mm**2, ion_type="He-4+", bimaxwellian=False):
     # Perform diagnostic on some sample data to get all diagnostic names and units as dictionary of strings
 
     bias = np.arange(-20, 20, 1) * u.V
@@ -138,8 +139,6 @@ def get_diagnostic_keys_units(probe_area, ion_type, bimaxwellian=False):
 
 def debug_char(characteristic, error_code, *pos):
     # A debug function to plot plateaus that cause errors
-    # tqdm.write(str(max(characteristic.current)))
-    # tqdm.write(f"Pos: {pos}")
     if 5 < pos[-1] < 13 and 0.3 < pos[-2] / 71 < 0.7:  # max(characteristic.current) > 20 * u.mA
         pass
         # tqdm.write("Plateau at position " + str(pos) + " is unusable")
@@ -153,21 +152,3 @@ def crop_value(diagnostic, minimum, maximum):  # discard diagnostic values (e.g.
 
     value = value_safe(diagnostic)
     return value if minimum <= value <= maximum else np.nan
-
-
-def value_safe(quantity_or_scalar):  # Get value of quantity or scalar, depending on type
-
-    try:
-        val = quantity_or_scalar.value  # input is a quantity with dimension and value
-    except AttributeError:
-        val = quantity_or_scalar  # input is a dimensionless scalar with no value
-    return val
-
-
-def unit_safe(quantity_or_scalar):  # Get unit of quantity or scalar, if possible
-
-    try:
-        unit = quantity_or_scalar.unit
-    except AttributeError:
-        unit = None  # The input data is dimensionless
-    return unit

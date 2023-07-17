@@ -13,6 +13,7 @@ from interferometry import *
 from neutrals import *
 from experimental import *
 from preconfiguration import *
+from helper import *
 
 # TODO prompt user to change these?
 # hdf5_folder = "/Users/leomurphy/lapd-data/April_2018/"                      # end this with slash
@@ -66,7 +67,8 @@ if __name__ == "__main__":
 
     print("The following NetCDF files were found in the NetCDF folder (specified in main.py): ")
     nc_paths = sorted(search_folder(netcdf_folder, 'nc', limit=52))
-    nc_paths_to_open_ints = choose_multiple_list(nc_paths, "NetCDF file", null_action="perform diagnostics on HDF5 files")
+    nc_paths_to_open_ints = choose_multiple_list(nc_paths, "NetCDF file",
+                                                 null_action="perform diagnostics on HDF5 files")
 
     if len(nc_paths_to_open_ints) > 0:
         datasets = [xr.open_dataset(nc_paths[choice]) for choice in nc_paths_to_open_ints]
