@@ -6,10 +6,8 @@ from scipy.signal import find_peaks
 from scipy.ndimage import uniform_filter1d
 from plasmapy.diagnostics.langmuir import Characteristic
 
-import sys
-from tqdm import tqdm, trange
-
 from helper import *
+
 
 def characterize_sweep_array(unsmooth_bias, unsmooth_current, margin, sample_sec):
     r"""
@@ -31,10 +29,6 @@ def characterize_sweep_array(unsmooth_bias, unsmooth_current, margin, sample_sec
     ramp_bounds = isolate_plateaus(bias, margin=margin)
 
     # trim bad, distorted averaged ends in isolate plateaus
-    """
-    # Need to trim off edges of sweep distorted by smoothing function (contaminated by quench time!); margin/2 each side
-    ramp_bounds + [margin // 2, -margin // 2]
-    """
 
     ramp_times = ramp_bounds[:, 1] * sample_sec.to(u.ms)
     # NOTE: MATLAB code stores peak voltage time (end of plateaus), then only uses plateau times for very first position
