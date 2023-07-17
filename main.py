@@ -1,6 +1,6 @@
 """
 The lapd-plasma-analysis repository was written by Leo Murphy based on code
-written in MATLAB by Conor Perks (MIT) and using the PlasmaPy library.
+written in MATLAB by Conor Perks (MIT) and using the PlasmaPy and bapsflib libraries.
 Comments are added inline. A separate documentation page is not yet complete.
 """
 
@@ -14,7 +14,7 @@ from neutrals import *
 from experimental import *
 from preconfiguration import *
 
-hdf5_folder = "/Users/leomurphy/lapd-data/April_2018/"
+hdf5_folder = "/Users/leomurphy/lapd-data/April_2018/"                      # end this with slash
 # hdf5_folder = "/Users/leomurphy/lapd-data/November_2022/"                 # end this with slash
 langmuir_nc_folder = hdf5_folder + "lang_nc/"
 
@@ -57,20 +57,21 @@ if __name__ == "__main__":
                             for key in get_diagnostic_keys_units(bimaxwellian=bimaxwellian).keys()}
     diagnostic_name_list = list(diagnostic_name_dict.values())
 
+    # TODO move until after files loaded!
     print("The following diagnostics are available to plot: ")
     diagnostics_to_plot_ints = choose_multiple_list(diagnostic_name_list, "diagnostic")
     diagnostic_to_plot_list = [list(diagnostic_name_dict.keys())[choice] for choice in diagnostics_to_plot_ints]
     print("Diagnostics selected:", diagnostic_to_plot_list)
 
     print("The following NetCDF files were found in the NetCDF folder (specified in main.py): ")
-    nc_paths = sorted(search_folder(netcdf_folder, 'nc', limit=26))
+    nc_paths = sorted(search_folder(netcdf_folder, 'nc', limit=52))
     nc_paths_to_open_ints = choose_multiple_list(nc_paths, "NetCDF file", null_action="perform diagnostics on HDF5 files")
 
     if len(nc_paths_to_open_ints) > 0:
         datasets = [xr.open_dataset(nc_paths[choice]) for choice in nc_paths_to_open_ints]
     else:
         print("The following HDF5 files were found in the HDF5 folder (specified in main.py): ")
-        hdf5_paths = sorted(search_folder(hdf5_folder, "hdf5", limit=26))
+        hdf5_paths = sorted(search_folder(hdf5_folder, "hdf5", limit=52))
         hdf5_chosen_ints = choose_multiple_list(hdf5_paths, "HDF5 file")
         hdf5_chosen_list = [hdf5_paths[choice] for choice in hdf5_chosen_ints]
 
@@ -144,9 +145,12 @@ if __name__ == "__main__":
                 calibrated_electron_density = diagnostics_dataset['n_e']
 
             # Find electron pressure
+            pressure_unit = u.Pa
             electron_temperature = diagnostics_dataset['T_e_avg'] if bimaxwellian else diagnostics_dataset['T_e']
-            pressure = (3 / 2) * electron_temperature * calibrated_electron_density * (1. * u.eV * u.m ** -3).to(u.Pa)
-            diagnostics_dataset = diagnostics_dataset.assign({'P_e': pressure})
+            pressure = (3 / 2) * electron_temperature * calibrated_electron_density * (1. * u.eV * u.m ** -3
+                                                                                       ).to(pressure_unit)
+            diagnostics_dataset = diagnostics_dataset.assign({'P_e': pressure}
+                                                             ).assign_attrs({'units': str(pressure_unit)})
 
             # Assign experimental parameters to diagnostic data attributes
             diagnostics_dataset = diagnostics_dataset.assign_attrs(exp_params_dict)
@@ -161,8 +165,8 @@ if __name__ == "__main__":
 
     steady_state_plateaus_runs = [detect_steady_state_ramps(dataset['n_e'], core_radius) for dataset in datasets]
 
+    """Plot chosen diagnostics for each individual dataset"""
     # """
-    # Plot chosen diagnostics for each individual dataset
     for plot_diagnostic in diagnostic_to_plot_list:
         for i in range(len(datasets)):
             plot_line_diagnostic(port_selector(datasets[i]), plot_diagnostic, 'contour', steady_state_plateaus_runs[i],
@@ -174,11 +178,9 @@ if __name__ == "__main__":
         and plot position on multiplot corresponding to second attribute
     """
     # """
-
     for plot_diagnostic in diagnostic_to_plot_list:
         multiplot_line_diagnostic(datasets, plot_diagnostic, port_selector,
                                   steady_state_plateaus_runs, tolerance=plot_tolerance)
-
     # """
 
 # Note: Not all MATLAB code has been transferred (e.g. neutrals, ExB)

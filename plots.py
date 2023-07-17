@@ -10,7 +10,6 @@ import astropy.units as u
 from astropy import visualization
 from diagnostics import value_safe, unit_safe
 # matplotlib.use('TkAgg')
-# TODO investigate
 matplotlib.use('QtAgg')
 
 
@@ -65,7 +64,7 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
 
             # Filter out certain points due to inconsistent data (likely random noise that skews average higher)
             if np.isfinite(tolerance):
-                da_mean = linear_da_mean.mean()
+                da_mean = linear_da_mean.mean(keep_attrs=True)
                 linear_da_mean = linear_da_mean.where(linear_da_std < tolerance * da_mean)
 
             ax.errorbar(linear_da_mean.coords[linear_dimension], linear_da_mean, yerr=linear_da_std,
