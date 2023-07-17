@@ -13,7 +13,9 @@ from interferometry import *
 from neutrals import *
 from experimental import *
 from preconfiguration import *
+from helper import *
 
+# TODO prompt user to change these?
 # hdf5_folder = "/Users/leomurphy/lapd-data/April_2018/"                      # end this with slash
 # hdf5_folder = "/Users/leomurphy/lapd-data/November_2022/"                 # end this with slash
 hdf5_folder = "/Users/leomurphy/lapd-data/March_2022/"                 # end this with slash
@@ -37,11 +39,10 @@ core_radius = 26. * u.cm                                         # From MATLAB c
 
 def port_selector(ds):  # TODO allow multiple modified datasets to be returned
     # port_list = dataset.port  # use if switch to dataset.sel
-
     manual_attrs = ds.attrs  # TODO raise xarray issue about losing attrs even with xr.set_options(keep_attrs=True):
     ds_port_selected = ds.isel(port=0)  # - ds.isel(port=1)  # TODO user change for ex. delta-P-parallel
     return ds_port_selected.assign_attrs(manual_attrs)
-    # ask for a linear transformation/matrix?
+    # ask user for a linear transformation/matrix?
     # Add a string attribute to the dataset to describe which port(s) comes from
 
 
@@ -66,7 +67,8 @@ if __name__ == "__main__":
 
     print("The following NetCDF files were found in the NetCDF folder (specified in main.py): ")
     nc_paths = sorted(search_folder(netcdf_folder, 'nc', limit=52))
-    nc_paths_to_open_ints = choose_multiple_list(nc_paths, "NetCDF file", null_action="perform diagnostics on HDF5 files")
+    nc_paths_to_open_ints = choose_multiple_list(nc_paths, "NetCDF file",
+                                                 null_action="perform diagnostics on HDF5 files")
 
     if len(nc_paths_to_open_ints) > 0:
         datasets = [xr.open_dataset(nc_paths[choice]) for choice in nc_paths_to_open_ints]
