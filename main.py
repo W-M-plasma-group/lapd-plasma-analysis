@@ -14,8 +14,9 @@ from neutrals import *
 from experimental import *
 from preconfiguration import *
 
-hdf5_folder = "/Users/leomurphy/lapd-data/April_2018/"                      # end this with slash
+# hdf5_folder = "/Users/leomurphy/lapd-data/April_2018/"                      # end this with slash
 # hdf5_folder = "/Users/leomurphy/lapd-data/November_2022/"                 # end this with slash
+hdf5_folder = "/Users/leomurphy/lapd-data/March_2022/"                 # end this with slash
 langmuir_nc_folder = hdf5_folder + "lang_nc/"
 
 # User file options
@@ -27,7 +28,7 @@ ion_type = 'He-4+'
 bimaxwellian = False
 
 smoothing_margin = 20                                            # Optimal values in range 0-25
-plot_tolerance = 0.25  # TODO user adjust plot_tolerance; np.nan = keep all data points; ~0.2-0.5 works well
+plot_tolerance = np.nan  # TODO user adjust plot_tolerance; np.nan = keep all data points; ~0.2-0.5 works well
 
 # QUESTION: can we calibrate both Langmuir probes using an interferometry ratio depending only on one of them?
 core_radius = 26. * u.cm                                         # From MATLAB code
@@ -40,7 +41,7 @@ def port_selector(ds):  # TODO allow multiple modified datasets to be returned
     manual_attrs = ds.attrs  # TODO raise xarray issue about losing attrs even with xr.set_options(keep_attrs=True):
     ds_port_selected = ds.isel(port=0)  # - ds.isel(port=1)  # TODO user change for ex. delta-P-parallel
     return ds_port_selected.assign_attrs(manual_attrs)
-    # use the "exec" function to prompt user to input desired transformation? Or ask for a linear transformation
+    # ask for a linear transformation/matrix?
     # Add a string attribute to the dataset to describe which port(s) comes from
 
 
@@ -95,18 +96,20 @@ if __name__ == "__main__":
                 hdf5_path, vsweep_board_channel, langmuir_probes)  # get current and bias data from Langmuir probe
             characteristics, ramp_times = characterize_sweep_array(bias, currents, smoothing_margin, sample_sec)
 
+            # TODO move to separate file
             if chara_view_mode:
                 x = np.unique(positions[:, 0])
                 y = np.unique(positions[:, 1])
                 print(f"\nDimensions of plateaus array: {characteristics.shape[0]} probes, {len(x)} x-positions, "
-                      f"{len(y)} y-positions, and {characteristics.shape[-1]} ramps.")
-                print(f"Probe ports are {ports}; \n"
-                      f"x positions range from {min(x)} to {max(x)}; \n"
-                      f"y positions range from {min(y)} to {max(y)}; \n"
-                      f"ramp times range from {min(ramp_times):.2f} to {max(ramp_times):.2f}.")
-                probe_x_y_ramp_to_plot = [0, 0, 0, 0]
-                variables_to_enter = ["probe", "x position", "y position", "ramp"]
-                print("Note: Enter a non-integer below to terminate characteristics plotting mode.\n")
+                      f"{len(y)} y-positions, {characteristics.shape[2]} shots, and {characteristics.shape[-1]} ramps.")
+                print(f"  * probe ports are {ports}",
+                      f"  * x positions range from {min(x)} to {max(x)}",
+                      f"  * y positions range from {min(y)} to {max(y)}",
+                      f"  * shot indices range from 0 to {characteristics.shape[2]}",
+                      f"  * ramp times range from {min(ramp_times):.2f} to {max(ramp_times):.2f}.", sep="\n")
+                probe_x_y_ramp_to_plot = [0, 0, 0, 0, 0]
+                variables_to_enter = ["probe", "x position", "y position", "shot", "ramp"]
+                print("\nNote: Enter a non-integer below to terminate characteristics plotting mode.")
                 while chara_view_mode:
                     for i in range(len(probe_x_y_ramp_to_plot)):
                         try:
@@ -120,13 +123,14 @@ if __name__ == "__main__":
                     print()
                     loc_x, loc_y = x[probe_x_y_ramp_to_plot[1]], y[probe_x_y_ramp_to_plot[2]]
                     loc = (positions == [loc_x, loc_y]).all(axis=1).nonzero()[0][0]
-                    characteristics[probe_x_y_ramp_to_plot[0], loc, probe_x_y_ramp_to_plot[3]].plot()
+                    indices_to_plot = (probe_x_y_ramp_to_plot[0], loc) + tuple(probe_x_y_ramp_to_plot[3:])
+                    characteristics[indices_to_plot].plot()
                     """ while chara_view_mode not in ["s", "a"]:
                         chara_view_mode = input("(S)how current plot or (a)dd another Characteristic?").lower()
                     if chara_view_mode == "s": """
                     plt.title(f"Run: {exp_params_dict['Run name']}\n"
                               f"Port: {ports[probe_x_y_ramp_to_plot[0]]}, x: {loc_x}, y: {loc_y}, "
-                              f"time: {ramp_times[probe_x_y_ramp_to_plot[3]]:.2f}")
+                              f"shot: {probe_x_y_ramp_to_plot[3]}, time: {ramp_times[probe_x_y_ramp_to_plot[4]]:.2f}")
                     plt.show()
 
             # characteristic = characteristic_arrays[p, l, r]

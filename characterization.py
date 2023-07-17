@@ -116,7 +116,7 @@ def validate_sweep_units(bias, current):
 
 
 def characteristic_array(bias, current, plateau_ranges):
-    # 3D: unique_position by shot by plateau_num
+    # 4D?: probe * unique_position * shot * plateau_num
 
     currents = current  # "currents" has "probe" dimension in front; may have size 1
     num_pos = bias.shape[0]
