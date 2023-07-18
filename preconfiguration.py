@@ -23,6 +23,11 @@ def get_vsweep_bc(config_id):  # return (board, channel) for vsweep data
     return vsweep_bcs[config_id]
 
 
+def get_voltage_gain(config_id):
+    # TODO develop; get from HDF5 metadata someday
+    return 100.
+
+
 def get_probe_config(hdf5_path, config_id):
 
     # each list in tuple corresponds to an experiment series;
@@ -54,7 +59,6 @@ def get_ports_receptacles(hdf5_path):
     with lapd.File(hdf5_path) as fi:
         configs = fi.controls['6K Compumotor'].configs
         return {configs[probe]['probe']['port']: configs[probe]['receptacle'] for probe in configs}
-        # f"{f.controls['6K Compumotor'].configs[probe]['probe']['probe name']}")
 
 
 def get_ion(config_id):
