@@ -4,12 +4,9 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="99051048-4239-4d54-a2e8-6a0399c265e9" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/characteristic_view.py" afterDir="false" />
+    <list default="true" id="99051048-4239-4d54-a2e8-6a0399c265e9" name="Changes" comment="Create new file characteristic_view.py to reduce clutter in main.py">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/helper.py" beforeDir="false" afterPath="$PROJECT_DIR$/helper.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/preconfiguration.py" beforeDir="false" afterPath="$PROJECT_DIR$/preconfiguration.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -179,6 +176,8 @@
       <workItem from="1688148033457" duration="16210000" />
       <workItem from="1688577327109" duration="31965000" />
       <workItem from="1689104555523" duration="18247000" />
+      <workItem from="1689698487480" duration="636000" />
+      <workItem from="1689700844516" duration="1109000" />
     </task>
     <task id="LOCAL-00001" summary="Switch plots to using QtAgg instead of TkAgg backend">
       <created>1680657801669</created>
@@ -257,7 +256,15 @@
       <option name="project" value="LOCAL" />
       <updated>1689633172089</updated>
     </task>
-    <option name="localTasksCounter" value="11" />
+    <task id="LOCAL-00011" summary="Create new file characteristic_view.py to reduce clutter in main.py">
+      <option name="closed" value="true" />
+      <created>1689635323365</created>
+      <option name="number" value="00011" />
+      <option name="presentableId" value="LOCAL-00011" />
+      <option name="project" value="LOCAL" />
+      <updated>1689635323365</updated>
+    </task>
+    <option name="localTasksCounter" value="12" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -304,7 +311,8 @@
     <MESSAGE value="Increase number of loadable files to 52 from 26" />
     <MESSAGE value="Fix characteristic view mode to include new dimension &quot;shot&quot; in characteristic arrays" />
     <MESSAGE value="Remove redundant functions after copying to helper.py" />
-    <option name="LAST_COMMIT_MESSAGE" value="Remove redundant functions after copying to helper.py" />
+    <MESSAGE value="Create new file characteristic_view.py to reduce clutter in main.py" />
+    <option name="LAST_COMMIT_MESSAGE" value="Create new file characteristic_view.py to reduce clutter in main.py" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/lapd_plasma_analysis$main.coverage" NAME="main Coverage Results" MODIFIED="1689630346160" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />

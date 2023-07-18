@@ -34,7 +34,24 @@ plot_tolerance = np.nan  # TODO user adjust plot_tolerance; np.nan = keep all da
 
 # QUESTION: can we calibrate both Langmuir probes using an interferometry ratio depending only on one of them?
 core_radius = 26. * u.cm                                         # From MATLAB code
-# TODO Insert diagram of LAPD
+
+
+# Diagram of LAPD
+"""
+     <- ~18m plasma length -> 
+____________________________________       A
+|    |                      '      |       |       ~75 cm
+|    |                      '      |       |   plasma diameter
+|____|______________________'______|       V
+    [a]                    [b]    [c]
+        +z direction (+ports) ==>
+                  plasma flow ==>
+            magnetic field B0 ==>
+
+(a) LaB6 electron beam cathode
+(b) downstream mesh anode
+(c) downstream cathode
+"""
 
 
 def port_selector(ds):  # TODO allow multiple modified datasets to be returned
@@ -101,7 +118,6 @@ if __name__ == "__main__":
 
             if chara_view_mode:
                 display_characteristics(characteristics, positions, ports, ramp_times, exp_params_dict)
-
             # characteristic = characteristic_arrays[p, l, r]
             # diagnostics_ds[key].loc[port, positions[l, 0], positions[l, 1], ramp_times[r]] = val
 
