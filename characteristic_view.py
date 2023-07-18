@@ -1,8 +1,8 @@
-import numpy as np
-import matplotlib.pyplot as plt
+from helper import *
 
 
-def display_characteristics(characteristics_array, positions, ports, ramp_times, exp_params_dict):
+def display_characteristics(characteristics_array, positions, ports, ramp_times, exp_params_dict, diagnostics=False,
+                            areas=None, ion=None, bimaxwellian=False):
 
     x = np.unique(positions[:, 0])
     y = np.unique(positions[:, 1])
@@ -30,12 +30,23 @@ def display_characteristics(characteristics_array, positions, ports, ramp_times,
         print()
         loc_x, loc_y = x[probe_x_y_ramp_to_plot[1]], y[probe_x_y_ramp_to_plot[2]]
         loc = (positions == [loc_x, loc_y]).all(axis=1).nonzero()[0][0]
-        indices_to_plot = (probe_x_y_ramp_to_plot[0], loc) + tuple(probe_x_y_ramp_to_plot[3:])
-        characteristics_array[indices_to_plot].plot()
+        chara_to_plot = characteristics_array[(probe_x_y_ramp_to_plot[0], loc, *probe_x_y_ramp_to_plot[3:])]
         """ while chara_view_mode not in ["s", "a"]:
             chara_view_mode = input("(S)how current plot or (a)dd another Characteristic?").lower()
         if chara_view_mode == "s": """
-        plt.title(f"Run: {exp_params_dict['Run name']}\n"
-                  f"Port: {ports[probe_x_y_ramp_to_plot[0]]}, x: {loc_x}, y: {loc_y}, "
-                  f"shot: {probe_x_y_ramp_to_plot[3]}, time: {ramp_times[probe_x_y_ramp_to_plot[4]]:.2f}")
+        plot_title = (f"Run: {exp_params_dict['Exp name']}, {exp_params_dict['Run name']}\n"
+                      f"Port: {ports[probe_x_y_ramp_to_plot[0]]}, x: {loc_x}, y: {loc_y}, "
+                      f"shot: {probe_x_y_ramp_to_plot[3]}, time: {ramp_times[probe_x_y_ramp_to_plot[4]]:.2f}")
+        if diagnostics:
+            if areas is None or ion is None:
+                raise ValueError("Area or ion not specified in characteristic display mode, but 'diagnostics' is True.")
+            try:
+                diagnostics = swept_probe_analysis(chara_to_plot, areas[probe_x_y_ramp_to_plot[0]], ion, bimaxwellian)
+                electron_temperature = diagnostics['T_e'] if not bimaxwellian \
+                    else unpack_bimaxwellian(diagnostics)['T_e_avg']
+                plot_title += f"\nTemperature: {electron_temperature}"
+            except (ValueError, RuntimeError, TypeError):
+                plot_title += f"\n(Error calculating plasma diagnostics)"
+        chara_to_plot.plot()
+        plt.title(plot_title)
         plt.show()
