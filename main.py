@@ -18,8 +18,8 @@ from characteristic_view import *
 
 # TODO prompt user to change these?
 # hdf5_folder = "/Users/leomurphy/lapd-data/April_2018/"                      # end this with slash
-# hdf5_folder = "/Users/leomurphy/lapd-data/November_2022/"                 # end this with slash
-hdf5_folder = "/Users/leomurphy/lapd-data/March_2022/"                 # end this with slash
+hdf5_folder = "/Users/leomurphy/lapd-data/November_2022/"                 # end this with slash
+# hdf5_folder = "/Users/leomurphy/lapd-data/March_2022/"                 # end this with slash
 langmuir_nc_folder = hdf5_folder + "lang_nc/"
 
 # User file options
@@ -29,7 +29,7 @@ interferometry_calibrate = False  # TODO make automatic
 # User global parameters                                         # From MATLAB code  # TODO move to preconfig?
 bimaxwellian = False
 
-smoothing_margin = 20                                            # Optimal values in range 0-25
+smoothing_margin = 40                                            # Optimal values in range 0-25
 plot_tolerance = np.nan  # TODO user adjust plot_tolerance; np.nan = keep all data points; ~0.2-0.5 works well
 
 # QUESTION: can we calibrate both Langmuir probes using an interferometry ratio depending only on one of them?
@@ -38,12 +38,12 @@ core_radius = 26. * u.cm                                         # From MATLAB c
 
 # Diagram of LAPD
 """
-     <- ~18m plasma length -> 
-____________________________________       A
-|    |                      '      |       |       ~75 cm
-|    |                      '      |       |   plasma diameter
-|____|______________________'______|       V
-    [a]                    [b]    [c]
+       <- ~18m plasma length -> 
+  ____________________________________       A
+  |    |                      '      |       |       ~75 cm
+  |    |                      '      |       |   plasma diameter
+  |____|______________________'______|       V
+      [a]                    [b]    [c]
         +z direction (+ports) ==>
                   plasma flow ==>
             magnetic field B0 ==>
@@ -111,15 +111,17 @@ if __name__ == "__main__":
             vsweep_board_channel = get_vsweep_bc(config_id)
             ion_type = get_ion(config_id)
             langmuir_probes = get_probe_config(hdf5_path, config_id)
+            voltage_gain = get_voltage_gain(config_id)
 
+            # get current and bias data from Langmuir probe, then form into array of Characteristic objects
             bias, currents, positions, sample_sec, ports = get_isweep_vsweep(
-                hdf5_path, vsweep_board_channel, langmuir_probes)  # get current and bias data from Langmuir probe
+                hdf5_path, vsweep_board_channel, langmuir_probes, voltage_gain)
             characteristics, ramp_times = characterize_sweep_array(bias, currents, smoothing_margin, sample_sec)
 
             if chara_view_mode:
-                display_characteristics(characteristics, positions, ports, ramp_times, exp_params_dict)
-            # characteristic = characteristic_arrays[p, l, r]
-            # diagnostics_ds[key].loc[port, positions[l, 0], positions[l, 1], ramp_times[r]] = val
+                display_characteristics(characteristics, positions, ports, ramp_times, exp_params_dict,
+                                        diagnostics=True, areas=langmuir_probes['area'],
+                                        ion=ion_type, bimaxwellian=bimaxwellian)
 
             diagnostics_dataset = langmuir_diagnostics(characteristics, positions, ramp_times, ports,
                                                        langmuir_probes['area'], ion_type, bimaxwellian=bimaxwellian)
@@ -172,4 +174,4 @@ if __name__ == "__main__":
                                   steady_state_plateaus_runs, tolerance=plot_tolerance)
     # """
 
-# Note: Not all MATLAB code has been transferred (e.g. neutrals, ExB)
+# TODO Not all MATLAB code has been transferred (e.g. neutrals, ExB)
