@@ -17,20 +17,19 @@ from helper import *
 from characteristic_view import *
 
 # TODO prompt user to change these?
-# hdf5_folder = "/Users/leomurphy/lapd-data/April_2018/"                      # end this with slash
 hdf5_folder = "/Users/leomurphy/lapd-data/November_2022/"                 # end this with slash
-# hdf5_folder = "/Users/leomurphy/lapd-data/March_2022/"                 # end this with slash
+# "/Users/leomurphy/lapd-data/April_2018/"
+# "/Users/leomurphy/lapd-data/March_2022/"
+
 langmuir_nc_folder = hdf5_folder + "lang_nc/"
 
 # User file options
-save_diagnostics = True  # Set save_diagnostics to True to save calculated diagnostic data to NetCDF files
-interferometry_calibrate = False  # TODO make automatic
+interferometry_calibrate = True                        # TODO make automatic, or at least try whenever possible
 
-# User global parameters                                         # From MATLAB code  # TODO move to preconfig?
-bimaxwellian = False
-
-smoothing_margin = 40                                            # Optimal values in range 0-25
-plot_tolerance = np.nan  # TODO user adjust plot_tolerance; np.nan = keep all data points; ~0.2-0.5 works well
+# User parameters
+bimaxwellian = False                                    # TODO perform both and store in same NetCDF file
+smoothing_margin = 40                                   # Optimal values in range 0-25
+plot_tolerance = 1.                                     # TODO optimal values are np.nan (plot all points) or >= 0.2
 
 # QUESTION: can we calibrate both Langmuir probes using an interferometry ratio depending only on one of them?
 core_radius = 26. * u.cm                                         # From MATLAB code
@@ -39,9 +38,9 @@ core_radius = 26. * u.cm                                         # From MATLAB c
 # Diagram of LAPD
 """
        <- ~18m plasma length -> 
-  ____________________________________       A
-  |    |                      '      |       |       ~75 cm
-  |    |                      '      |       |   plasma diameter
+  ____________________________________       
+  |    |                      '      |       A       
+  |    |                      '      |       |   ~75 cm plasma diameter
   |____|______________________'______|       V
       [a]                    [b]    [c]
         +z direction (+ports) ==>
@@ -57,7 +56,10 @@ core_radius = 26. * u.cm                                         # From MATLAB c
 def port_selector(ds):  # TODO allow multiple modified datasets to be returned
     # port_list = dataset.port  # use if switch to dataset.sel
     manual_attrs = ds.attrs  # TODO raise xarray issue about losing attrs even with xr.set_options(keep_attrs=True):
+    manual_sub_attrs = {key: ds[key].attrs for key in ds}
     ds_port_selected = ds.isel(port=0)  # - ds.isel(port=1)  # TODO user change for ex. delta-P-parallel
+    for key in ds:
+        ds_port_selected[key] = ds_port_selected[key].assign_attrs(manual_sub_attrs[key])
     return ds_port_selected.assign_attrs(manual_attrs)
     # ask user for a linear transformation/matrix?
     # Add a string attribute to the dataset to describe which port(s) comes from
@@ -78,7 +80,8 @@ if __name__ == "__main__":
 
     # TODO move until after files loaded!
     print("The following diagnostics are available to plot: ")
-    diagnostics_to_plot_ints = choose_multiple_list(diagnostic_name_list, "diagnostic")
+    diagnostics_to_plot_ints = choose_multiple_list(diagnostic_name_list, "diagnostic",
+                                                    null_action="calculate diagnostics without plotting")
     diagnostic_to_plot_list = [list(diagnostic_name_dict.keys())[choice] for choice in diagnostics_to_plot_ints]
     print("Diagnostics selected:", diagnostic_to_plot_list)
 
@@ -140,8 +143,8 @@ if __name__ == "__main__":
             electron_temperature = diagnostics_dataset['T_e_avg'] if bimaxwellian else diagnostics_dataset['T_e']
             pressure = (3 / 2) * electron_temperature * calibrated_electron_density * (1. * u.eV * u.m ** -3
                                                                                        ).to(pressure_unit)
-            diagnostics_dataset = diagnostics_dataset.assign({'P_e': pressure}
-                                                             ).assign_attrs({'units': str(pressure_unit)})
+            diagnostics_dataset = diagnostics_dataset.assign({'P_e': pressure})
+            diagnostics_dataset['P_e'] = diagnostics_dataset['P_e'].assign_attrs({'units': str(pressure_unit)})
 
             # Assign experimental parameters to diagnostic data attributes
             diagnostics_dataset = diagnostics_dataset.assign_attrs(exp_params_dict)
@@ -151,13 +154,12 @@ if __name__ == "__main__":
             datasets.append(diagnostics_dataset)
 
             save_diagnostic_path = make_path(netcdf_folder, exp_params_dict['Run name'], "nc")
-            if save_diagnostics:
-                write_netcdf(diagnostics_dataset, save_diagnostic_path)
+            write_netcdf(diagnostics_dataset, save_diagnostic_path)
 
     steady_state_plateaus_runs = [detect_steady_state_ramps(dataset['n_e'], core_radius) for dataset in datasets]
 
     """Plot chosen diagnostics for each individual dataset"""
-    # """
+    """
     for plot_diagnostic in diagnostic_to_plot_list:
         for i in range(len(datasets)):
             plot_line_diagnostic(port_selector(datasets[i]), plot_diagnostic, 'contour', steady_state_plateaus_runs[i],
