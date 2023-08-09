@@ -3,7 +3,7 @@ import astropy.units as u
 from bapsflib import lapd
 
 
-def get_isweep_vsweep(filename, vsweep_bc, langmuir_probes):  # TODO get voltage_gain from metadata?
+def get_isweep_vsweep(filename, vsweep_bc, langmuir_probes, voltage_gain):
     r"""
     Reads all sweep data (V-sweep and I-sweep) from HDF5 file Langmuir code.
 
@@ -12,6 +12,7 @@ def get_isweep_vsweep(filename, vsweep_bc, langmuir_probes):  # TODO get voltage
     :param filename: File path of HDF5 file from LAPD
     :param vsweep_bc: Board and channel number of vsweep data in HDF5 file
     :param langmuir_probes: structure array of board, channel, receptacle, port, resistance, and area for each probe
+    :param voltage_gain: numerical value of scaling constant for getting real bias voltages from abstract vsweep data
     :return: bias, currents, x, y, dt: the relevant multidimensional v_sweep, i_sweeps, position, and timestep
     """
 
@@ -40,11 +41,11 @@ def get_isweep_vsweep(filename, vsweep_bc, langmuir_probes):  # TODO get voltage
     resistances_shape = [len(ports)] + [1 for _ in range(len(isweep_signal.shape) - 1)]
     resistances = np.reshape([langmuir_probes['resistance'][langmuir_probes['port'] == port] for port in ports], resistances_shape)
 
-    # TODO remove unnecessary to_real_sweep_units
-    """# Convert to real units (not abstract) 
+    # Convert to real units (not abstract)
     bias = vsweep_signal * voltage_gain * u.V
-    currents = isweep_signal / resistances * u.A"""
-    bias, currents = to_real_sweep_units(vsweep_signal, isweep_signal, resistances)
+    currents = isweep_signal / resistances * u.A
+    # bias, currents = to_real_sweep_units(vsweep_signal, isweep_signal, resistances)
+
     currents_dc_offset = np.mean(currents[..., -1000:], axis=-1, keepdims=True)
     currents -= currents_dc_offset
 
@@ -79,25 +80,3 @@ def get_shot_positions(isweep_motor_data):
         raise ValueError("Non-uniform position values when grouping Langmuir probe data by position")
 
     return positions, num_positions, shots_per_position
-
-
-def to_real_sweep_units(vsweep, isweep, resistances):
-    r"""
-    Convert raw sweep probe data into real bias and current measurements.
-
-    Parameters
-    ----------
-    :param vsweep: array
-    :param isweep: array
-    :param resistances: array, resistance of each isweep probe
-    :return: bias and current array in real units
-    """
-
-    # The conversion factors from abstract units to real bias (V) are hard-coded in here.
-    # NOTE: 2018 current data is inverted, while 2022 data is not.
-
-    # Conversion factors taken from MATLAB code: Current = isweep / 11 ohms; Voltage = vsweep * 100
-    gain = 100.  # voltage gain                                         # TODO get from HDF5 metadata
-
-    return vsweep * gain * u.V, isweep / resistances * u.A
-

@@ -1,12 +1,9 @@
-import warnings
-
-import astropy.units as u
-import numpy as np
-from scipy.signal import find_peaks
-from scipy.ndimage import uniform_filter1d
-from plasmapy.diagnostics.langmuir import Characteristic
-
 from helper import *
+
+import warnings
+import bottleneck as bn
+from scipy.signal import find_peaks
+# from scipy.ndimage import uniform_filter1d
 
 
 def characterize_sweep_array(unsmooth_bias, unsmooth_current, margin, sample_sec):
@@ -25,9 +22,10 @@ def characterize_sweep_array(unsmooth_bias, unsmooth_current, margin, sample_sec
     """
 
     validate_sweep_units(unsmooth_bias, unsmooth_current)
-    bias, current = smooth_characteristic(unsmooth_bias, unsmooth_current, margin=margin)
+    # bias, current = smooth_characteristic(unsmooth_bias, unsmooth_current, margin=margin)
+    bias = bn.move_mean(unsmooth_bias, window=margin) * (u.V if unit_safe(unsmooth_bias) == u.V else 1)
+    current = bn.move_mean(unsmooth_current, window=margin) * (u.A if unit_safe(unsmooth_current) == u.A else 1)
     ramp_bounds = isolate_plateaus(bias, margin=margin)
-
     # trim bad, distorted averaged ends in isolate plateaus
 
     ramp_times = ramp_bounds[:, 1] * sample_sec.to(u.ms)
@@ -35,48 +33,6 @@ def characterize_sweep_array(unsmooth_bias, unsmooth_current, margin, sample_sec
     # This uses the time of the peak voltage for the average of all shots ("top of the average ramp")
 
     return characteristic_array(bias, current, ramp_bounds), ramp_times
-
-
-def smooth_characteristic(bias, current, margin):
-    r"""
-    Simple moving-average smoothing function for bias and current.
-
-    Parameters
-    ----------
-    :param bias: ndarray
-    :param current: ndarray
-    :param margin: int, window length for moving average
-    :return: smoothed bias, smoothed current
-    """
-
-    if margin < 0:
-        raise ValueError("Cannot smooth over negative number", margin, "of points")
-    if margin == 0:
-        return bias, current
-    if current.shape[-1] <= margin:
-        raise ValueError("Last dimension length", current.shape[-1], "is too short to take", margin, "-point mean over")
-
-    return smooth_array(bias, margin), smooth_array(current, margin)
-
-
-def smooth_array(array, margin):
-    r"""
-    Utility function to smooth ndarray using moving average along last dimension.
-
-    Parameters
-    ----------
-    :param array: ndarray to be smoothed
-    :param margin: width of moving average window
-    :return: smoothed ndarray with last dimension length decreased by margin
-    """
-
-    # Find cumulative mean of each consecutive block of (margin + 1) elements per row
-    array_sum = np.cumsum(np.insert(array, 0, 0, axis=-1), axis=-1, dtype=np.float64)
-    smoothed_array = (array_sum[..., margin:] - array_sum[..., :-margin]) / margin
-
-    # TODO consider following!
-    """smoothed_arrays.append(uniform_filter1d(array, size=margin, mode='nearest', axis=-1) * unit)"""
-    return smoothed_array.astype(float)
 
 
 def isolate_plateaus(bias, margin=0):

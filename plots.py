@@ -88,7 +88,7 @@ def plot_line_diagnostic(diagnostics_ds: xr.Dataset, diagnostic, plot_type, stea
                          shot_mode="mean", tolerance=np.nan):
     # Plots the given diagnostic(s) from the dataset in the given style
 
-    run_name = diagnostics_ds.attrs['Run name'] + "\n"
+    run_name = f"{diagnostics_ds.attrs['Exp name']}, {diagnostics_ds.attrs['Run name']}"
 
     linear_dimension = get_valid_linear_dimension(diagnostics_ds.sizes)
     pre_linear_ds = diagnostics_ds.squeeze()
@@ -122,7 +122,7 @@ def plot_line_diagnostic(diagnostics_ds: xr.Dataset, diagnostic, plot_type, stea
         for key in diagnostic_list:
             # if check_diagnostic(linear_ds_1d, choice):
             linear_plot_1d(linear_ds_1d[key], linear_dimension)
-            plt.title(run_name + get_title(key) + " " + plot_type + " plot")
+            plt.title(run_name + "\n" + get_title(key) + " " + plot_type + " plot")
             if show:
                 plt.show()
     # 2D plot type
@@ -130,7 +130,7 @@ def plot_line_diagnostic(diagnostics_ds: xr.Dataset, diagnostic, plot_type, stea
         for key in diagnostic_list:
             # if check_diagnostic(linear_ds, choice):
             linear_plot_2d(linear_ds[key], plot_type, linear_dimension)
-            plt.title(run_name + get_title(key) + " " + plot_type + " plot (2D)")
+            plt.title(run_name + "\n" + get_title(key) + " " + plot_type + " plot (2D)")
             if show:
                 plt.show()
 
