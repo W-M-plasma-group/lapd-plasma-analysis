@@ -3,11 +3,8 @@ import warnings
 
 import xarray as xr
 
-# TODO rename file-acccess.py or similar
-
 
 def choose_multiple_list(choices, name, null_action=None):
-
     if len(choices) > 52:
         warnings.warn("More than 52 " + name + "s found. Only the first 52 are displayed.")
     print(*["  " + num_to_chr(i) + ": " + choices[i] for i in range(len(choices[:52]))], sep="\n")
@@ -62,17 +59,18 @@ def write_netcdf(dataset, path):
     dataset.to_netcdf(path=path, mode=save_mode)
 
 
-def search_folder(directory, ext, limit=None) -> list:
+def search_folder(directory, ext, limit=None) -> list[str]:
     r"""Searches the given directory and all subdirectories for files of a desired extension,
-    stopping when it reaches 'limit' number of files."""
-    netcdf_files = []
+    stopping when it reaches 'limit' number of file paths."""
+    ext = ext if ext.startswith(".") else "." + ext
+    paths_found = []
     for path, dirs, files in os.walk(directory):
         for filename in files:
-            if filename.endswith("." + ext):
-                netcdf_files.append(os.path.join(path, filename))
-                if type(limit) == int and len(netcdf_files) >= limit:
-                    return netcdf_files
-    return netcdf_files
+            if filename.endswith(ext):
+                paths_found.append(os.path.join(path, filename))
+                if type(limit) == int and len(paths_found) >= limit:
+                    return paths_found
+    return paths_found
 
 
 def ensure_directory(directory_path: str):
