@@ -27,6 +27,7 @@ interferometry_folder = hdf5_folder
 # interferometry_folder = "/Users/leomurphy/lapd-data/November_2022/uwave_288_GHz_waveforms/"
 
 """ User parameters """
+probes_choice = [0, 1]                                  # TODO user choice for probe or linear combination to use
 bimaxwellian = False                                    # TODO perform both and store in same NetCDF file?
 smoothing_margin = 40                                   # Optimal values in range 0-50
 plot_tolerance = 0.5                                     # Optimal values are np.nan (plot all points) or >= 0.2
@@ -51,18 +52,6 @@ a) LaB6 electron beam cathode
 b) downstream mesh anode
 c) downstream cathode
 """
-
-
-def port_selector(ds):  # TODO allow multiple modified datasets to be returned
-    # use "port_list = dataset.port" if switch to dataset.sel
-    manual_attrs = ds.attrs  # TODO raise xarray issue about losing attrs even with xr.set_options(keep_attrs=True):
-    manual_sub_attrs = {key: ds[key].attrs for key in ds}
-    ds_port_selected = ds.isel(port=0)  # - ds.isel(port=1)  # TODO user change for ex. delta-P-parallel
-    for key in ds:
-        ds_port_selected[key] = ds_port_selected[key].assign_attrs(manual_sub_attrs[key])
-    return ds_port_selected.assign_attrs(manual_attrs)
-    # ask user for a linear transformation/matrix?
-    # Add a string attribute to the dataset to describe which port(s) comes from
 
 
 if __name__ == "__main__":
@@ -176,7 +165,7 @@ if __name__ == "__main__":
     """
     # """
     for plot_diagnostic in diagnostic_to_plot_list:
-        multiplot_line_diagnostic(datasets, plot_diagnostic, port_selector,
+        multiplot_line_diagnostic(datasets, plot_diagnostic, probes_choice,
                                   steady_state_plateaus_runs, tolerance=plot_tolerance)
     # """
 
