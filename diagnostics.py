@@ -1,9 +1,4 @@
-import numpy as np
 import xarray as xr
-
-import astropy.units as u
-import matplotlib.pyplot as plt
-from plasmapy.diagnostics.langmuir import swept_probe_analysis, reduce_bimaxwellian_temperature, Characteristic
 
 import sys
 import warnings
@@ -57,9 +52,14 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, ports, pr
                                                                    ).assign_attrs({"units": keys_units[key]})
                                  for key in keys_units.keys()})
 
+    # TODO Leo debug!
     num_positions = (diagnostics_ds.sizes['x'] * diagnostics_ds.sizes['y']
                      * diagnostics_ds.sizes['shot'] * diagnostics_ds.sizes['time'])
-    print(f"Calculating langmuir diagnostics ({len(ports)} probe(s) to analyze) ...")
+    # """
+    error_types = []
+    error_chart = np.zeros(shape=(num_ports, len(x), len(y), num_shots, num_plateaus))
+    print(f"Calculating Langmuir diagnostics for {len(ports)} probe(s) ...")
+    # """
 
     warnings.simplefilter(action='ignore')  # Suppress warnings to not break progress bar
     for p in range(characteristic_arrays.shape[0]):  # probe
@@ -71,18 +71,40 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, ports, pr
                         characteristic = characteristic_arrays[p, l, s, r]
                         diagnostics = diagnose_char(characteristic, probe_areas[p], ion_type, bimaxwellian=bimaxwellian)
                         pbar.update(1)
-                        if diagnostics in (1, 2):  # problem with diagnostics; otherwise diagnostics successful
-                            # debug_char(characteristic, diagnostics, p, l, r)  # DEBUG
+                        if isinstance(diagnostics, str):  # error with diagnostics
+                            # print(p, l, s, r, ": ", diagnostics)
+                            if diagnostics not in error_types:
+                                error_types.append(diagnostics)
+                            error_chart[p,
+                                        np.where(x == positions[l, 0])[0][0],
+                                        np.where(y == positions[l, 1])[0][0],
+                                        s, r] = error_types.index(diagnostics) + 1
                             continue
                         if bimaxwellian:
                             diagnostics = unpack_bimaxwellian(diagnostics)
                         for key in diagnostics.keys():
-                            # Crop diagnostics with "T_e" in name because otherwise skew averages, pressure data
-                            val = value_safe(diagnostics[key]) if "T_e" not in key \
-                                else crop_value(diagnostics[key], 0, 10)
+                            # REMOVED: crop diagnostics with "T_e" in name because otherwise skew averages/pressure data
+                            val = value_safe(diagnostics[key])  # if "T_e" not in / crop_value(diagnostics[key], 0, 10)
                             diagnostics_ds[key].loc[port, positions[l, 0], positions[l, 1], s, ramp_times[r]] = val
 
     warnings.simplefilter(action='default')  # Restore warnings to default handling
+
+    # Leo debug below
+    """
+    for s in range(error_chart.shape[3]):
+        ax = plt.subplot()
+        im = ax.imshow(error_chart[0, :, 0, s, :],
+                       extent=(positions[:, 0].min(), positions[:, 0].max(),
+                               ramp_times.value.min(), ramp_times.value.max()),
+                       origin="lower")
+        cbar = plt.colorbar(im)
+        cbar.set_ticks(list(np.arange(len(error_types) + 1)))
+        cbar.set_ticklabels(["No error"] + [error_types[t] for t in np.arange(len(error_types))])
+        plt.title(f"Error types (s = {s})")
+        plt.show()
+        # raise ValueError
+    """
+    # end Leo Debug
 
     return diagnostics_ds
 
@@ -91,9 +113,17 @@ def in_core(pos_list, core_radius):
     return [abs(pos) < core_radius.to(u.cm).value for pos in pos_list]
 
 
+def get_pressure(lang_ds, calibrated_electron_density, bimaxwellian):
+    r"""Calculate electron pressure from temperature and calibrated density"""
+    pressure_unit = u.Pa
+    electron_temperature = lang_ds['T_e_avg'] if bimaxwellian else lang_ds['T_e']
+    pressure = (3 / 2) * electron_temperature * calibrated_electron_density * (1. * u.eV * u.m ** -3).to(pressure_unit)
+    return pressure.assign_attrs({'units': str(pressure_unit)})
+
+
 def detect_steady_state_ramps(density: xr.DataArray, core_radius):
     core_density = density.where(np.logical_and(*in_core([density.x, density.y], core_radius)), drop=True)
-    core_density_time = core_density.isel(port=0).mean(['x', 'y']).squeeze()
+    core_density_time = core_density.isel(port=0).mean(['x', 'y', 'shot']).squeeze()
     threshold = 0.9 * core_density_time.max()
     start_index = (core_density_time > threshold).argmax().item() + 1
     end_index = core_density_time.sizes['time'] - np.nanargmax(
@@ -101,26 +131,23 @@ def detect_steady_state_ramps(density: xr.DataArray, core_radius):
     return start_index, end_index
 
 
-def diagnose_char(characteristic, probe_area, ion_type, bimaxwellian):
-    # TODO save error messages/optionally print to separate log file
+def diagnose_char(characteristic, probe_area, ion_type, bimaxwellian, indices=None):
     try:
         diagnostics = swept_probe_analysis(characteristic, probe_area, ion_type, bimaxwellian=bimaxwellian)
-    except ValueError:
-        return 1
-    except (TypeError, RuntimeError):
-        return 2
+    except (ValueError, TypeError, RuntimeError) as e:
+        diagnostics = str(e)
     return diagnostics
 
 
-def debug_char(characteristic, error_code, *pos):
+def debug_char(characteristic, error_str, *pos):
     # A debug function to plot plateaus that cause errors
-    if 5 < pos[-1] < 13 and 0.3 < pos[-2] / 71 < 0.7:  # max(characteristic.current) > 20 * u.mA
-        pass
-        # tqdm.write("Plateau at position " + str(pos) + " is unusable")
-        characteristic.plot()
-        plt.title(f"Plateau at position {pos} is unusable" if error_code == 1
-                  else f"Unknown error at position {pos}")
-        plt.show()
+    # TODO update the below core-checker
+    # if 5 < pos[-1] < 13 and 0.3 < pos[-2] / 71 < 0.7:  # max(characteristic.current) > 20 * u.mA
+    #      pass
+    #      tqdm.write("Plateau at position " + str(pos) + " is unusable")
+    characteristic.plot()
+    plt.title(f"{pos}\n{error_str}")
+    plt.show()
 
 
 def crop_value(diagnostic, minimum, maximum):  # discard diagnostic values (e.g. T_e) outside specified range
