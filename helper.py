@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import astropy.units as u
-from plasmapy.diagnostics.langmuir import *
+from plasmapy.diagnostics.langmuir import swept_probe_analysis, reduce_bimaxwellian_temperature, Characteristic
 
 
 plt.rcParams["figure.dpi"] = 160
