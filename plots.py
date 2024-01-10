@@ -1,27 +1,24 @@
-# Add comments
 from warnings import warn
 
+import xarray as xr
 import matplotlib
-import matplotlib.pyplot as plt
-import numpy as np
-
-import astropy.units as u
 from astropy import visualization
-from diagnostics import value_safe, unit_safe
+
+from helper import *
+
 # matplotlib.use('TkAgg')
-# TODO investigate
-matplotlib.use('QtAgg')
+# matplotlib.use('QtAgg')
 
 
-def plot_line_diagnostic_by(diagnostics_datasets: list, plot_diagnostic, port_selector, steady_state_by_runs,
-                            attribute=None, tolerance=1/2, share_y=True):
+def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagnostic, port_selector,
+                              steady_state_by_runs, attribute=None, tolerance=np.nan):
     # diagnostics_datasets is a list of different HDF5 datasets
 
     if attribute is None:
         attribute = [attr for attr in diagnostics_datasets[0].attrs if "Nominal" in attr]
     attributes = np.atleast_1d(attribute)
     if len(attributes) > 2:
-        raise ValueError("Cannot categorize line plots by more than two attributes")
+        raise ValueError("Cannot currently categorize line plots by more than two attributes")
 
     # outer_inverses = np.argsort([dataset[attributes[1]] for dataset in diagnostics_datasets]) if two_attrs else [None]
     # diagnostics_datasets_sorted = np.sort(diagnostics_datasets, order=np.flip(attribute))
@@ -37,7 +34,8 @@ def plot_line_diagnostic_by(diagnostics_datasets: list, plot_diagnostic, port_se
     outer_bounds = np.append(outer_indexes, len(outer_values))
 
     visualization.quantity_support()
-    plt.rcParams['figure.figsize'] = (4 + 4 * len(outer_indexes), 6)
+    plt.rcParams['figure.dpi'] = 300
+    plt.rcParams['figure.figsize'] = (3 + 3 * len(outer_indexes), 4)
     fig, axes = plt.subplots(1, len(outer_indexes), sharey="row")
 
     fig.suptitle(get_title(plot_diagnostic), size=18)
@@ -48,7 +46,7 @@ def plot_line_diagnostic_by(diagnostics_datasets: list, plot_diagnostic, port_se
         datasets = diagnostics_datasets_sorted[outer_bounds[outer_index]:outer_bounds[outer_index + 1]]
         num_datasets = outer_bounds[outer_index + 1] - outer_bounds[outer_index]
 
-        color_map = matplotlib.colormaps["plasma"](np.linspace(0, 1, num_datasets))
+        color_map = matplotlib.colormaps["plasma"](np.linspace(0, 0.9, num_datasets))
         for inner_index in range(num_datasets):
             dataset = port_selector(datasets[inner_index])  # TODO allow looping through multiple datasets returned
             inner_val = dataset.attrs[attributes[0]]
@@ -56,19 +54,27 @@ def plot_line_diagnostic_by(diagnostics_datasets: list, plot_diagnostic, port_se
             linear_dimension = get_valid_linear_dimension(dataset.sizes)
             linear_da = dataset.squeeze()[plot_diagnostic]
 
-            line_diagnostic = steady_state_only(linear_da,
-                                                steady_state_plateaus=steady_state_by_runs[0])  # TODO finish this!
-            line_diagnostic_mean = line_diagnostic.mean('time', keep_attrs=True)
-            line_diagnostic_std = line_diagnostic.std('time', ddof=1, keep_attrs=True)
+            linear_da_steady_state = steady_state_only(linear_da,
+                                                            steady_state_plateaus=steady_state_by_runs[inner_index])
+            linear_da_mean = linear_da_steady_state.mean(['shot', 'time'], keep_attrs=True)
+            linear_da_std = linear_da_steady_state.std(['shot', 'time'], ddof=1, keep_attrs=True)
+            linear_da_std *= 1.95 / np.sqrt(linear_da_steady_state.sizes['shot']
+                                            * linear_da_steady_state.sizes['time'])  # two-st.dev. confidence interval
 
-            line_diagnostic_points = line_diagnostic_mean.where(
-                line_diagnostic_std < np.abs(line_diagnostic_mean).mean() * tolerance)
-            # TODO incorporate tolerance - maybe compare std to (std if you find two-element moving ave. over time)?
+            # Filter out certain points due to inconsistent data (likely random noise that skews average higher)
+            if np.isfinite(tolerance):
+                da_median = linear_da_mean.median(keep_attrs=True)
+                linear_da_mean = linear_da_mean.where(linear_da_std < tolerance * da_median)  # TODO hardcoded
 
-            ax.plot(line_diagnostic.coords[linear_dimension], line_diagnostic_points,
-                    color=color_map[inner_index], label=str(inner_val))
-            ax.set_xlabel(line_diagnostic.coords[linear_dimension].attrs['units'])
-            ax.set_ylabel(line_diagnostic.attrs['units'])
+            if np.isfinite(linear_da_mean).any():
+                ax.errorbar(linear_da_mean.coords[linear_dimension], linear_da_mean, yerr=linear_da_std,
+                            fmt="-", color=color_map[inner_index], label=str(inner_val))
+            ax.set_xlabel(linear_da_mean.coords[linear_dimension].attrs['units'])
+            ax.set_ylabel(linear_da_mean.attrs['units'])
+            # TODO very hardcoded
+            if "eV" in linear_da_mean.attrs['units']:
+                ax.set_ylim((0, 6))
+            # ax.set_ylim((-0.4e18, 8e18))  # for truly hardcoded plot limits
         ax.tick_params(axis="y", left=True, labelleft=True)
         ax.title.set_text((attribute[1] + ": " + str(outer_val) if len(attribute) == 2 else "")
                           + "\nColor: " + attribute[0])
@@ -77,55 +83,60 @@ def plot_line_diagnostic_by(diagnostics_datasets: list, plot_diagnostic, port_se
     plt.show()
 
 
-def line_time_diagnostic_plot(diagnostics_dataset, diagnostic, plot_type, steady_state, show=True, **kwargs):
+def plot_line_diagnostic(diagnostics_ds: xr.Dataset, diagnostic, plot_type, steady_state, show=True,
+                         shot_mode="mean", tolerance=np.nan):
     # Plots the given diagnostic(s) from the dataset in the given style
 
-    try:
-        run_name = diagnostics_dataset.attrs['Run name'] + "\n"
-    except KeyError:
-        run_name = ""
+    run_name = f"{diagnostics_ds.attrs['Exp name']}, {diagnostics_ds.attrs['Run name']}"
 
-    linear_dimension = get_valid_linear_dimension(diagnostics_dataset.sizes)
-    linear_diagnostics_dataset = diagnostics_dataset.squeeze()
+    linear_dimension = get_valid_linear_dimension(diagnostics_ds.sizes)
+    pre_linear_ds = diagnostics_ds.squeeze()
+    linear_ds_std = pre_linear_ds.std(dim='shot', ddof=1, keep_attrs=True)
+
+    if shot_mode == "mean":
+        linear_ds = pre_linear_ds.mean(dim='shot', keep_attrs=True).squeeze()
+    elif shot_mode == "all":
+        raise NotImplementedError("Shot handling mode 'all' not yet supported for plotting")
+    else:
+        raise NotImplementedError("Shot handling mode " + repr(shot_mode) + " not currently implemented for plotting")
+
+    # Filter out certain points due to inconsistent data (likely random noise that skews average higher)
+    if np.isfinite(tolerance):  # note: an insidious error was made here with (tolerance != np.nan)
+        da_mean = linear_ds.mean()
+        linear_ds = linear_ds.where(linear_ds_std < tolerance * da_mean)
 
     diagnostic_list = np.atleast_1d(diagnostic)
-
-    """
-    if np.any([choice not in linear_diagnostics_dataset for choice in diagnostic_list]):
-        raise ValueError("The diagnostic choice input" + repr(diagnostic_list) + " contains invalid diagnostics. "
-                         "Valid diagnostics are:" + repr(linear_diagnostics_dataset.keys()))
-    """
 
     plot_types_1d = {'line'}
     plot_types_2d = {'contour', 'surface'}
 
     # Unsupported plot type
-    if plot_type not in plot_types_1d and plot_type not in plot_types_2d:
+    if plot_type not in plot_types_1d | plot_types_2d:
         warn("The type of plot " + repr(plot_type) + " is not in the supported plot type list "
              + repr(plot_types_1d | plot_types_2d) + ". Defaulting to contour plot.")
         plot_type = 'contour'
     # 1D plot type
     if plot_type in plot_types_1d:
-        linear_diagnostics_dataset_1d = steady_state_only(linear_diagnostics_dataset,
-                                                          steady_state_plateaus=steady_state).mean('time')
-        for choice in diagnostic_list:
-            if check_diagnostic(linear_diagnostics_dataset_1d, choice):
-                linear_plot_1d(linear_diagnostics_dataset_1d[choice], linear_dimension)
-                plt.title(run_name + get_title(choice) + " " + plot_type + " plot")
-                if show:
-                    plt.show()
+        linear_ds_1d = steady_state_only(linear_ds, steady_state_plateaus=steady_state).mean('time')
+        for key in diagnostic_list:
+            linear_plot_1d(linear_ds_1d[key], linear_dimension)
+            plt.title(run_name + "\n" + get_title(key) + " " + plot_type + " plot")
+            if show:
+                plt.show()
     # 2D plot type
     elif plot_type in plot_types_2d:
-        for choice in diagnostic_list:
-            if check_diagnostic(linear_diagnostics_dataset, choice):
-                linear_plot_2d(linear_diagnostics_dataset[choice], plot_type, linear_dimension)
-                plt.title(run_name + get_title(choice) + " " + plot_type + " plot (2D)")
+        for key in diagnostic_list:
+            try:
+                linear_plot_2d(linear_ds[key], plot_type, linear_dimension)
+                plt.title(run_name + "\n" + get_title(key) + " " + plot_type + " plot (2D)")
                 if show:
                     plt.show()
+            except ValueError as e:
+                print(f"Problem plotting {key} for {diagnostics_ds.attrs['Run name']}:"
+                      f"\n{repr(e)}")
 
 
 def get_valid_linear_dimension(diagnostics_dataset_sizes):
-
     if diagnostics_dataset_sizes['y'] == 1:
         linear_dimension = 'x'
     elif diagnostics_dataset_sizes['x'] == 1:
@@ -152,13 +163,9 @@ def linear_plot_2d(diagnostic_array, plot_type, linear_dimension, trim_colormap=
     if plot_type == "contour":
         diagnostic_array.plot.contourf(**plot_params, robust=True)
     elif plot_type == "surface":
-        trimmed_diagnostic_array = diagnostic_array.where(diagnostic_array <= trim_max)
-        trimmed_diagnostic_array.plot.surface(**plot_params)
+        # trimmed_diagnostic_array = diagnostic_array.where(diagnostic_array <= trim_max); bad to cherry pick data?
+        diagnostic_array.plot.surface(**plot_params)
         # TODO raise issue on xarray about surface plotting not handling np.nan properly in choosing colormap
-        """
-        # crop outlier diagnostic values; make sure that this is acceptable data handling
-        # note: only crops high values; cropping low and high would require numpy.logical_and, aka "both"
-        """
 
 
 def check_diagnostic(diagnostic_dataset, choice):
@@ -170,7 +177,7 @@ def check_diagnostic(diagnostic_dataset, choice):
         return False
 
 
-def get_title(diagnostic):
+def get_title(diagnostic: str) -> str:
 
     full_names = {'V_P': "Plasma potential",
                   'V_F': "Floating potential",
@@ -187,10 +194,10 @@ def get_title(diagnostic):
                   'P_e': "Electron pressure",
                   'n_e_cal': "Calibrated electron density"}
 
-    if diagnostic in full_names:
-        return full_names[diagnostic]
-    else:
-        return diagnostic
+    for key in sorted(list(full_names.keys()), key=len, reverse=True):
+        diagnostic = diagnostic.replace(key, full_names[key])
+
+    return diagnostic
 
 
 # TODO remove?
