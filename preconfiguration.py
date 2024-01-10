@@ -61,5 +61,9 @@ def get_ports_receptacles(hdf5_path):
         return {configs[probe]['probe']['port']: configs[probe]['receptacle'] for probe in configs}
 
 
-def get_ion(config_id):
-    return "He-4+"
+def get_ion(hdf5_path: str):
+    if "h2" in hdf5_path.lower():
+        print("Assuming fully dissociated hydrogen (H+)")
+        return "H+"
+    else:
+        return "He-4+"
