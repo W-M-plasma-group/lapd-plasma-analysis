@@ -3,10 +3,9 @@ from helper import *
 import warnings
 import bottleneck as bn
 from scipy.signal import find_peaks
-# from scipy.ndimage import uniform_filter1d
 
 
-def characterize_sweep_array(unsmooth_bias, unsmooth_current, margin, sample_sec):
+def characterize_sweep_array(unsmooth_bias, unsmooth_currents, margin, sample_sec):
     r"""
     Function that processes bias and current data into a DataArray of distinct Characteristics.
     Takes in bias and current arrays, smooths them, divides them into separate ramp sections, 
@@ -15,16 +14,18 @@ def characterize_sweep_array(unsmooth_bias, unsmooth_current, margin, sample_sec
     Parameters
     ----------
     :param unsmooth_bias: array, units of voltage
-    :param unsmooth_current: array, units of current
+    :param unsmooth_currents: array, units of current
     :param margin: int, positive
     :param sample_sec: float, units of time
     :return: 2D array of Characteristic objects by shot number and plateau number
     """
 
-    validate_sweep_units(unsmooth_bias, unsmooth_current)
-    # bias, current = smooth_characteristic(unsmooth_bias, unsmooth_current, margin=margin)
-    bias = bn.move_mean(unsmooth_bias, window=margin) * (u.V if unit_safe(unsmooth_bias) == u.V else 1)
-    current = bn.move_mean(unsmooth_current, window=margin) * (u.A if unit_safe(unsmooth_current) == u.A else 1)
+    validate_sweep_units(unsmooth_bias, unsmooth_currents)
+    if margin > 0:
+        bias = bn.move_mean(unsmooth_bias, window=margin) * (u.V if unit_safe(unsmooth_bias) == u.V else 1)
+        currents = bn.move_mean(unsmooth_currents, window=margin) * (u.A if unit_safe(unsmooth_currents) == u.A else 1)
+    else:
+        bias, currents = unsmooth_bias, unsmooth_currents
     ramp_bounds = isolate_plateaus(bias, margin=margin)
     # trim bad, distorted averaged ends in isolate plateaus
 
@@ -32,7 +33,7 @@ def characterize_sweep_array(unsmooth_bias, unsmooth_current, margin, sample_sec
     # NOTE: MATLAB code stores peak voltage time (end of plateaus), then only uses plateau times for very first position
     # This uses the time of the peak voltage for the average of all shots ("top of the average ramp")
 
-    return characteristic_array(bias, current, ramp_bounds), ramp_times
+    return characteristic_array(bias, currents, ramp_bounds), ramp_times
 
 
 def isolate_plateaus(bias, margin=0):
@@ -85,7 +86,7 @@ def characteristic_array(bias, current, plateau_ranges):
     plateau_slices = np.array([slice(plateau[0], plateau[1]) for plateau in plateau_ranges])
 
     # Mixed arbitrary/indexed list comprehension
-    print(f"Creating characteristics ({currents.shape[0]} probes to analyze)...")
+    print(f"Creating characteristics for {currents.shape[0]} probe(s) ...")
     warnings.simplefilter(action='ignore', category=FutureWarning)  # Suppress FutureWarnings to not break loading bar
     print("\t(plasmapy.langmuir.diagnostics pending deprecation FutureWarning suppressed)")
     return np.concatenate([np.array([[[Characteristic(bias[pos, shot, plateau_slice], current[pos, shot, plateau_slice])

@@ -8,28 +8,28 @@ from getIVsweep import *
 from characterization import *
 from diagnostics import *
 from plots import *
-from netCDFaccess import *
+from file_access import *
 from interferometry import *
 from neutrals import *
 from experimental import *
 from preconfiguration import *
-from helper import *
 from characteristic_view import *
 
-# TODO prompt user to change these?
-hdf5_folder = "/Users/leomurphy/lapd-data/November_2022/"                 # end this with slash
-# "/Users/leomurphy/lapd-data/April_2018/"
-# "/Users/leomurphy/lapd-data/March_2022/"
+""" End directory paths with a slash """
+# hdf5_folder = "/Users/leomurphy/lapd-data/April_2018/"
+hdf5_folder = "/Users/leomurphy/lapd-data/March_2022/"
+# hdf5_folder = "/Users/leomurphy/lapd-data/November_2022/"
 
 langmuir_nc_folder = hdf5_folder + "lang_nc/"
 
-# User file options
-interferometry_calibrate = True                        # TODO make automatic, or at least try whenever possible
+""" Set to False or equivalent if interferometry calibration is not desired """
+interferometry_folder = hdf5_folder
+# interferometry_folder = "/Users/leomurphy/lapd-data/November_2022/uwave_288_GHz_waveforms/"
 
-# User parameters
-bimaxwellian = False                                    # TODO perform both and store in same NetCDF file
-smoothing_margin = 40                                   # Optimal values in range 0-25
-plot_tolerance = 1.                                     # TODO optimal values are np.nan (plot all points) or >= 0.2
+""" User parameters """
+bimaxwellian = False                                    # TODO perform both and store in same NetCDF file?
+smoothing_margin = 40                                   # Optimal values in range 0-50
+plot_tolerance = 0.5                                     # Optimal values are np.nan (plot all points) or >= 0.2
 
 # QUESTION: can we calibrate both Langmuir probes using an interferometry ratio depending only on one of them?
 core_radius = 26. * u.cm                                         # From MATLAB code
@@ -42,19 +42,19 @@ core_radius = 26. * u.cm                                         # From MATLAB c
   |    |                      '      |       A       
   |    |                      '      |       |   ~75 cm plasma diameter
   |____|______________________'______|       V
-      [a]                    [b]    [c]
+      (a)                    (b)    (c)
         +z direction (+ports) ==>
                   plasma flow ==>
             magnetic field B0 ==>
 
-(a) LaB6 electron beam cathode
-(b) downstream mesh anode
-(c) downstream cathode
+a) LaB6 electron beam cathode
+b) downstream mesh anode
+c) downstream cathode
 """
 
 
 def port_selector(ds):  # TODO allow multiple modified datasets to be returned
-    # port_list = dataset.port  # use if switch to dataset.sel
+    # use "port_list = dataset.port" if switch to dataset.sel
     manual_attrs = ds.attrs  # TODO raise xarray issue about losing attrs even with xr.set_options(keep_attrs=True):
     manual_sub_attrs = {key: ds[key].attrs for key in ds}
     ds_port_selected = ds.isel(port=0)  # - ds.isel(port=1)  # TODO user change for ex. delta-P-parallel
@@ -67,25 +67,20 @@ def port_selector(ds):  # TODO allow multiple modified datasets to be returned
 
 if __name__ == "__main__":
 
+    interferometry_calibrate = bool(interferometry_folder)
     if not interferometry_calibrate:
         print("Interferometry calibration is OFF. "
               "Interferometry-calibrated electron density ('n_e_cal') is not available.")
 
+    print("Current HDF5 directory path:\t\t\t", repr(hdf5_folder),
+          "\nCurrent NetCDF directory path:\t\t\t", repr(langmuir_nc_folder),
+          "\nCurrent interferometry directory path:\t", repr(interferometry_folder),
+          "\nThese can be changed in main.py.")
+    input("Enter any key to continue: ")
+
     netcdf_folder = ensure_directory(langmuir_nc_folder)  # Create folder to save NetCDF files if not yet existing
 
-    # list possible diagnostics and their full names, e.g. "n_e" and "Electron density"
-    diagnostic_name_dict = {key: get_title(key)
-                            for key in get_diagnostic_keys_units(bimaxwellian=bimaxwellian).keys()}
-    diagnostic_name_list = list(diagnostic_name_dict.values())
-
-    # TODO move until after files loaded!
-    print("The following diagnostics are available to plot: ")
-    diagnostics_to_plot_ints = choose_multiple_list(diagnostic_name_list, "diagnostic",
-                                                    null_action="calculate diagnostics without plotting")
-    diagnostic_to_plot_list = [list(diagnostic_name_dict.keys())[choice] for choice in diagnostics_to_plot_ints]
-    print("Diagnostics selected:", diagnostic_to_plot_list)
-
-    print("The following NetCDF files were found in the NetCDF folder (specified in main.py): ")
+    print("\nThe following NetCDF files were found in the NetCDF folder (specified in main.py): ")
     nc_paths = sorted(search_folder(netcdf_folder, 'nc', limit=52))
     nc_paths_to_open_ints = choose_multiple_list(nc_paths, "NetCDF file",
                                                  null_action="perform diagnostics on HDF5 files")
@@ -93,7 +88,7 @@ if __name__ == "__main__":
     if len(nc_paths_to_open_ints) > 0:
         datasets = [xr.open_dataset(nc_paths[choice]) for choice in nc_paths_to_open_ints]
     else:
-        print("The following HDF5 files were found in the HDF5 folder (specified in main.py): ")
+        print("\nThe following HDF5 files were found in the HDF5 folder (specified in main.py): ")
         hdf5_paths = sorted(search_folder(hdf5_folder, "hdf5", limit=52))
         hdf5_chosen_ints = choose_multiple_list(hdf5_paths, "HDF5 file")
         hdf5_chosen_list = [hdf5_paths[choice] for choice in hdf5_chosen_ints]
@@ -101,7 +96,7 @@ if __name__ == "__main__":
         chara_view_mode = ""
         if len(hdf5_chosen_list) == 1:
             while chara_view_mode not in ["y", "n"]:
-                chara_view_mode = input("Use characteristic plotting mode? (y/n) ").lower()
+                chara_view_mode = input("Start characteristic plotting mode? (y/n) ").lower()
             chara_view_mode = (chara_view_mode == "y")
 
         datasets = []
@@ -110,9 +105,9 @@ if __name__ == "__main__":
             print("\nOpening file", repr(hdf5_path), "...")
 
             exp_params_dict = get_exp_params(hdf5_path)  # list of experimental parameters
+            ion_type = get_ion(exp_params_dict['Run name'])
             config_id = get_config_id(exp_params_dict['Exp name'])
             vsweep_board_channel = get_vsweep_bc(config_id)
-            ion_type = get_ion(config_id)
             langmuir_probes = get_probe_config(hdf5_path, config_id)
             voltage_gain = get_voltage_gain(config_id)
 
@@ -128,35 +123,44 @@ if __name__ == "__main__":
 
             diagnostics_dataset = langmuir_diagnostics(characteristics, positions, ramp_times, ports,
                                                        langmuir_probes['area'], ion_type, bimaxwellian=bimaxwellian)
-
-            # Perform interferometry calibration for electron density
-            if interferometry_calibrate:
-                steady_state_plateaus = detect_steady_state_ramps(diagnostics_dataset['n_e'], core_radius)
-                calibrated_electron_density = interferometry_calibration(diagnostics_dataset['n_e'], hdf5_path,
-                                                                         steady_state_plateaus, core_radius)
-                diagnostics_dataset = diagnostics_dataset.assign({"n_e_cal": calibrated_electron_density})
-            else:
-                calibrated_electron_density = diagnostics_dataset['n_e']
-
-            # Find electron pressure
-            pressure_unit = u.Pa
-            electron_temperature = diagnostics_dataset['T_e_avg'] if bimaxwellian else diagnostics_dataset['T_e']
-            pressure = (3 / 2) * electron_temperature * calibrated_electron_density * (1. * u.eV * u.m ** -3
-                                                                                       ).to(pressure_unit)
-            diagnostics_dataset = diagnostics_dataset.assign({'P_e': pressure})
-            diagnostics_dataset['P_e'] = diagnostics_dataset['P_e'].assign_attrs({'units': str(pressure_unit)})
-
-            # Assign experimental parameters to diagnostic data attributes
             diagnostics_dataset = diagnostics_dataset.assign_attrs(exp_params_dict)
-            diagnostics_dataset = diagnostics_dataset.assign_attrs({"Interferometry calibrated":
-                                                                    interferometry_calibrate})
-
             datasets.append(diagnostics_dataset)
 
-            save_diagnostic_path = make_path(netcdf_folder, exp_params_dict['Run name'], "nc")
-            write_netcdf(diagnostics_dataset, save_diagnostic_path)
-
     steady_state_plateaus_runs = [detect_steady_state_ramps(dataset['n_e'], core_radius) for dataset in datasets]
+
+    if len(nc_paths_to_open_ints) == 0:
+        # External interferometry calibration for electron density
+        for i in range(len(datasets)):
+            if interferometry_calibrate:
+                calibrated_electron_density = interferometry_calibration(datasets[i]['n_e'].copy(),
+                                                                         datasets[i].attrs,          # exp params
+                                                                         interferometry_folder,
+                                                                         steady_state_plateaus_runs[i],
+                                                                         core_radius=core_radius)
+                datasets[i] = datasets[i].assign({"n_e_cal": calibrated_electron_density})
+            else:
+                calibrated_electron_density = datasets[i]['n_e'].copy()
+
+            datasets[i] = datasets[i].assign({'P_e': get_pressure(datasets[i], calibrated_electron_density,
+                                                                  bimaxwellian)})
+            datasets[i] = datasets[i].assign_attrs({"Interferometry calibrated": interferometry_calibrate})
+
+            save_diagnostic_path = make_path(netcdf_folder, datasets[i].attrs['Run name'], "nc")
+            write_netcdf(datasets[i], save_diagnostic_path)
+
+    # Get possible diagnostics and their full names, e.g. "n_e" and "Electron density"
+    diagnostic_name_dict = {key: get_title(key)
+                            for key in set.intersection(*[set(dataset) for dataset in datasets])}
+
+    # Ask users for list of diagnostics to plot
+    print("The following diagnostics are available to plot: ")
+    diagnostics_sort_indices = np.argsort(list(diagnostic_name_dict.keys()))
+    diagnostics_to_plot_ints = choose_multiple_list(np.array(list(diagnostic_name_dict.values())
+                                                             )[diagnostics_sort_indices],
+                                                    "diagnostic", null_action="end")
+    diagnostic_to_plot_list = [np.array(list(diagnostic_name_dict.keys()))[diagnostics_sort_indices][choice]
+                               for choice in diagnostics_to_plot_ints]
+    print("Diagnostics selected:", diagnostic_to_plot_list)
 
     """Plot chosen diagnostics for each individual dataset"""
     """
