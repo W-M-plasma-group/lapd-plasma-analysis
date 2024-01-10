@@ -1,18 +1,13 @@
-# Add comments
 from warnings import warn
 
-import matplotlib
-import matplotlib.pyplot as plt
-import numpy as np
 import xarray as xr
-
-import astropy.units as u
+import matplotlib
 from astropy import visualization
 
 from helper import *
 
 # matplotlib.use('TkAgg')
-matplotlib.use('QtAgg')
+# matplotlib.use('QtAgg')
 
 
 def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagnostic, port_selector,
@@ -39,7 +34,8 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
     outer_bounds = np.append(outer_indexes, len(outer_values))
 
     visualization.quantity_support()
-    plt.rcParams['figure.figsize'] = (4 + 4 * len(outer_indexes), 6)
+    plt.rcParams['figure.dpi'] = 300
+    plt.rcParams['figure.figsize'] = (3 + 3 * len(outer_indexes), 4)
     fig, axes = plt.subplots(1, len(outer_indexes), sharey="row")
 
     fig.suptitle(get_title(plot_diagnostic), size=18)
@@ -50,7 +46,7 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
         datasets = diagnostics_datasets_sorted[outer_bounds[outer_index]:outer_bounds[outer_index + 1]]
         num_datasets = outer_bounds[outer_index + 1] - outer_bounds[outer_index]
 
-        color_map = matplotlib.colormaps["plasma"](np.linspace(0, 1, num_datasets))
+        color_map = matplotlib.colormaps["plasma"](np.linspace(0, 0.9, num_datasets))
         for inner_index in range(num_datasets):
             dataset = port_selector(datasets[inner_index])  # TODO allow looping through multiple datasets returned
             inner_val = dataset.attrs[attributes[0]]
@@ -58,24 +54,27 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
             linear_dimension = get_valid_linear_dimension(dataset.sizes)
             linear_da = dataset.squeeze()[plot_diagnostic]
 
-            linear_da_steady_state_mean = steady_state_only(linear_da,
-                                                            steady_state_plateaus=steady_state_by_runs[inner_index]
-                                                            ).mean('time', keep_attrs=True)
-            linear_da_mean = linear_da_steady_state_mean.mean('shot', keep_attrs=True)
-            linear_da_std = linear_da_steady_state_mean.std('shot', ddof=1, keep_attrs=True)
-            # TODO but incorporate variation between means along the *time* axis too!
+            linear_da_steady_state = steady_state_only(linear_da,
+                                                            steady_state_plateaus=steady_state_by_runs[inner_index])
+            linear_da_mean = linear_da_steady_state.mean(['shot', 'time'], keep_attrs=True)
+            linear_da_std = linear_da_steady_state.std(['shot', 'time'], ddof=1, keep_attrs=True)
+            linear_da_std *= 1.95 / np.sqrt(linear_da_steady_state.sizes['shot']
+                                            * linear_da_steady_state.sizes['time'])  # two-st.dev. confidence interval
 
             # Filter out certain points due to inconsistent data (likely random noise that skews average higher)
             if np.isfinite(tolerance):
-                da_mean = linear_da_mean.mean(keep_attrs=True)
-                linear_da_mean = linear_da_mean.where(linear_da_std < tolerance * da_mean)
+                da_median = linear_da_mean.median(keep_attrs=True)
+                linear_da_mean = linear_da_mean.where(linear_da_std < tolerance * da_median)  # TODO hardcoded
 
-            ax.errorbar(linear_da_mean.coords[linear_dimension], linear_da_mean, yerr=linear_da_std,
-                        fmt="-", color=color_map[inner_index], label=str(inner_val))
-            # ax.plot(line_diagnostic.coords[linear_dimension], line_diagnostic_points,
-            #         color=color_map[inner_index], label=str(inner_val))
+            if np.isfinite(linear_da_mean).any():
+                ax.errorbar(linear_da_mean.coords[linear_dimension], linear_da_mean, yerr=linear_da_std,
+                            fmt="-", color=color_map[inner_index], label=str(inner_val))
             ax.set_xlabel(linear_da_mean.coords[linear_dimension].attrs['units'])
             ax.set_ylabel(linear_da_mean.attrs['units'])
+            # TODO very hardcoded
+            if "eV" in linear_da_mean.attrs['units']:
+                ax.set_ylim((0, 6))
+            # ax.set_ylim((-0.4e18, 8e18))  # for truly hardcoded plot limits
         ax.tick_params(axis="y", left=True, labelleft=True)
         ax.title.set_text((attribute[1] + ": " + str(outer_val) if len(attribute) == 2 else "")
                           + "\nColor: " + attribute[0])
@@ -120,7 +119,6 @@ def plot_line_diagnostic(diagnostics_ds: xr.Dataset, diagnostic, plot_type, stea
     if plot_type in plot_types_1d:
         linear_ds_1d = steady_state_only(linear_ds, steady_state_plateaus=steady_state).mean('time')
         for key in diagnostic_list:
-            # if check_diagnostic(linear_ds_1d, choice):
             linear_plot_1d(linear_ds_1d[key], linear_dimension)
             plt.title(run_name + "\n" + get_title(key) + " " + plot_type + " plot")
             if show:
@@ -128,15 +126,17 @@ def plot_line_diagnostic(diagnostics_ds: xr.Dataset, diagnostic, plot_type, stea
     # 2D plot type
     elif plot_type in plot_types_2d:
         for key in diagnostic_list:
-            # if check_diagnostic(linear_ds, choice):
-            linear_plot_2d(linear_ds[key], plot_type, linear_dimension)
-            plt.title(run_name + "\n" + get_title(key) + " " + plot_type + " plot (2D)")
-            if show:
-                plt.show()
+            try:
+                linear_plot_2d(linear_ds[key], plot_type, linear_dimension)
+                plt.title(run_name + "\n" + get_title(key) + " " + plot_type + " plot (2D)")
+                if show:
+                    plt.show()
+            except ValueError as e:
+                print(f"Problem plotting {key} for {diagnostics_ds.attrs['Run name']}:"
+                      f"\n{repr(e)}")
 
 
 def get_valid_linear_dimension(diagnostics_dataset_sizes):
-
     if diagnostics_dataset_sizes['y'] == 1:
         linear_dimension = 'x'
     elif diagnostics_dataset_sizes['x'] == 1:
