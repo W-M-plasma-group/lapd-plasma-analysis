@@ -27,7 +27,7 @@ interferometry_folder = hdf5_folder
 # interferometry_folder = "/Users/leomurphy/lapd-data/November_2022/uwave_288_GHz_waveforms/"
 
 """ User parameters """
-probes_choice = [0, 1]                                  # TODO user choice for probe or linear combination to use
+probes_choice = [1, 0]                                  # TODO user choice for probe or linear combination to use
 bimaxwellian = False                                    # TODO perform both and store in same NetCDF file?
 smoothing_margin = 40                                   # Optimal values in range 0-50
 plot_tolerance = 0.5                                     # Optimal values are np.nan (plot all points) or >= 0.2
@@ -97,7 +97,7 @@ if __name__ == "__main__":
             ion_type = get_ion(exp_params_dict['Run name'])
             config_id = get_config_id(exp_params_dict['Exp name'])
             vsweep_board_channel = get_vsweep_bc(config_id)
-            langmuir_probes = get_probe_config(hdf5_path, config_id)
+            langmuir_probes = get_langmuir_config(hdf5_path, config_id)
             voltage_gain = get_voltage_gain(config_id)
 
             # get current and bias data from Langmuir probe, then form into array of Characteristic objects
@@ -155,8 +155,8 @@ if __name__ == "__main__":
     """
     for plot_diagnostic in diagnostic_to_plot_list:
         for i in range(len(datasets)):
-            plot_line_diagnostic(port_selector(datasets[i]), plot_diagnostic, 'contour', steady_state_plateaus_runs[i],
-                                 tolerance=plot_tolerance)
+            plot_line_diagnostic(port_selector(datasets[i], probes_choice), plot_diagnostic, 'contour',
+                                 steady_state_plateaus_runs[i], tolerance=plot_tolerance)
     # """
 
     """
