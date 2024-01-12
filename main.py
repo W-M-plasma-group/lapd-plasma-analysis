@@ -17,8 +17,8 @@ from characteristic_view import *
 
 """ End directory paths with a slash """
 # hdf5_folder = "/Users/leomurphy/lapd-data/April_2018/"
-hdf5_folder = "/Users/leomurphy/lapd-data/March_2022/"
-# hdf5_folder = "/Users/leomurphy/lapd-data/November_2022/"
+# hdf5_folder = "/Users/leomurphy/lapd-data/March_2022/"
+hdf5_folder = "/Users/leomurphy/lapd-data/November_2022/"
 
 langmuir_nc_folder = hdf5_folder + "lang_nc/"
 
@@ -82,11 +82,7 @@ if __name__ == "__main__":
         hdf5_chosen_ints = choose_multiple_list(hdf5_paths, "HDF5 file")
         hdf5_chosen_list = [hdf5_paths[choice] for choice in hdf5_chosen_ints]
 
-        chara_view_mode = ""
-        if len(hdf5_chosen_list) == 1:
-            while chara_view_mode not in ["y", "n"]:
-                chara_view_mode = input("Start characteristic plotting mode? (y/n) ").lower()
-            chara_view_mode = (chara_view_mode == "y")
+        chara_view_mode = (len(hdf5_chosen_list) == 1) and ask_yes_or_no("Start characteristic plotting mode? (y/n) ")
 
         datasets = []
         for hdf5_path in hdf5_chosen_list:
@@ -152,21 +148,19 @@ if __name__ == "__main__":
     print("Diagnostics selected:", diagnostic_to_plot_list)
 
     """Plot chosen diagnostics for each individual dataset"""
-    """
-    for plot_diagnostic in diagnostic_to_plot_list:
-        for i in range(len(datasets)):
-            plot_line_diagnostic(port_selector(datasets[i], probes_choice), plot_diagnostic, 'contour',
-                                 steady_state_plateaus_runs[i], tolerance=plot_tolerance)
-    # """
+    if ask_yes_or_no("Generate contour plot of selected diagnostics over time and radial position? (y/n) "):
+        for plot_diagnostic in diagnostic_to_plot_list:
+            for i in range(len(datasets)):
+                plot_line_diagnostic(port_selector(datasets[i], probes_choice), plot_diagnostic, 'contour',
+                                     steady_state_plateaus_runs[i], tolerance=plot_tolerance)
 
     """
     Plot radial profiles of diagnostic (steady-state time average), with color corresponding to first attribute
         and plot position on multiplot corresponding to second attribute
     """
-    # """
-    for plot_diagnostic in diagnostic_to_plot_list:
-        multiplot_line_diagnostic(datasets, plot_diagnostic, probes_choice,
-                                  steady_state_plateaus_runs, tolerance=plot_tolerance)
-    # """
+    if ask_yes_or_no("Generate line plot of selected diagnostics over radial position? (y/n) "):
+        for plot_diagnostic in diagnostic_to_plot_list:
+            multiplot_line_diagnostic(datasets, plot_diagnostic, probes_choice,
+                                      steady_state_plateaus_runs, tolerance=plot_tolerance)
 
 # TODO Not all MATLAB code has been transferred (e.g. neutrals, ExB)
