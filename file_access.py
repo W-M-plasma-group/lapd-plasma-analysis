@@ -22,6 +22,13 @@ def choose_multiple_list(choices, name, null_action=None):
     return [chr_to_num(letter) for letter in selection_str]
 
 
+def ask_yes_or_no(prompt):
+    response = ""
+    while response not in ("y", "n"):
+        response = input(prompt).lower()
+    return response == "y"
+
+
 def chr_to_num(car):
     code = ord(car)
     if 97 <= code <= 122:
