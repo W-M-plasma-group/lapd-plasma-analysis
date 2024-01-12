@@ -101,9 +101,10 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, ports, pr
         cbar.set_ticks(list(np.arange(len(error_types) + 1)))
         cbar.set_ticklabels(["No error"] + [error_types[t] for t in np.arange(len(error_types))])
         plt.title(f"Error types (s = {s})")
+        plt.tight_layout()
         plt.show()
         # raise ValueError
-    """
+    # """
     # end Leo Debug
 
     return diagnostics_ds
