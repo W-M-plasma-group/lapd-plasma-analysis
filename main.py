@@ -117,12 +117,16 @@ if __name__ == "__main__":
         # External interferometry calibration for electron density
         for i in range(len(datasets)):
             if interferometry_calibrate:
-                calibrated_electron_density = interferometry_calibration(datasets[i]['n_e'].copy(),
-                                                                         datasets[i].attrs,          # exp params
-                                                                         interferometry_folder,
-                                                                         steady_state_plateaus_runs[i],
-                                                                         core_radius=core_radius)
-                datasets[i] = datasets[i].assign({"n_e_cal": calibrated_electron_density})
+                try:
+                    calibrated_electron_density = interferometry_calibration(datasets[i]['n_e'].copy(),
+                                                                             datasets[i].attrs,          # exp params
+                                                                             interferometry_folder,
+                                                                             steady_state_plateaus_runs[i],
+                                                                             core_radius=core_radius)
+                    datasets[i] = datasets[i].assign({"n_e_cal": calibrated_electron_density})
+                except (IndexError, ValueError, TypeError, AttributeError, KeyError) as e:
+                    print(f"Error in calibrating electron density: \n{str(e)}")
+                    calibrated_electron_density = datasets[i]['n_e'].copy()
             else:
                 calibrated_electron_density = datasets[i]['n_e'].copy()
 
