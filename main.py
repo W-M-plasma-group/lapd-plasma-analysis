@@ -17,8 +17,8 @@ from characteristic_view import *
 
 """ End directory paths with a slash """
 # hdf5_folder = "/Users/leomurphy/lapd-data/April_2018/"
-hdf5_folder = "/Users/leomurphy/lapd-data/March_2022/"
-# hdf5_folder = "/Users/leomurphy/lapd-data/November_2022/"
+# hdf5_folder = "/Users/leomurphy/lapd-data/March_2022/"
+hdf5_folder = "/Users/leomurphy/lapd-data/November_2022/"
 
 langmuir_nc_folder = hdf5_folder + "lang_nc/"
 
@@ -27,9 +27,10 @@ interferometry_folder = hdf5_folder
 # interferometry_folder = "/Users/leomurphy/lapd-data/November_2022/uwave_288_GHz_waveforms/"
 
 """ User parameters """
+probes_choice = [1, 0]                                  # TODO user choice for probe or linear combination to use
 bimaxwellian = False                                    # TODO perform both and store in same NetCDF file?
-smoothing_margin = 40                                   # Optimal values in range 0-50
-plot_tolerance = 0.5                                     # Optimal values are np.nan (plot all points) or >= 0.2
+smoothing_margin = 200                                  # Optimal values in range 100-400 if "median" smoothing method
+plot_tolerance = 1                                    # Optimal values are np.nan (plot all points) or >= 0.2
 
 # QUESTION: can we calibrate both Langmuir probes using an interferometry ratio depending only on one of them?
 core_radius = 26. * u.cm                                         # From MATLAB code
@@ -51,18 +52,6 @@ a) LaB6 electron beam cathode
 b) downstream mesh anode
 c) downstream cathode
 """
-
-
-def port_selector(ds):  # TODO allow multiple modified datasets to be returned
-    # use "port_list = dataset.port" if switch to dataset.sel
-    manual_attrs = ds.attrs  # TODO raise xarray issue about losing attrs even with xr.set_options(keep_attrs=True):
-    manual_sub_attrs = {key: ds[key].attrs for key in ds}
-    ds_port_selected = ds.isel(port=0)  # - ds.isel(port=1)  # TODO user change for ex. delta-P-parallel
-    for key in ds:
-        ds_port_selected[key] = ds_port_selected[key].assign_attrs(manual_sub_attrs[key])
-    return ds_port_selected.assign_attrs(manual_attrs)
-    # ask user for a linear transformation/matrix?
-    # Add a string attribute to the dataset to describe which port(s) comes from
 
 
 if __name__ == "__main__":
@@ -93,11 +82,7 @@ if __name__ == "__main__":
         hdf5_chosen_ints = choose_multiple_list(hdf5_paths, "HDF5 file")
         hdf5_chosen_list = [hdf5_paths[choice] for choice in hdf5_chosen_ints]
 
-        chara_view_mode = ""
-        if len(hdf5_chosen_list) == 1:
-            while chara_view_mode not in ["y", "n"]:
-                chara_view_mode = input("Start characteristic plotting mode? (y/n) ").lower()
-            chara_view_mode = (chara_view_mode == "y")
+        chara_view_mode = (len(hdf5_chosen_list) == 1) and ask_yes_or_no("Start characteristic plotting mode? (y/n) ")
 
         datasets = []
         for hdf5_path in hdf5_chosen_list:
@@ -108,7 +93,7 @@ if __name__ == "__main__":
             ion_type = get_ion(exp_params_dict['Run name'])
             config_id = get_config_id(exp_params_dict['Exp name'])
             vsweep_board_channel = get_vsweep_bc(config_id)
-            langmuir_probes = get_probe_config(hdf5_path, config_id)
+            langmuir_probes = get_langmuir_config(hdf5_path, config_id)
             voltage_gain = get_voltage_gain(config_id)
 
             # get current and bias data from Langmuir probe, then form into array of Characteristic objects
@@ -132,12 +117,16 @@ if __name__ == "__main__":
         # External interferometry calibration for electron density
         for i in range(len(datasets)):
             if interferometry_calibrate:
-                calibrated_electron_density = interferometry_calibration(datasets[i]['n_e'].copy(),
-                                                                         datasets[i].attrs,          # exp params
-                                                                         interferometry_folder,
-                                                                         steady_state_plateaus_runs[i],
-                                                                         core_radius=core_radius)
-                datasets[i] = datasets[i].assign({"n_e_cal": calibrated_electron_density})
+                try:
+                    calibrated_electron_density = interferometry_calibration(datasets[i]['n_e'].copy(),
+                                                                             datasets[i].attrs,          # exp params
+                                                                             interferometry_folder,
+                                                                             steady_state_plateaus_runs[i],
+                                                                             core_radius=core_radius)
+                    datasets[i] = datasets[i].assign({"n_e_cal": calibrated_electron_density})
+                except (IndexError, ValueError, TypeError, AttributeError, KeyError) as e:
+                    print(f"Error in calibrating electron density: \n{str(e)}")
+                    calibrated_electron_density = datasets[i]['n_e'].copy()
             else:
                 calibrated_electron_density = datasets[i]['n_e'].copy()
 
@@ -163,21 +152,19 @@ if __name__ == "__main__":
     print("Diagnostics selected:", diagnostic_to_plot_list)
 
     """Plot chosen diagnostics for each individual dataset"""
-    """
-    for plot_diagnostic in diagnostic_to_plot_list:
-        for i in range(len(datasets)):
-            plot_line_diagnostic(port_selector(datasets[i]), plot_diagnostic, 'contour', steady_state_plateaus_runs[i],
-                                 tolerance=plot_tolerance)
-    # """
+    if ask_yes_or_no("Generate contour plot of selected diagnostics over time and radial position? (y/n) "):
+        for plot_diagnostic in diagnostic_to_plot_list:
+            for i in range(len(datasets)):
+                plot_line_diagnostic(port_selector(datasets[i], probes_choice), plot_diagnostic, 'contour',
+                                     steady_state_plateaus_runs[i], tolerance=plot_tolerance)
 
     """
     Plot radial profiles of diagnostic (steady-state time average), with color corresponding to first attribute
         and plot position on multiplot corresponding to second attribute
     """
-    # """
-    for plot_diagnostic in diagnostic_to_plot_list:
-        multiplot_line_diagnostic(datasets, plot_diagnostic, port_selector,
-                                  steady_state_plateaus_runs, tolerance=plot_tolerance)
-    # """
+    if ask_yes_or_no("Generate line plot of selected diagnostics over radial position? (y/n) "):
+        for plot_diagnostic in diagnostic_to_plot_list:
+            multiplot_line_diagnostic(datasets, plot_diagnostic, probes_choice,
+                                      steady_state_plateaus_runs, tolerance=plot_tolerance)
 
 # TODO Not all MATLAB code has been transferred (e.g. neutrals, ExB)

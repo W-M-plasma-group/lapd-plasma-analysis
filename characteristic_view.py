@@ -44,9 +44,10 @@ def display_characteristics(characteristics_array, positions, ports, ramp_times,
                 diagnostics = swept_probe_analysis(chara_to_plot, areas[probe_x_y_ramp_to_plot[0]], ion, bimaxwellian)
                 electron_temperature = diagnostics['T_e'] if not bimaxwellian \
                     else unpack_bimaxwellian(diagnostics)['T_e_avg']
-                plot_title += f"\nTemperature: {electron_temperature}"
-            except (ValueError, RuntimeError, TypeError):
-                plot_title += f"\n(Error calculating plasma diagnostics)"
+                plot_title += f"\nTemperature: {electron_temperature:.3f}"
+            except (ValueError, RuntimeError, TypeError) as e:
+                plot_title += f"\n(Error calculating plasma diagnostics: \n{str(e)[:35]})"
         chara_to_plot.plot()
         plt.title(plot_title)
+        plt.tight_layout()
         plt.show()

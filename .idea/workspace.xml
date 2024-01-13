@@ -4,18 +4,12 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="99051048-4239-4d54-a2e8-6a0399c265e9" name="Changes" comment="Introduce existing astropy constants library to interferometry functions; reword comments">
-      <change beforePath="$PROJECT_DIR$/.idea/lapd-plasma-analysis.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/lapd-plasma-analysis.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+    <list default="true" id="99051048-4239-4d54-a2e8-6a0399c265e9" name="Changes" comment="Implement tight_layout for plots">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/characterization.py" beforeDir="false" afterPath="$PROJECT_DIR$/characterization.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/diagnostics.py" beforeDir="false" afterPath="$PROJECT_DIR$/diagnostics.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/helper.py" beforeDir="false" afterPath="$PROJECT_DIR$/helper.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/interferometry.py" beforeDir="false" afterPath="$PROJECT_DIR$/interferometry.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/netCDFaccess.py" beforeDir="false" afterPath="$PROJECT_DIR$/file_access.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/plots.py" beforeDir="false" afterPath="$PROJECT_DIR$/plots.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/preconfiguration.py" beforeDir="false" afterPath="$PROJECT_DIR$/preconfiguration.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -72,7 +66,7 @@
     &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
     &quot;WebServerToolWindowFactoryState&quot;: &quot;false&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;fourier&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;leo&quot;,
     &quot;last.edited.regexp&quot;: &quot;08_radial_line_25press_3500A.hdf5&quot;,
     &quot;last_opened_file_path&quot;: &quot;/Users/leomurphy/Library/Application Support/JetBrains/PyCharm2023.2/scratches&quot;,
     &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
@@ -121,114 +115,7 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
-    <configuration name="cine_to_mp4" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
-      <module name="lapd-plasma-analysis" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-      </envs>
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$APPLICATION_CONFIG_DIR$/scratches" />
-      <option name="IS_MODULE_SDK" value="false" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$APPLICATION_CONFIG_DIR$/scratches/cine_to_mp4.py" />
-      <option name="PARAMETERS" value="" />
-      <option name="SHOW_COMMAND_LINE" value="true" />
-      <option name="EMULATE_TERMINAL" value="false" />
-      <option name="MODULE_MODE" value="false" />
-      <option name="REDIRECT_INPUT" value="false" />
-      <option name="INPUT_FILE" value="" />
-      <method v="2" />
-    </configuration>
-    <configuration name="density_temp_gradients_edge" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
-      <module name="lapd-plasma-analysis" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$APPLICATION_CONFIG_DIR$/scratches" />
-      <option name="IS_MODULE_SDK" value="false" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$APPLICATION_CONFIG_DIR$/scratches/density_temp_gradients_edge.py" />
-      <option name="PARAMETERS" value="" />
-      <option name="SHOW_COMMAND_LINE" value="true" />
-      <option name="EMULATE_TERMINAL" value="false" />
-      <option name="MODULE_MODE" value="false" />
-      <option name="REDIRECT_INPUT" value="false" />
-      <option name="INPUT_FILE" value="" />
-      <method v="2" />
-    </configuration>
-    <configuration name="indiv_char_plot" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
-      <module name="lapd-plasma-analysis" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-      </envs>
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$APPLICATION_CONFIG_DIR$/scratches" />
-      <option name="IS_MODULE_SDK" value="false" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$APPLICATION_CONFIG_DIR$/scratches/indiv_char_plot.py" />
-      <option name="PARAMETERS" value="" />
-      <option name="SHOW_COMMAND_LINE" value="true" />
-      <option name="EMULATE_TERMINAL" value="false" />
-      <option name="MODULE_MODE" value="false" />
-      <option name="REDIRECT_INPUT" value="false" />
-      <option name="INPUT_FILE" value="" />
-      <method v="2" />
-    </configuration>
-    <configuration name="itfm_plot_Mar2022" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
-      <module name="lapd-plasma-analysis" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-      </envs>
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$APPLICATION_CONFIG_DIR$/scratches" />
-      <option name="IS_MODULE_SDK" value="false" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$APPLICATION_CONFIG_DIR$/scratches/itfm_plot_Mar2022.py" />
-      <option name="PARAMETERS" value="" />
-      <option name="SHOW_COMMAND_LINE" value="true" />
-      <option name="EMULATE_TERMINAL" value="false" />
-      <option name="MODULE_MODE" value="false" />
-      <option name="REDIRECT_INPUT" value="false" />
-      <option name="INPUT_FILE" value="" />
-      <method v="2" />
-    </configuration>
-    <configuration name="itfm_plot_Nov2022" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
-      <module name="lapd-plasma-analysis" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-      </envs>
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$APPLICATION_CONFIG_DIR$/scratches" />
-      <option name="IS_MODULE_SDK" value="false" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$APPLICATION_CONFIG_DIR$/scratches/itfm_plot_Nov2022.py" />
-      <option name="PARAMETERS" value="" />
-      <option name="SHOW_COMMAND_LINE" value="true" />
-      <option name="EMULATE_TERMINAL" value="false" />
-      <option name="MODULE_MODE" value="false" />
-      <option name="REDIRECT_INPUT" value="false" />
-      <option name="INPUT_FILE" value="" />
-      <method v="2" />
-    </configuration>
-    <configuration name="main" type="PythonConfigurationType" factoryName="Python" nameIsGenerated="true">
+    <configuration name="main" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="lapd-plasma-analysis" />
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
@@ -251,21 +138,84 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
+    <configuration name="scratch" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="lapd-plasma-analysis" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$APPLICATION_CONFIG_DIR$/scratches" />
+      <option name="IS_MODULE_SDK" value="false" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$APPLICATION_CONFIG_DIR$/scratches/scratch.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="scratch_1" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="lapd-plasma-analysis" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$APPLICATION_CONFIG_DIR$/scratches" />
+      <option name="IS_MODULE_SDK" value="false" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$APPLICATION_CONFIG_DIR$/scratches/scratch_1.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="true" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="scratch_2" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="lapd-plasma-analysis" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$APPLICATION_CONFIG_DIR$/scratches" />
+      <option name="IS_MODULE_SDK" value="false" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$APPLICATION_CONFIG_DIR$/scratches/scratch_2.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="true" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
     <list>
+      <item itemvalue="Python.scratch" />
+      <item itemvalue="Python.scratch_1" />
+      <item itemvalue="Python.scratch_2" />
       <item itemvalue="Python.main" />
-      <item itemvalue="Python.density_temp_gradients_edge" />
-      <item itemvalue="Python.cine_to_mp4" />
-      <item itemvalue="Python.indiv_char_plot" />
-      <item itemvalue="Python.itfm_plot_Mar2022" />
-      <item itemvalue="Python.itfm_plot_Nov2022" />
     </list>
     <recent_temporary>
       <list>
-        <item itemvalue="Python.density_temp_gradients_edge" />
-        <item itemvalue="Python.cine_to_mp4" />
-        <item itemvalue="Python.itfm_plot_Mar2022" />
-        <item itemvalue="Python.itfm_plot_Nov2022" />
-        <item itemvalue="Python.indiv_char_plot" />
+        <item itemvalue="Python.main" />
+        <item itemvalue="Python.scratch" />
+        <item itemvalue="Python.scratch_1" />
+        <item itemvalue="Python.scratch_2" />
       </list>
     </recent_temporary>
   </component>
@@ -311,7 +261,8 @@
       <workItem from="1703690816663" duration="606000" />
       <workItem from="1703781983531" duration="6517000" />
       <workItem from="1704728132069" duration="4671000" />
-      <workItem from="1704921169352" duration="1501000" />
+      <workItem from="1704921169352" duration="5608000" />
+      <workItem from="1704982886633" duration="31209000" />
     </task>
     <task id="LOCAL-00001" summary="Switch plots to using QtAgg instead of TkAgg backend">
       <created>1680657801669</created>
@@ -454,7 +405,119 @@
       <option name="project" value="LOCAL" />
       <updated>1689712964317</updated>
     </task>
-    <option name="localTasksCounter" value="19" />
+    <task id="LOCAL-00019" summary="Pluralize some variable names">
+      <option name="closed" value="true" />
+      <created>1704923538165</created>
+      <option name="number" value="00019" />
+      <option name="presentableId" value="LOCAL-00019" />
+      <option name="project" value="LOCAL" />
+      <updated>1704923538165</updated>
+    </task>
+    <task id="LOCAL-00020" summary="Save error string for failed diagnostics; create get_pressure function">
+      <option name="closed" value="true" />
+      <created>1704923629218</created>
+      <option name="number" value="00020" />
+      <option name="presentableId" value="LOCAL-00020" />
+      <option name="project" value="LOCAL" />
+      <updated>1704923629218</updated>
+    </task>
+    <task id="LOCAL-00021" summary="Generalize netCDFaccess functions to allow general file access">
+      <option name="closed" value="true" />
+      <created>1704923666970</created>
+      <option name="number" value="00021" />
+      <option name="presentableId" value="LOCAL-00021" />
+      <option name="project" value="LOCAL" />
+      <updated>1704923666970</updated>
+    </task>
+    <task id="LOCAL-00022" summary="Generalize netCDFaccess functions to allow general file access">
+      <option name="closed" value="true" />
+      <created>1704923683105</created>
+      <option name="number" value="00022" />
+      <option name="presentableId" value="LOCAL-00022" />
+      <option name="project" value="LOCAL" />
+      <updated>1704923683105</updated>
+    </task>
+    <task id="LOCAL-00023" summary="Reorganize interferometry.py">
+      <option name="closed" value="true" />
+      <created>1704923775921</created>
+      <option name="number" value="00023" />
+      <option name="presentableId" value="LOCAL-00023" />
+      <option name="project" value="LOCAL" />
+      <updated>1704923775921</updated>
+    </task>
+    <task id="LOCAL-00024" summary="Reorganize main.py">
+      <option name="closed" value="true" />
+      <created>1704923819731</created>
+      <option name="number" value="00024" />
+      <option name="presentableId" value="LOCAL-00024" />
+      <option name="project" value="LOCAL" />
+      <updated>1704923819731</updated>
+    </task>
+    <task id="LOCAL-00025" summary="Improve errorbar calculations">
+      <option name="closed" value="true" />
+      <created>1704923846456</created>
+      <option name="number" value="00025" />
+      <option name="presentableId" value="LOCAL-00025" />
+      <option name="project" value="LOCAL" />
+      <updated>1704923846456</updated>
+    </task>
+    <task id="LOCAL-00026" summary="Detect ion type from HDF5 filename">
+      <option name="closed" value="true" />
+      <created>1704923879115</created>
+      <option name="number" value="00026" />
+      <option name="presentableId" value="LOCAL-00026" />
+      <option name="project" value="LOCAL" />
+      <updated>1704923879115</updated>
+    </task>
+    <task id="LOCAL-00027" summary="Move port_selector function to helper.py to simplify user interface in main.py">
+      <option name="closed" value="true" />
+      <created>1704926054038</created>
+      <option name="number" value="00027" />
+      <option name="presentableId" value="LOCAL-00027" />
+      <option name="project" value="LOCAL" />
+      <updated>1704926054038</updated>
+    </task>
+    <task id="LOCAL-00028" summary="Change name of probe_config in preconfiguration.py to langmuir_config to better describe scope">
+      <option name="closed" value="true" />
+      <created>1704991335759</created>
+      <option name="number" value="00028" />
+      <option name="presentableId" value="LOCAL-00028" />
+      <option name="project" value="LOCAL" />
+      <updated>1704991335759</updated>
+    </task>
+    <task id="LOCAL-00029" summary="Add ask_yes_or_no function to file_access.py to ease user choice of plots to generate">
+      <option name="closed" value="true" />
+      <created>1705090458209</created>
+      <option name="number" value="00029" />
+      <option name="presentableId" value="LOCAL-00029" />
+      <option name="project" value="LOCAL" />
+      <updated>1705090458209</updated>
+    </task>
+    <task id="LOCAL-00030" summary="Display error messages on plots in characteristic view mode">
+      <option name="closed" value="true" />
+      <created>1705090508403</created>
+      <option name="number" value="00030" />
+      <option name="presentableId" value="LOCAL-00030" />
+      <option name="project" value="LOCAL" />
+      <updated>1705090508403</updated>
+    </task>
+    <task id="LOCAL-00031" summary="Implement tight_layout for plots">
+      <option name="closed" value="true" />
+      <created>1705090536713</created>
+      <option name="number" value="00031" />
+      <option name="presentableId" value="LOCAL-00031" />
+      <option name="project" value="LOCAL" />
+      <updated>1705090536713</updated>
+    </task>
+    <task id="LOCAL-00032" summary="Implement tight_layout for plots">
+      <option name="closed" value="true" />
+      <created>1705090568813</created>
+      <option name="number" value="00032" />
+      <option name="presentableId" value="LOCAL-00032" />
+      <option name="project" value="LOCAL" />
+      <updated>1705090568813</updated>
+    </task>
+    <option name="localTasksCounter" value="33" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -505,7 +568,7 @@
                   <entry key="branch">
                     <value>
                       <list>
-                        <option value="unaveraged_shots_analysis" />
+                        <option value="main" />
                       </list>
                     </value>
                   </entry>
@@ -518,12 +581,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="Switch plots to using QtAgg instead of TkAgg backend" />
-    <MESSAGE value="Create characteristic plotting mode, which allows users to plot various Characteristics before performing diagnostics to judge them visually" />
-    <MESSAGE value="Rename plot variable to more descriptive plot_type variable; correct typoed &quot;run name&quot; attribute to &quot;Run name&quot; to allow display on graph titles" />
-    <MESSAGE value="Make list of plot categorization attributes optional; when blank, will categorize plots by all &quot;Nominal&quot; experimental parameters possible to maximize flexibility with different experiment runs" />
-    <MESSAGE value="Detect experimental series (e.g. April_2018) automatically and set up probes using hardcoded configuration data in new preconfiguration.py; replaces old manual user-input configuration, which is highly prone to mistakes" />
-    <MESSAGE value="Preserve separate sweep arrays, Characteristics, and diagnostic results for separate shots, instead of averaging together shots taken at the same location, and instead use variation of diagnostics between shots to plot errorbars and allow removal of inconsistent/noisy data points" />
     <MESSAGE value="Allow probes to have different surface areas; recognition of separate shot data; code cleanup" />
     <MESSAGE value="Increase number of loadable files to 52 from 26" />
     <MESSAGE value="Fix characteristic view mode to include new dimension &quot;shot&quot; in characteristic arrays" />
@@ -536,12 +593,25 @@
     <MESSAGE value="Print experiment name (e.g. &quot;March_2022&quot;) for single-hdf5-file graphs" />
     <MESSAGE value="Remove to_real_sweep_units function and replace with inline calculation of real bias and current values" />
     <MESSAGE value="Increase smoothing, accommodate diagnostic display in characteristic view mode" />
-    <option name="LAST_COMMIT_MESSAGE" value="Increase smoothing, accommodate diagnostic display in characteristic view mode" />
+    <MESSAGE value="Pluralize some variable names" />
+    <MESSAGE value="Save error string for failed diagnostics; create get_pressure function" />
+    <MESSAGE value="Generalize netCDFaccess functions to allow general file access" />
+    <MESSAGE value="Reorganize interferometry.py" />
+    <MESSAGE value="Reorganize main.py" />
+    <MESSAGE value="Improve errorbar calculations" />
+    <MESSAGE value="Detect ion type from HDF5 filename" />
+    <MESSAGE value="Move port_selector function to helper.py to simplify user interface in main.py" />
+    <MESSAGE value="Change name of probe_config in preconfiguration.py to langmuir_config to better describe scope" />
+    <MESSAGE value="Add ask_yes_or_no function to file_access.py to ease user choice of plots to generate" />
+    <MESSAGE value="Display error messages on plots in characteristic view mode" />
+    <MESSAGE value="Begin implementing tight_layout for plots" />
+    <MESSAGE value="Implement tight_layout for plots" />
+    <option name="LAST_COMMIT_MESSAGE" value="Implement tight_layout for plots" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/lapd_plasma_analysis$scratch_4.coverage" NAME="scratch_4 Coverage Results" MODIFIED="1692131134620" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$APPLICATION_CONFIG_DIR$/scratches" />
     <SUITE FILE_PATH="coverage/lapd_plasma_analysis$fourier.coverage" NAME="fourier Coverage Results" MODIFIED="1695663830302" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/lapd_plasma_analysis$main.coverage" NAME="main Coverage Results" MODIFIED="1704923184055" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/lapd_plasma_analysis$main.coverage" NAME="main Coverage Results" MODIFIED="1705184012283" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/lapd_plasma_analysis$scratch_2.coverage" NAME="scratch_2 Coverage Results" MODIFIED="1691534973579" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$APPLICATION_CONFIG_DIR$/scratches" />
     <SUITE FILE_PATH="coverage/lapd_plasma_analysis$scratch_6.coverage" NAME="scratch_6 Coverage Results" MODIFIED="1696432972127" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$APPLICATION_CONFIG_DIR$/scratches" />
     <SUITE FILE_PATH="coverage/lapd_plasma_analysis$scratch.coverage" NAME="scratch Coverage Results" MODIFIED="1689972569303" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$APPLICATION_CONFIG_DIR$/scratches" />

@@ -20,20 +20,39 @@ def characterize_sweep_array(unsmooth_bias, unsmooth_currents, margin, sample_se
     :return: 2D array of Characteristic objects by shot number and plateau number
     """
 
-    validate_sweep_units(unsmooth_bias, unsmooth_currents)
-    if margin > 0:
-        bias = bn.move_mean(unsmooth_bias, window=margin) * (u.V if unit_safe(unsmooth_bias) == u.V else 1)
-        currents = bn.move_mean(unsmooth_currents, window=margin) * (u.A if unit_safe(unsmooth_currents) == u.A else 1)
-    else:
-        bias, currents = unsmooth_bias, unsmooth_currents
+    ensure_sweep_units(unsmooth_bias, unsmooth_currents)
+
+    bias = smooth_array(unsmooth_bias,         margin, "median") * u.V
+    currents = smooth_array(unsmooth_currents, margin, "median") * u.A
+
+    # trim bad, distorted averaged ends in isolated plateaus
     ramp_bounds = isolate_plateaus(bias, margin=margin)
-    # trim bad, distorted averaged ends in isolate plateaus
 
     ramp_times = ramp_bounds[:, 1] * sample_sec.to(u.ms)
     # NOTE: MATLAB code stores peak voltage time (end of plateaus), then only uses plateau times for very first position
     # This uses the time of the peak voltage for the average of all shots ("top of the average ramp")
 
     return characteristic_array(bias, currents, ramp_bounds), ramp_times
+
+
+def smooth_array(raw_array, margin: int, method: str = "mean") -> np.ndarray:
+    r"""
+    Smooth an array using a moving mean or median applied over a window.
+    :param raw_array:
+    :param margin:
+    :param method:
+    :return:
+    """
+    array = raw_array.copy()
+    if margin > 0:
+        if method == "mean":
+            smooth_func = bn.move_mean
+        elif method == "median":
+            smooth_func = bn.move_median
+        else:
+            raise ValueError(f"Invalid smoothing method {repr(method)}; 'mean' or 'median' expected")
+        array = smooth_func(array, window=margin)
+    return array
 
 
 def isolate_plateaus(bias, margin=0):
@@ -65,19 +84,28 @@ def isolate_plateaus(bias, margin=0):
     return np.stack((peak_properties['left_ips'].astype(int) + margin // 2, peak_frames - margin // 2), axis=-1)
 
 
-def validate_sweep_units(bias, current):
+def ensure_sweep_units(bias, current):
     try:
-        assert (bias.unit == u.V)
-    except (AttributeError, AssertionError):
-        warnings.warn("Input bias array does not have units of Volts. Ensure that bias values are in real units.")
+        if bias.unit.is_equivalent(u.V):
+            new_bias = bias.to(u.V)
+        else:
+            raise ValueError(f"Probe bias has units of {bias.unit} when units convertible to Volts were expected.")
+    except AttributeError:
+        warnings.warn("Input bias array is missing explicit units. Assuming units of Volts.")
+        new_bias = bias * u.V
     try:
-        assert (current.unit == u.A)
-    except (AttributeError, AssertionError):
-        warnings.warn("Input bias array does not have units of Amps. Ensure that current values are in real units.")
+        if current.unit.is_equivalent(u.A):
+            new_current = current.to(u.A)
+        else:
+            raise ValueError(f"Probe current has units of {current.unit} when units convertible to Amps were expected.")
+    except AttributeError:
+        warnings.warn("Input current array is missing explicit units. Assuming units of Amps.")
+        new_current = current * u.A
+    return new_bias, new_current
 
 
 def characteristic_array(bias, current, plateau_ranges):
-    # 4D?: probe * unique_position * shot * plateau_num
+    # 4D: probe * unique_position * shot * plateau_num
 
     currents = current  # "currents" has "probe" dimension in front; may have size 1
     num_pos = bias.shape[0]
