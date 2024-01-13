@@ -29,8 +29,8 @@ interferometry_folder = hdf5_folder
 """ User parameters """
 probes_choice = [1, 0]                                  # TODO user choice for probe or linear combination to use
 bimaxwellian = False                                    # TODO perform both and store in same NetCDF file?
-smoothing_margin = 40                                   # Optimal values in range 0-50
-plot_tolerance = 0.5                                     # Optimal values are np.nan (plot all points) or >= 0.2
+smoothing_margin = 200                                  # Optimal values in range 100-400 if "median" smoothing method
+plot_tolerance = 1                                    # Optimal values are np.nan (plot all points) or >= 0.2
 
 # QUESTION: can we calibrate both Langmuir probes using an interferometry ratio depending only on one of them?
 core_radius = 26. * u.cm                                         # From MATLAB code
