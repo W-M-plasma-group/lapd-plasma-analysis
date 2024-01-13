@@ -58,8 +58,9 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
                                                             steady_state_plateaus=steady_state_by_runs[inner_index])
             linear_da_mean = linear_da_steady_state.mean(['shot', 'time'], keep_attrs=True)
             linear_da_std = linear_da_steady_state.std(['shot', 'time'], ddof=1, keep_attrs=True)
-            linear_da_std *= 1.96 / np.sqrt(linear_da_steady_state.sizes['shot']
-                                            * linear_da_steady_state.sizes['time'])  # two-st.dev. confidence interval
+            # 95% (~two standard deviation) confidence interval
+            linear_da_error = linear_da_std * 1.96 / np.sqrt(linear_da_steady_state.sizes['shot']
+                                                             * linear_da_steady_state.sizes['time'])
 
             # Filter out certain points due to inconsistent data (likely random noise that skews average higher)
             if np.isfinite(tolerance):
@@ -67,7 +68,7 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
                 linear_da_mean = linear_da_mean.where(linear_da_std < tolerance * da_median)  # TODO hardcoded
 
             if np.isfinite(linear_da_mean).any():
-                ax.errorbar(linear_da_mean.coords[linear_dimension], linear_da_mean, yerr=linear_da_std,
+                ax.errorbar(linear_da_mean.coords[linear_dimension], linear_da_mean, yerr=linear_da_error,
                             fmt="-", color=color_map[inner_index], label=str(inner_val))
             ax.set_xlabel(linear_da_mean.coords[linear_dimension].attrs['units'])
             ax.set_ylabel(linear_da_mean.attrs['units'])
@@ -157,6 +158,7 @@ def linear_plot_1d(diagnostic_array_1d, linear_dimension):
 def linear_plot_2d(diagnostic_array, plot_type, linear_dimension, trim_colormap=True):
     q1, q3, reasonable_max = np.nanpercentile(diagnostic_array, [25, 75, 98])
     trim_max = min(reasonable_max, q3 + 1.5 * (q3 - q1))
+    print(q1, q3, trim_max)
     plot_params = {'x': 'time', 'y': linear_dimension}
     if trim_colormap:
         plot_params = {**plot_params, 'vmax': trim_max}

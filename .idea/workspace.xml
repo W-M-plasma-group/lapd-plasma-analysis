@@ -4,13 +4,12 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="99051048-4239-4d54-a2e8-6a0399c265e9" name="Changes" comment="Change name of probe_config in preconfiguration.py to langmuir_config to better describe scope">
+    <list default="true" id="99051048-4239-4d54-a2e8-6a0399c265e9" name="Changes" comment="Implement tight_layout for plots">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/characteristic_view.py" beforeDir="false" afterPath="$PROJECT_DIR$/characteristic_view.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/characterization.py" beforeDir="false" afterPath="$PROJECT_DIR$/characterization.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/diagnostics.py" beforeDir="false" afterPath="$PROJECT_DIR$/diagnostics.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/file_access.py" beforeDir="false" afterPath="$PROJECT_DIR$/file_access.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/helper.py" beforeDir="false" afterPath="$PROJECT_DIR$/helper.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/plots.py" beforeDir="false" afterPath="$PROJECT_DIR$/plots.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -263,7 +262,7 @@
       <workItem from="1703781983531" duration="6517000" />
       <workItem from="1704728132069" duration="4671000" />
       <workItem from="1704921169352" duration="5608000" />
-      <workItem from="1704982886633" duration="13441000" />
+      <workItem from="1704982886633" duration="31209000" />
     </task>
     <task id="LOCAL-00001" summary="Switch plots to using QtAgg instead of TkAgg backend">
       <created>1680657801669</created>
@@ -486,7 +485,39 @@
       <option name="project" value="LOCAL" />
       <updated>1704991335759</updated>
     </task>
-    <option name="localTasksCounter" value="29" />
+    <task id="LOCAL-00029" summary="Add ask_yes_or_no function to file_access.py to ease user choice of plots to generate">
+      <option name="closed" value="true" />
+      <created>1705090458209</created>
+      <option name="number" value="00029" />
+      <option name="presentableId" value="LOCAL-00029" />
+      <option name="project" value="LOCAL" />
+      <updated>1705090458209</updated>
+    </task>
+    <task id="LOCAL-00030" summary="Display error messages on plots in characteristic view mode">
+      <option name="closed" value="true" />
+      <created>1705090508403</created>
+      <option name="number" value="00030" />
+      <option name="presentableId" value="LOCAL-00030" />
+      <option name="project" value="LOCAL" />
+      <updated>1705090508403</updated>
+    </task>
+    <task id="LOCAL-00031" summary="Implement tight_layout for plots">
+      <option name="closed" value="true" />
+      <created>1705090536713</created>
+      <option name="number" value="00031" />
+      <option name="presentableId" value="LOCAL-00031" />
+      <option name="project" value="LOCAL" />
+      <updated>1705090536713</updated>
+    </task>
+    <task id="LOCAL-00032" summary="Implement tight_layout for plots">
+      <option name="closed" value="true" />
+      <created>1705090568813</created>
+      <option name="number" value="00032" />
+      <option name="presentableId" value="LOCAL-00032" />
+      <option name="project" value="LOCAL" />
+      <updated>1705090568813</updated>
+    </task>
+    <option name="localTasksCounter" value="33" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -550,10 +581,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="Rename plot variable to more descriptive plot_type variable; correct typoed &quot;run name&quot; attribute to &quot;Run name&quot; to allow display on graph titles" />
-    <MESSAGE value="Make list of plot categorization attributes optional; when blank, will categorize plots by all &quot;Nominal&quot; experimental parameters possible to maximize flexibility with different experiment runs" />
-    <MESSAGE value="Detect experimental series (e.g. April_2018) automatically and set up probes using hardcoded configuration data in new preconfiguration.py; replaces old manual user-input configuration, which is highly prone to mistakes" />
-    <MESSAGE value="Preserve separate sweep arrays, Characteristics, and diagnostic results for separate shots, instead of averaging together shots taken at the same location, and instead use variation of diagnostics between shots to plot errorbars and allow removal of inconsistent/noisy data points" />
     <MESSAGE value="Allow probes to have different surface areas; recognition of separate shot data; code cleanup" />
     <MESSAGE value="Increase number of loadable files to 52 from 26" />
     <MESSAGE value="Fix characteristic view mode to include new dimension &quot;shot&quot; in characteristic arrays" />
@@ -575,12 +602,16 @@
     <MESSAGE value="Detect ion type from HDF5 filename" />
     <MESSAGE value="Move port_selector function to helper.py to simplify user interface in main.py" />
     <MESSAGE value="Change name of probe_config in preconfiguration.py to langmuir_config to better describe scope" />
-    <option name="LAST_COMMIT_MESSAGE" value="Change name of probe_config in preconfiguration.py to langmuir_config to better describe scope" />
+    <MESSAGE value="Add ask_yes_or_no function to file_access.py to ease user choice of plots to generate" />
+    <MESSAGE value="Display error messages on plots in characteristic view mode" />
+    <MESSAGE value="Begin implementing tight_layout for plots" />
+    <MESSAGE value="Implement tight_layout for plots" />
+    <option name="LAST_COMMIT_MESSAGE" value="Implement tight_layout for plots" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/lapd_plasma_analysis$scratch_4.coverage" NAME="scratch_4 Coverage Results" MODIFIED="1692131134620" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$APPLICATION_CONFIG_DIR$/scratches" />
     <SUITE FILE_PATH="coverage/lapd_plasma_analysis$fourier.coverage" NAME="fourier Coverage Results" MODIFIED="1695663830302" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/lapd_plasma_analysis$main.coverage" NAME="main Coverage Results" MODIFIED="1705087188868" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/lapd_plasma_analysis$main.coverage" NAME="main Coverage Results" MODIFIED="1705184012283" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/lapd_plasma_analysis$scratch_2.coverage" NAME="scratch_2 Coverage Results" MODIFIED="1691534973579" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$APPLICATION_CONFIG_DIR$/scratches" />
     <SUITE FILE_PATH="coverage/lapd_plasma_analysis$scratch_6.coverage" NAME="scratch_6 Coverage Results" MODIFIED="1696432972127" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$APPLICATION_CONFIG_DIR$/scratches" />
     <SUITE FILE_PATH="coverage/lapd_plasma_analysis$scratch.coverage" NAME="scratch Coverage Results" MODIFIED="1689972569303" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$APPLICATION_CONFIG_DIR$/scratches" />
