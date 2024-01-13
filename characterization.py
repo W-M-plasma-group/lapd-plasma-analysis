@@ -20,20 +20,39 @@ def characterize_sweep_array(unsmooth_bias, unsmooth_currents, margin, sample_se
     :return: 2D array of Characteristic objects by shot number and plateau number
     """
 
-    validate_sweep_units(unsmooth_bias, unsmooth_currents)
-    if margin > 0:
-        bias = bn.move_mean(unsmooth_bias, window=margin) * (u.V if unit_safe(unsmooth_bias) == u.V else 1)
-        currents = bn.move_mean(unsmooth_currents, window=margin) * (u.A if unit_safe(unsmooth_currents) == u.A else 1)
-    else:
-        bias, currents = unsmooth_bias, unsmooth_currents
+    ensure_sweep_units(unsmooth_bias, unsmooth_currents)
+
+    bias = smooth_array(unsmooth_bias,         margin, "median") * u.V
+    currents = smooth_array(unsmooth_currents, margin, "median") * u.A
+
+    # trim bad, distorted averaged ends in isolated plateaus
     ramp_bounds = isolate_plateaus(bias, margin=margin)
-    # trim bad, distorted averaged ends in isolate plateaus
 
     ramp_times = ramp_bounds[:, 1] * sample_sec.to(u.ms)
     # NOTE: MATLAB code stores peak voltage time (end of plateaus), then only uses plateau times for very first position
     # This uses the time of the peak voltage for the average of all shots ("top of the average ramp")
 
     return characteristic_array(bias, currents, ramp_bounds), ramp_times
+
+
+def smooth_array(raw_array, margin: int, method: str = "mean") -> np.ndarray:
+    r"""
+    Smooth an array using a moving mean or median applied over a window.
+    :param raw_array:
+    :param margin:
+    :param method:
+    :return:
+    """
+    array = raw_array.copy()
+    if margin > 0:
+        if method == "mean":
+            smooth_func = bn.move_mean
+        elif method == "median":
+            smooth_func = bn.move_median
+        else:
+            raise ValueError(f"Invalid smoothing method {repr(method)}; 'mean' or 'median' expected")
+        array = smooth_func(array, window=margin)
+    return array
 
 
 def isolate_plateaus(bias, margin=0):
