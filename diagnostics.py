@@ -77,8 +77,7 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, ports, pr
                                 error_types.append(diagnostics)
                             error_chart[p,
                                         np.where(x == positions[l, 0])[0][0],
-                                        np.where(y == positions[l, 1])[0][0],
-                                        s, r] = error_types.index(diagnostics) + 1
+                                        np.where(y == positions[l, 1])[0][0], s, r] = error_types.index(diagnostics) + 1
                             continue
                         if bimaxwellian:
                             diagnostics = unpack_bimaxwellian(diagnostics)
@@ -89,7 +88,7 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, ports, pr
 
     warnings.simplefilter(action='default')  # Restore warnings to default handling
 
-    # Leo debug below
+    # Leo debug below: display plots showing types of errors
     """
     for s in range(error_chart.shape[3]):
         ax = plt.subplot()
@@ -133,6 +132,8 @@ def detect_steady_state_ramps(density: xr.DataArray, core_radius):
 
 
 def diagnose_char(characteristic, probe_area, ion_type, bimaxwellian, indices=None):
+    if np.max(characteristic.current.to(u.A).value) < 0.01:  # TODO hardcoded
+        return "Probe current is below 10 mA, which can lead to unreliable results"
     try:
         diagnostics = swept_probe_analysis(characteristic, probe_area, ion_type, bimaxwellian=bimaxwellian)
     except (ValueError, TypeError, RuntimeError) as e:
