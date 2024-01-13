@@ -84,19 +84,28 @@ def isolate_plateaus(bias, margin=0):
     return np.stack((peak_properties['left_ips'].astype(int) + margin // 2, peak_frames - margin // 2), axis=-1)
 
 
-def validate_sweep_units(bias, current):
+def ensure_sweep_units(bias, current):
     try:
-        assert (bias.unit == u.V)
-    except (AttributeError, AssertionError):
-        warnings.warn("Input bias array does not have units of Volts. Ensure that bias values are in real units.")
+        if bias.unit.is_equivalent(u.V):
+            new_bias = bias.to(u.V)
+        else:
+            raise ValueError(f"Probe bias has units of {bias.unit} when units convertible to Volts were expected.")
+    except AttributeError:
+        warnings.warn("Input bias array is missing explicit units. Assuming units of Volts.")
+        new_bias = bias * u.V
     try:
-        assert (current.unit == u.A)
-    except (AttributeError, AssertionError):
-        warnings.warn("Input bias array does not have units of Amps. Ensure that current values are in real units.")
+        if current.unit.is_equivalent(u.A):
+            new_current = current.to(u.A)
+        else:
+            raise ValueError(f"Probe current has units of {current.unit} when units convertible to Amps were expected.")
+    except AttributeError:
+        warnings.warn("Input current array is missing explicit units. Assuming units of Amps.")
+        new_current = current * u.A
+    return new_bias, new_current
 
 
 def characteristic_array(bias, current, plateau_ranges):
-    # 4D?: probe * unique_position * shot * plateau_num
+    # 4D: probe * unique_position * shot * plateau_num
 
     currents = current  # "currents" has "probe" dimension in front; may have size 1
     num_pos = bias.shape[0]
