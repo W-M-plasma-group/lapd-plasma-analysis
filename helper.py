@@ -74,3 +74,7 @@ def port_selector(ds, vector):  # TODO should separate diagnostics_main and plot
     return ds_port_selected.assign_attrs(manual_attrs)
     # ask user for a linear transformation/matrix?
     # Add a string attribute to the dataset to describe which port(s) comes from
+
+
+def array_lookup(array, value):
+    return np.where(np.isclose(array, value))[0][0]
