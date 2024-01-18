@@ -4,4 +4,4 @@ This repository holds Python code for analyzing plasma physics experiment data. 
 ### Managed by
 This GitHub page is managed by Leo Murphy as part of a research project under Prof. Saskia Mordijck for William and Mary plasma physics.
 ### Use
-Download all Python files to the same directory. Download desired HDF5 files and note their file paths. Change necessary parameters inside main.py before running. Make sure numpy, astropy, plasmapy, xarray, bottleneck, PyQt, h5py, and bapsflib are installed. This code was written in Python 3.8.
+Download all Python files to the same directory. Download desired HDF5 files and note their file paths. Change necessary parameters inside main.py before running. Make sure numpy, astropy, plasmapy, xarray, bottleneck, PyQt, h5py, and bapsflib-2.0.0b3.dev11+g936e493 are installed. This code was written in Python 3.8.
