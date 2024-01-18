@@ -55,7 +55,7 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
             linear_da = dataset.squeeze()[plot_diagnostic]
 
             linear_da_steady_state = steady_state_only(linear_da,
-                                                            steady_state_plateaus=steady_state_by_runs[inner_index])
+                                                       steady_state_plateaus=steady_state_by_runs[inner_index])
             linear_da_mean = linear_da_steady_state.mean(['shot', 'time'], keep_attrs=True)
             linear_da_std = linear_da_steady_state.std(['shot', 'time'], ddof=1, keep_attrs=True)
             # 95% (~two standard deviation) confidence interval

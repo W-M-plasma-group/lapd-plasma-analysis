@@ -132,8 +132,9 @@ def detect_steady_state_ramps(density: xr.DataArray, core_radius):
 
 
 def diagnose_char(characteristic, probe_area, ion_type, bimaxwellian, indices=None):
-    if np.max(characteristic.current.to(u.A).value) < 0.01:  # TODO hardcoded
-        return "Probe current is below 10 mA, which can lead to unreliable results"
+    threshold = 8 * u.mA  # TODO hardcoded
+    if np.max(characteristic.current.to(u.A).value) < threshold.to(u.A).value:
+        return f"Probe current is below {str(threshold)}, which can lead to unreliable results"
     try:
         diagnostics = swept_probe_analysis(characteristic, probe_area, ion_type, bimaxwellian=bimaxwellian)
     except (ValueError, TypeError, RuntimeError) as e:
