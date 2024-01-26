@@ -77,4 +77,4 @@ def port_selector(ds, vector):  # TODO should separate diagnostics_main and plot
 
 
 def array_lookup(array, value):
-    return np.where(np.isclose(array, value))[0][0]
+    return np.argmin(np.abs(array - value))
