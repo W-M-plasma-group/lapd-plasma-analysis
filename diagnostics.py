@@ -52,19 +52,20 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, ports, pr
                                                                    ).assign_attrs({"units": keys_units[key]})
                                  for key in keys_units.keys()})
 
+    num_characteristics = (diagnostics_ds.sizes['port'] * diagnostics_ds.sizes['x'] * diagnostics_ds.sizes['y']
+                           * diagnostics_ds.sizes['shot'] * diagnostics_ds.sizes['time'])
+
     # TODO Leo debug!
-    num_positions = (diagnostics_ds.sizes['x'] * diagnostics_ds.sizes['y']
-                     * diagnostics_ds.sizes['shot'] * diagnostics_ds.sizes['time'])
     # """
     error_types = []
     error_chart = np.zeros(shape=(num_ports, len(x), len(y), num_shots, num_plateaus))
-    print(f"Calculating Langmuir diagnostics for {len(ports)} probe(s) ...")
+    print(f"Calculating Langmuir diagnostics...")
     # """
 
     warnings.simplefilter(action='ignore')  # Suppress warnings to not break progress bar
-    for p in range(characteristic_arrays.shape[0]):  # probe
-        port = ports[p]
-        with tqdm(total=num_positions, unit="characteristic", file=sys.stdout) as pbar:
+    with tqdm(total=num_characteristics, unit="characteristic", file=sys.stdout) as pbar:
+        for p in range(characteristic_arrays.shape[0]):  # probe
+            port = ports[p]
             for l in range(characteristic_arrays.shape[1]):  # location  # noqa
                 for s in range(characteristic_arrays.shape[2]):  # shot
                     for r in range(characteristic_arrays.shape[3]):  # ramp
