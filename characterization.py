@@ -20,10 +20,10 @@ def characterize_sweep_array(unsmooth_bias, unsmooth_currents, margin, sample_se
     :return: 2D array of Characteristic objects by shot number and plateau number
     """
 
-    ensure_sweep_units(unsmooth_bias, unsmooth_currents)
+    unsmooth_bias, unsmooth_currents = ensure_sweep_units(unsmooth_bias, unsmooth_currents)
 
-    bias = smooth_array(unsmooth_bias,         margin, "median") * u.V
-    currents = smooth_array(unsmooth_currents, margin, "median") * u.A
+    bias = smooth_array(unsmooth_bias.value,         margin, "median") * u.V
+    currents = smooth_array(unsmooth_currents.value, margin, "median") * u.A
 
     # trim bad, distorted averaged ends in isolated plateaus
     ramp_bounds = isolate_plateaus(bias, margin=margin)
@@ -35,7 +35,7 @@ def characterize_sweep_array(unsmooth_bias, unsmooth_currents, margin, sample_se
     return characteristic_array(bias, currents, ramp_bounds), ramp_times
 
 
-def smooth_array(raw_array, margin: int, method: str = "mean") -> np.ndarray:
+def smooth_array(raw_array, margin: int, method: str = "median") -> np.ndarray:
     r"""
     Smooth an array using a moving mean or median applied over a window.
     :param raw_array:
@@ -43,6 +43,7 @@ def smooth_array(raw_array, margin: int, method: str = "mean") -> np.ndarray:
     :param method:
     :return:
     """
+
     array = raw_array.copy()
     if margin > 0:
         if method == "mean":
@@ -104,22 +105,26 @@ def ensure_sweep_units(bias, current):
     return new_bias, new_current
 
 
-def characteristic_array(bias, current, plateau_ranges):
+def characteristic_array(bias, current, ramp_bounds):
     # 4D: probe * unique_position * shot * plateau_num
 
     currents = current  # "currents" has "probe" dimension in front; may have size 1
-    num_pos = bias.shape[0]
+    num_loc = bias.shape[0]
     num_shot = bias.shape[1]
 
-    plateau_slices = np.array([slice(plateau[0], plateau[1]) for plateau in plateau_ranges])
+    ramp_slices = np.array([slice(ramp[0], ramp[1]) for ramp in ramp_bounds])
 
     # Mixed arbitrary/indexed list comprehension
     print(f"Creating characteristics for {currents.shape[0]} probe(s) ...")
     warnings.simplefilter(action='ignore', category=FutureWarning)  # Suppress FutureWarnings to not break loading bar
     print("\t(plasmapy.langmuir.diagnostics pending deprecation FutureWarning suppressed)")
-    return np.concatenate([np.array([[[Characteristic(bias[pos, shot, plateau_slice], current[pos, shot, plateau_slice])
-                                       for plateau_slice in plateau_slices]
-                                      for shot in range(num_shot)]
-                                     for pos in range(num_pos)])[np.newaxis, ...]
-                           for current in currents])
-    # for pos in trange(num_pos, unit="position", file=sys.stdout)])[np.newaxis, ...]
+
+    chara_array = np.array([[[[Characteristic(bias[loc, shot, ramp_slice],
+                                              current[loc, shot, ramp_slice])
+                               for ramp_slice in ramp_slices]
+                              for shot in range(num_shot)]
+                             for loc in range(num_loc)]
+                            for current in currents])
+    # for loc in trange(num_loc, unit="location", file=sys.stdout)])[np.newaxis, ...]
+
+    return chara_array
