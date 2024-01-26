@@ -72,10 +72,14 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
                             fmt="-", color=color_map[inner_index], label=str(inner_val))
             ax.set_xlabel(linear_da_mean.coords[linear_dimension].attrs['units'])
             ax.set_ylabel(linear_da_mean.attrs['units'])
-            # TODO very hardcoded
-            if "eV" in linear_da_mean.attrs['units']:
-                ax.set_ylim((0, 6))
-            # ax.set_ylim((-0.4e18, 8e18))  # for truly hardcoded plot limits
+
+            if "eV" in linear_da_mean.attrs['units']:  # TODO very hardcoded
+                pass
+                # ax.set_ylim((0, 13))
+            if "Pa" in linear_da_mean.attrs['units']:
+                pass
+                # ax.set_ylim((-1, 20))
+            # ax.set_ylim((-0.4e18, 8e18))
         ax.tick_params(axis="y", left=True, labelleft=True)
         ax.title.set_text((attribute[1] + ": " + str(outer_val) if len(attribute) == 2 else "")
                           + "\nColor: " + attribute[0])
@@ -158,7 +162,7 @@ def linear_plot_1d(diagnostic_array_1d, linear_dimension):
 def linear_plot_2d(diagnostic_array, plot_type, linear_dimension, trim_colormap=True):
     q1, q3, reasonable_max = np.nanpercentile(diagnostic_array, [25, 75, 98])
     trim_max = min(reasonable_max, q3 + 1.5 * (q3 - q1))
-    print(q1, q3, trim_max)
+    # print(q1, q3, trim_max)  # debug
     plot_params = {'x': 'time', 'y': linear_dimension}
     if trim_colormap:
         plot_params = {**plot_params, 'vmax': trim_max}

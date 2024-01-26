@@ -49,8 +49,8 @@ def get_isweep_vsweep(filename, vsweep_bc, langmuir_probes, voltage_gain):
     currents_dc_offset = np.mean(currents[..., -1000:], axis=-1, keepdims=True)
     currents -= currents_dc_offset
 
-    # bias dimensions:            position, shot, frame  (e.g.    (71, 15, 55296))
-    # currents dimensions:  port, position, shot, frame  (e.g. (1, 71, 15, 55296))
+    # bias dimensions:             position, shot, frame   (e.g.    (71, 15, 55296))
+    # currents dimensions:   port, position, shot, frame   (e.g. (1, 71, 15, 55296))
 
     # Determine up/down orientation of sweep by finding median current at a central shot; should be negative
     invert = np.sign(np.median(currents[:, int(num_positions / 2), :, :]))

@@ -4,13 +4,8 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="99051048-4239-4d54-a2e8-6a0399c265e9" name="Changes" comment="Fix bug by using standard deviation, not standard error, to determine if data is too noisy to plot">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/characteristic_view.py" beforeDir="false" afterPath="$PROJECT_DIR$/characteristic_view.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/diagnostics.py" beforeDir="false" afterPath="$PROJECT_DIR$/diagnostics.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/helper.py" beforeDir="false" afterPath="$PROJECT_DIR$/helper.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/plots.py" beforeDir="false" afterPath="$PROJECT_DIR$/plots.py" afterDir="false" />
+    <list default="true" id="99051048-4239-4d54-a2e8-6a0399c265e9" name="Changes" comment="Remove debug print statements in plotting function; temporarily turn off hardcoded axis limits">
+      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -25,6 +20,11 @@
     </option>
   </component>
   <component name="Git.Settings">
+    <option name="PREVIOUS_COMMIT_AUTHORS">
+      <list>
+        <option value="Leo Murphy &lt;85201894+leomurphywm24@users.noreply.github.com&gt;" />
+      </list>
+    </option>
     <option name="RECENT_BRANCH_BY_REPOSITORY">
       <map>
         <entry key="$PROJECT_DIR$" value="leo" />
@@ -62,27 +62,27 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;WebServerToolWindowFactoryState&quot;: &quot;false&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;leo&quot;,
-    &quot;last.edited.regexp&quot;: &quot;08_radial_line_25press_3500A.hdf5&quot;,
-    &quot;last_opened_file_path&quot;: &quot;/Users/leomurphy/Library/Application Support/JetBrains/PyCharm2023.2/scratches&quot;,
-    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
-    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
-    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
-    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable&quot;,
-    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "RunOnceActivity.OpenProjectViewOnStart": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "WebServerToolWindowFactoryState": "false",
+    "git-widget-placeholder": "leo",
+    "last.edited.regexp": "08_radial_line_25press_3500A.hdf5",
+    "last_opened_file_path": "/Users/leomurphy/PycharmProjects/lapd-plasma-analysis",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "settings.editor.selected.configurable": "com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable",
+    "vue.rearranger.settings.migration": "true"
   },
-  &quot;keyToStringList&quot;: {
-    &quot;com.intellij.ide.scratch.ScratchImplUtil$2/New Scratch File&quot;: [
-      &quot;Python&quot;
+  "keyToStringList": {
+    "com.intellij.ide.scratch.ScratchImplUtil$2/New Scratch File": [
+      "Python"
     ]
   }
-}</component>
+}]]></component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="$APPLICATION_CONFIG_DIR$/scratches" />
@@ -263,7 +263,9 @@
       <workItem from="1703781983531" duration="6517000" />
       <workItem from="1704728132069" duration="4671000" />
       <workItem from="1704921169352" duration="5608000" />
-      <workItem from="1704982886633" duration="44527000" />
+      <workItem from="1704982886633" duration="48971000" />
+      <workItem from="1705639084143" duration="2572000" />
+      <workItem from="1705686470606" duration="35091000" />
     </task>
     <task id="LOCAL-00001" summary="Switch plots to using QtAgg instead of TkAgg backend">
       <created>1680657801669</created>
@@ -566,7 +568,87 @@
       <option name="project" value="LOCAL" />
       <updated>1705184806798</updated>
     </task>
-    <option name="localTasksCounter" value="39" />
+    <task id="LOCAL-00039" summary="Plot V_F and V_P in characteristic view mode">
+      <option name="closed" value="true" />
+      <created>1705594949742</created>
+      <option name="number" value="00039" />
+      <option name="presentableId" value="LOCAL-00039" />
+      <option name="project" value="LOCAL" />
+      <updated>1705594949742</updated>
+    </task>
+    <task id="LOCAL-00040" summary="Adjust threshold to 8 mA; make error message reflect threshold">
+      <option name="closed" value="true" />
+      <created>1705594989792</created>
+      <option name="number" value="00040" />
+      <option name="presentableId" value="LOCAL-00040" />
+      <option name="project" value="LOCAL" />
+      <updated>1705594989792</updated>
+    </task>
+    <task id="LOCAL-00041" summary="Create function array_lookup in helper.py to plot V_F and V_P in characteristic view mode">
+      <option name="closed" value="true" />
+      <created>1705595029553</created>
+      <option name="number" value="00041" />
+      <option name="presentableId" value="LOCAL-00041" />
+      <option name="project" value="LOCAL" />
+      <updated>1705595029553</updated>
+    </task>
+    <task id="LOCAL-00042" summary="Create function array_lookup in helper.py to plot V_F and V_P in characteristic view mode">
+      <option name="closed" value="true" />
+      <created>1705595051078</created>
+      <option name="number" value="00042" />
+      <option name="presentableId" value="LOCAL-00042" />
+      <option name="project" value="LOCAL" />
+      <updated>1705595051078</updated>
+    </task>
+    <task id="LOCAL-00043" summary="Update README.md&#10;&#10;Elaboration of libraries required&#10;&#10;(cherry picked from commit 8ab1d4cda63427daaa4021d6876d622e81330ceb)">
+      <option name="closed" value="true" />
+      <created>1705595397148</created>
+      <option name="number" value="00043" />
+      <option name="presentableId" value="LOCAL-00043" />
+      <option name="project" value="LOCAL" />
+      <updated>1705595397148</updated>
+    </task>
+    <task id="LOCAL-00044" summary="Fix bug that occurred when plotting V_F and V_P after a failed diagnostics calculation in characteristic view mode">
+      <option name="closed" value="true" />
+      <created>1706304983124</created>
+      <option name="number" value="00044" />
+      <option name="presentableId" value="LOCAL-00044" />
+      <option name="project" value="LOCAL" />
+      <updated>1706304983124</updated>
+    </task>
+    <task id="LOCAL-00045" summary="Improve internal variable naming; make default smoothing median smoothing">
+      <option name="closed" value="true" />
+      <created>1706305247537</created>
+      <option name="number" value="00045" />
+      <option name="presentableId" value="LOCAL-00045" />
+      <option name="project" value="LOCAL" />
+      <updated>1706305247537</updated>
+    </task>
+    <task id="LOCAL-00046" summary="Combine diagnostics loading bars for multiple probes">
+      <option name="closed" value="true" />
+      <created>1706305315202</created>
+      <option name="number" value="00046" />
+      <option name="presentableId" value="LOCAL-00046" />
+      <option name="project" value="LOCAL" />
+      <updated>1706305315202</updated>
+    </task>
+    <task id="LOCAL-00047" summary="Fix bug that sometimes caused failure of array_lookup helper function">
+      <option name="closed" value="true" />
+      <created>1706305352993</created>
+      <option name="number" value="00047" />
+      <option name="presentableId" value="LOCAL-00047" />
+      <option name="project" value="LOCAL" />
+      <updated>1706305352993</updated>
+    </task>
+    <task id="LOCAL-00048" summary="Remove debug print statements in plotting function; temporarily turn off hardcoded axis limits">
+      <option name="closed" value="true" />
+      <created>1706305520439</created>
+      <option name="number" value="00048" />
+      <option name="presentableId" value="LOCAL-00048" />
+      <option name="project" value="LOCAL" />
+      <updated>1706305520439</updated>
+    </task>
+    <option name="localTasksCounter" value="49" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -617,7 +699,7 @@
                   <entry key="branch">
                     <value>
                       <list>
-                        <option value="main" />
+                        <option value="leo" />
                       </list>
                     </value>
                   </entry>
@@ -630,15 +712,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="Add diagnostic viewing to characteristic_view.py" />
-    <MESSAGE value="Replace custom smoothing functions with fast, existing bottleneck.move_mean function" />
-    <MESSAGE value="Move diagnostic helper functions to helper.py" />
-    <MESSAGE value="Print experiment name (e.g. &quot;March_2022&quot;) for single-hdf5-file graphs" />
-    <MESSAGE value="Remove to_real_sweep_units function and replace with inline calculation of real bias and current values" />
-    <MESSAGE value="Increase smoothing, accommodate diagnostic display in characteristic view mode" />
-    <MESSAGE value="Pluralize some variable names" />
-    <MESSAGE value="Save error string for failed diagnostics; create get_pressure function" />
-    <MESSAGE value="Generalize netCDFaccess functions to allow general file access" />
     <MESSAGE value="Reorganize interferometry.py" />
     <MESSAGE value="Reorganize main.py" />
     <MESSAGE value="Improve errorbar calculations" />
@@ -655,12 +728,37 @@
     <MESSAGE value="Vary plot tolerance and smoothing margin to reflect new rolling-median smoothing method" />
     <MESSAGE value="Save plasma diagnostics even in the event of a failure in interferometry density calibration" />
     <MESSAGE value="Fix bug by using standard deviation, not standard error, to determine if data is too noisy to plot" />
-    <option name="LAST_COMMIT_MESSAGE" value="Fix bug by using standard deviation, not standard error, to determine if data is too noisy to plot" />
+    <MESSAGE value="Plot V_F and V_P in characteristic view mode" />
+    <MESSAGE value="Adjust threshold to 8 mA; make error message reflect threshold" />
+    <MESSAGE value="Create function array_lookup in helper.py to plot V_F and V_P in characteristic view mode" />
+    <MESSAGE value="Update README.md&#10;&#10;Elaboration of libraries required&#10;&#10;(cherry picked from commit 8ab1d4cda63427daaa4021d6876d622e81330ceb)" />
+    <MESSAGE value="Fix bug that occurred when plotting V_F and V_P after a failed diagnostics calculation in characteristic view mode" />
+    <MESSAGE value="Improve internal variable naming; make default smoothing median smoothing" />
+    <MESSAGE value="Combine diagnostics loading bars for multiple probes" />
+    <MESSAGE value="Fix bug that sometimes caused failure of array_lookup helper function" />
+    <MESSAGE value="Remove debug print statements in plotting function; temporarily turn off hardcoded axis limits" />
+    <option name="LAST_COMMIT_MESSAGE" value="Remove debug print statements in plotting function; temporarily turn off hardcoded axis limits" />
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/main.py</url>
+          <line>108</line>
+          <option name="timeStamp" value="8" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/main.py</url>
+          <line>144</line>
+          <option name="timeStamp" value="10" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/lapd_plasma_analysis$scratch_4.coverage" NAME="scratch_4 Coverage Results" MODIFIED="1692131134620" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$APPLICATION_CONFIG_DIR$/scratches" />
     <SUITE FILE_PATH="coverage/lapd_plasma_analysis$fourier.coverage" NAME="fourier Coverage Results" MODIFIED="1695663830302" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/lapd_plasma_analysis$main.coverage" NAME="main Coverage Results" MODIFIED="1705592763568" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/lapd_plasma_analysis$main.coverage" NAME="main Coverage Results" MODIFIED="1706304715131" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/lapd_plasma_analysis$scratch_2.coverage" NAME="scratch_2 Coverage Results" MODIFIED="1691534973579" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$APPLICATION_CONFIG_DIR$/scratches" />
     <SUITE FILE_PATH="coverage/lapd_plasma_analysis$scratch_6.coverage" NAME="scratch_6 Coverage Results" MODIFIED="1696432972127" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$APPLICATION_CONFIG_DIR$/scratches" />
     <SUITE FILE_PATH="coverage/lapd_plasma_analysis$scratch.coverage" NAME="scratch Coverage Results" MODIFIED="1689972569303" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$APPLICATION_CONFIG_DIR$/scratches" />

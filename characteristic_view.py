@@ -45,14 +45,17 @@ def display_characteristics(characteristics_array, positions, ports, ramp_times,
                 electron_temperature = diagnostics['T_e'] if not bimaxwellian \
                     else unpack_bimaxwellian(diagnostics)['T_e_avg']
                 plot_title += f"\nTemperature: {electron_temperature:.3f}"
+                chara_to_plot.plot()
+                plt.plot(diagnostics['V_F'],
+                         chara_to_plot.current[array_lookup(chara_to_plot.bias, diagnostics['V_F'])], 'go', label="V_F")
+                plt.plot(diagnostics['V_P'],
+                         chara_to_plot.current[array_lookup(chara_to_plot.bias, diagnostics['V_P'])], 'ro', label="V_P")
+                plt.legend()
+
             except (ValueError, RuntimeError, TypeError) as e:
                 plot_title += f"\n(Error calculating plasma diagnostics: \n{str(e)[:35]})"
-        chara_to_plot.plot()
-        plt.plot(diagnostics['V_F'],
-                 chara_to_plot.current[array_lookup(chara_to_plot.bias, diagnostics['V_F'])], 'go', label="V_F")
-        plt.plot(diagnostics['V_P'],
-                 chara_to_plot.current[array_lookup(chara_to_plot.bias, diagnostics['V_P'])], 'ro', label="V_P")
-        plt.legend()
-        plt.title(plot_title)
-        plt.tight_layout()
-        plt.show()
+                chara_to_plot.plot()
+
+            plt.title(plot_title)
+            plt.tight_layout()
+            plt.show()
