@@ -4,15 +4,8 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="99051048-4239-4d54-a2e8-6a0399c265e9" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/characteristic_view.py" beforeDir="false" afterPath="$PROJECT_DIR$/characteristic_view.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/characterization.py" beforeDir="false" afterPath="$PROJECT_DIR$/characterization.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/diagnostics.py" beforeDir="false" afterPath="$PROJECT_DIR$/diagnostics.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/getIVsweep.py" beforeDir="false" afterPath="$PROJECT_DIR$/getIVsweep.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/helper.py" beforeDir="false" afterPath="$PROJECT_DIR$/helper.py" afterDir="false" />
+    <list default="true" id="99051048-4239-4d54-a2e8-6a0399c265e9" name="Changes" comment="Remove debug print statements in plotting function; temporarily turn off hardcoded axis limits">
       <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/plots.py" beforeDir="false" afterPath="$PROJECT_DIR$/plots.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -272,7 +265,7 @@
       <workItem from="1704921169352" duration="5608000" />
       <workItem from="1704982886633" duration="48971000" />
       <workItem from="1705639084143" duration="2572000" />
-      <workItem from="1705686470606" duration="34439000" />
+      <workItem from="1705686470606" duration="35091000" />
     </task>
     <task id="LOCAL-00001" summary="Switch plots to using QtAgg instead of TkAgg backend">
       <created>1680657801669</created>
@@ -615,7 +608,47 @@
       <option name="project" value="LOCAL" />
       <updated>1705595397148</updated>
     </task>
-    <option name="localTasksCounter" value="44" />
+    <task id="LOCAL-00044" summary="Fix bug that occurred when plotting V_F and V_P after a failed diagnostics calculation in characteristic view mode">
+      <option name="closed" value="true" />
+      <created>1706304983124</created>
+      <option name="number" value="00044" />
+      <option name="presentableId" value="LOCAL-00044" />
+      <option name="project" value="LOCAL" />
+      <updated>1706304983124</updated>
+    </task>
+    <task id="LOCAL-00045" summary="Improve internal variable naming; make default smoothing median smoothing">
+      <option name="closed" value="true" />
+      <created>1706305247537</created>
+      <option name="number" value="00045" />
+      <option name="presentableId" value="LOCAL-00045" />
+      <option name="project" value="LOCAL" />
+      <updated>1706305247537</updated>
+    </task>
+    <task id="LOCAL-00046" summary="Combine diagnostics loading bars for multiple probes">
+      <option name="closed" value="true" />
+      <created>1706305315202</created>
+      <option name="number" value="00046" />
+      <option name="presentableId" value="LOCAL-00046" />
+      <option name="project" value="LOCAL" />
+      <updated>1706305315202</updated>
+    </task>
+    <task id="LOCAL-00047" summary="Fix bug that sometimes caused failure of array_lookup helper function">
+      <option name="closed" value="true" />
+      <created>1706305352993</created>
+      <option name="number" value="00047" />
+      <option name="presentableId" value="LOCAL-00047" />
+      <option name="project" value="LOCAL" />
+      <updated>1706305352993</updated>
+    </task>
+    <task id="LOCAL-00048" summary="Remove debug print statements in plotting function; temporarily turn off hardcoded axis limits">
+      <option name="closed" value="true" />
+      <created>1706305520439</created>
+      <option name="number" value="00048" />
+      <option name="presentableId" value="LOCAL-00048" />
+      <option name="project" value="LOCAL" />
+      <updated>1706305520439</updated>
+    </task>
+    <option name="localTasksCounter" value="49" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -679,11 +712,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="Remove to_real_sweep_units function and replace with inline calculation of real bias and current values" />
-    <MESSAGE value="Increase smoothing, accommodate diagnostic display in characteristic view mode" />
-    <MESSAGE value="Pluralize some variable names" />
-    <MESSAGE value="Save error string for failed diagnostics; create get_pressure function" />
-    <MESSAGE value="Generalize netCDFaccess functions to allow general file access" />
     <MESSAGE value="Reorganize interferometry.py" />
     <MESSAGE value="Reorganize main.py" />
     <MESSAGE value="Improve errorbar calculations" />
@@ -704,7 +732,12 @@
     <MESSAGE value="Adjust threshold to 8 mA; make error message reflect threshold" />
     <MESSAGE value="Create function array_lookup in helper.py to plot V_F and V_P in characteristic view mode" />
     <MESSAGE value="Update README.md&#10;&#10;Elaboration of libraries required&#10;&#10;(cherry picked from commit 8ab1d4cda63427daaa4021d6876d622e81330ceb)" />
-    <option name="LAST_COMMIT_MESSAGE" value="Update README.md&#10;&#10;Elaboration of libraries required&#10;&#10;(cherry picked from commit 8ab1d4cda63427daaa4021d6876d622e81330ceb)" />
+    <MESSAGE value="Fix bug that occurred when plotting V_F and V_P after a failed diagnostics calculation in characteristic view mode" />
+    <MESSAGE value="Improve internal variable naming; make default smoothing median smoothing" />
+    <MESSAGE value="Combine diagnostics loading bars for multiple probes" />
+    <MESSAGE value="Fix bug that sometimes caused failure of array_lookup helper function" />
+    <MESSAGE value="Remove debug print statements in plotting function; temporarily turn off hardcoded axis limits" />
+    <option name="LAST_COMMIT_MESSAGE" value="Remove debug print statements in plotting function; temporarily turn off hardcoded axis limits" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>

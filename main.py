@@ -30,7 +30,7 @@ interferometry_folder = hdf5_folder
 probes_choice = [1, 0]                                  # TODO user choice for probe or linear combination to use
 bimaxwellian = False                                    # TODO perform both and store in same NetCDF file?
 smoothing_margin = 200                                  # Optimal values in range 100-400 if "median" smoothing method
-plot_tolerance = 1                                    # Optimal values are np.nan (plot all points) or >= 0.2
+plot_tolerance = np.nan   # was 2                       # Optimal values are np.nan (plot all points) or >= 0.5
 
 # QUESTION: can we calibrate both Langmuir probes using an interferometry ratio depending only on one of them?
 core_radius = 26. * u.cm                                         # From MATLAB code
@@ -134,7 +134,7 @@ if __name__ == "__main__":
                                                                   bimaxwellian)})
             datasets[i] = datasets[i].assign_attrs({"Interferometry calibrated": interferometry_calibrate})
 
-            save_diagnostic_path = make_path(netcdf_folder, datasets[i].attrs['Run name'], "nc")
+            save_diagnostic_path = make_path(netcdf_folder, datasets[i].attrs['Run name'] + "_lang", "nc")
             write_netcdf(datasets[i], save_diagnostic_path)
 
     # Get possible diagnostics and their full names, e.g. "n_e" and "Electron density"
