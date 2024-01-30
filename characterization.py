@@ -3,6 +3,8 @@ from helper import *
 import warnings
 import bottleneck as bn
 from scipy.signal import find_peaks
+from tqdm import tqdm
+import sys
 
 
 def characterize_sweep_array(unsmooth_bias, unsmooth_currents, margin, sample_sec):
@@ -105,26 +107,31 @@ def ensure_sweep_units(bias, current):
     return new_bias, new_current
 
 
-def characteristic_array(bias, current, ramp_bounds):
+def characteristic_array(bias, currents, ramp_bounds):
     # 4D: probe * unique_position * shot * plateau_num
-
-    currents = current  # "currents" has "probe" dimension in front; may have size 1
-    num_loc = bias.shape[0]
-    num_shot = bias.shape[1]
+    # "currents" has "probe" dimension in front; may have size 1
 
     ramp_slices = np.array([slice(ramp[0], ramp[1]) for ramp in ramp_bounds])
 
-    # Mixed arbitrary/indexed list comprehension
-    print(f"Creating characteristics for {currents.shape[0]} probe(s) ...")
+    num_probe = len(currents)
+    num_loc = bias.shape[0]
+    num_shot = bias.shape[1]
+    num_ramp = len(ramp_slices)
+
+    print(f"Creating characteristics ...")
     warnings.simplefilter(action='ignore', category=FutureWarning)  # Suppress FutureWarnings to not break loading bar
     print("\t(plasmapy.langmuir.diagnostics pending deprecation FutureWarning suppressed)")
 
-    chara_array = np.array([[[[Characteristic(bias[loc, shot, ramp_slice],
-                                              current[loc, shot, ramp_slice])
-                               for ramp_slice in ramp_slices]
-                              for shot in range(num_shot)]
-                             for loc in range(num_loc)]
-                            for current in currents])
-    # for loc in trange(num_loc, unit="location", file=sys.stdout)])[np.newaxis, ...]
+    num_characteristics = num_probe * num_loc * num_shot * num_ramp
+    chara_array = np.empty((len(currents), num_loc, num_shot, len(ramp_slices)), dtype=Characteristic)
+    with tqdm(total=num_characteristics, unit="characteristic", file=sys.stdout) as pbar:
+        for probe in range(num_probe):
+            for loc in range(num_loc):
+                for shot in range(num_shot):
+                    for ramp in range(num_ramp):
+                        chara_array[probe, loc, shot, ramp] = Characteristic(
+                            bias[loc, shot, ramp_slices[ramp]],
+                            currents[probe, loc, shot, ramp_slices[ramp]])
+                        pbar.update(1)
 
     return chara_array
