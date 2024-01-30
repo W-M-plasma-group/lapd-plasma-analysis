@@ -13,18 +13,18 @@ def get_exp_params(hdf5_path):
                             get_discharge,
                             get_gas_pressure,
                             get_magnetic_field]
-    exp_params_functions_2018 = [get_nominal_discharge_2018,
-                                 get_nominal_pressure_2018]
-    exp_params_functions_2022 = [get_nominal_discharge_2022,
-                                 get_nominal_gas_puff_2022]
+    exp_params_functions_0 = [get_nominal_discharge_2018,
+                              get_nominal_pressure_2018]
+    exp_params_functions_123 = [get_nominal_discharge_2022,
+                                get_nominal_gas_puff_2022]
     # Units are given in MATLAB code
     exp_params_names_values = {}
     with lapd.File(hdf5_path) as hdf5_file:
         exp_name = hdf5_file.info['exp name']
         if exp_name == "April_2018":
-            exp_params_functions += exp_params_functions_2018
-        elif exp_name in ["March_2022", "November_2022"]:
-            exp_params_functions += exp_params_functions_2022
+            exp_params_functions += exp_params_functions_0
+        elif exp_name in ["March_2022", "November_2022", "February_2024"]:
+            exp_params_functions += exp_params_functions_123
         for exp_param_func in exp_params_functions:
             exp_params_names_values.update(exp_param_func(hdf5_file))
     return exp_params_names_values
