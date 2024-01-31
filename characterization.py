@@ -82,7 +82,7 @@ def isolate_plateaus(bias, margin=0):
 
     # Second fit to find maximum bias frames
     peak_frames, peak_properties = find_peaks(bias_avg, height=0, distance=guess_plateau_spacing // 2,
-                                              width=min_plateau_width, rel_height=0.97)  # 0.97 may be hardcoded
+                                              width=min_plateau_width, rel_height=0.97)  # TODO 0.97 may be hardcoded
 
     return np.stack((peak_properties['left_ips'].astype(int) + margin // 2, peak_frames - margin // 2), axis=-1)
 
@@ -130,7 +130,7 @@ def characteristic_array(bias, currents, ramp_bounds):
                 for shot in range(num_shot):
                     for ramp in range(num_ramp):
                         chara_array[probe, loc, shot, ramp] = Characteristic(
-                            bias[loc, shot, ramp_slices[ramp]],
+                            bias[loc,            shot, ramp_slices[ramp]],
                             currents[probe, loc, shot, ramp_slices[ramp]])
                         pbar.update(1)
 
