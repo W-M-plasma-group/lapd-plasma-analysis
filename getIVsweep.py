@@ -3,7 +3,7 @@ import astropy.units as u
 from bapsflib import lapd
 
 
-def get_isweep_vsweep(filename, vsweep_bc, langmuir_probes, voltage_gain):
+def get_isweep_vsweep(filename, vsweep_bc, langmuir_probes, voltage_gain, orientation):
     r"""
     Reads all sweep data (V-sweep and I-sweep) from HDF5 file Langmuir code.
 
@@ -13,6 +13,7 @@ def get_isweep_vsweep(filename, vsweep_bc, langmuir_probes, voltage_gain):
     :param vsweep_bc: Board and channel number of vsweep data in HDF5 file
     :param langmuir_probes: structure array of board, channel, receptacle, port, resistance, and area for each probe
     :param voltage_gain: numerical value of scaling constant for getting real bias voltages from abstract vsweep data
+    :param orientation: +1 or -1, depending on if Isweep should be inverted before analysis
     :return: bias, currents, x, y, dt: the relevant multidimensional v_sweep, i_sweeps, position, and timestep
     """
 
@@ -52,9 +53,8 @@ def get_isweep_vsweep(filename, vsweep_bc, langmuir_probes, voltage_gain):
     # bias dimensions:             position, shot, frame   (e.g.    (71, 15, 55296))
     # currents dimensions:   port, position, shot, frame   (e.g. (1, 71, 15, 55296))
 
-    # Determine up/down orientation of sweep by finding median current at a central shot; should be negative
-    invert = np.sign(np.median(currents[:, int(num_positions / 2), :, :]))
-    currents *= -invert
+    # Up-down orientation of sweep is hardcoded for an entire experiment, e.g. November_2022, in preconfiguration.py
+    currents *= orientation
 
     dt = vsweep_data.dt
     return bias, currents, positions, dt, ports

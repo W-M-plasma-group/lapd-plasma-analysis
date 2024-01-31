@@ -5,7 +5,7 @@ import xarray as xr
 
 
 def get_config_id(exp_name):
-    valid_configs = ["April_2018", "March_2022", "November_2022"]
+    valid_configs = ["April_2018", "March_2022", "November_2022", "February_2024"]
 
     try:
         return valid_configs.index(exp_name)
@@ -19,7 +19,8 @@ def get_config_id(exp_name):
 def get_vsweep_bc(config_id):  # return (board, channel) for vsweep data
     vsweep_bcs = [(1, 3),   # April_2018
                   (1, 1),   # March_2022
-                  (1, 1)]   # November_2022
+                  (1, 1),   # November_2022
+                  (0, 0)]   # February_2024
     return vsweep_bcs[config_id]
 
 
@@ -33,13 +34,16 @@ def get_langmuir_config(hdf5_path, config_id):
     # each list in tuple corresponds to an experiment series;
     # each tuple in list corresponds to configuration data for a single probe used in those experiments
     # -1 is placeholder; what each entry corresponds to is given in 'dtype' parameter below
-    langmuir_probe_configs = ([(1, 2, 25, -1, 11., 1 * u.mm ** 2)],    # April_2018
+    langmuir_probe_configs = ([(1, 2, 25, -1, 11.,  1 * u.mm ** 2)],    # April_2018
 
-                              [(1, 2, 27, -1, 1.25, 1 * u.mm ** 2),    # March_2022
+                              [(1, 2, 27, -1, 1.25, 1 * u.mm ** 2),     # March_2022
                                (1, 3, 43, -1, 2.10, 1 * u.mm ** 2)],
 
-                              [(1, 2, 29, -1, 2.20, 2 * u.mm ** 2),    # November_2022
-                               (1, 3, 35, -1, 2.20, 2 * u.mm ** 2)]
+                              [(1, 2, 29, -1, 2.20, 2 * u.mm ** 2),     # November_2022
+                               (1, 3, 35, -1, 2.20, 2 * u.mm ** 2)],
+
+                              [(0, 0, 0,  -1, 0,    2 * u.mm ** 2),     # February_2024
+                               (0, 0, 27, -1, 0,    2 * u.mm ** 2)]
                               )
 
     langmuir_configs_array = np.array(langmuir_probe_configs[config_id], dtype=[('board', int),
@@ -61,8 +65,8 @@ def get_ports_receptacles(hdf5_path):
         return {configs[probe]['probe']['port']: configs[probe]['receptacle'] for probe in configs}
 
 
-def get_ion(hdf5_path: str):
-    if "h2" in hdf5_path.lower():
+def get_ion(run_name: str):
+    if "h2" in run_name.lower():
         print("Assuming fully dissociated hydrogen (H+)")
         return "H+"
     else:
