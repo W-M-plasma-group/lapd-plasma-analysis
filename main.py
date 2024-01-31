@@ -95,10 +95,11 @@ if __name__ == "__main__":
             vsweep_board_channel = get_vsweep_bc(config_id)
             langmuir_probes = get_langmuir_config(hdf5_path, config_id)
             voltage_gain = get_voltage_gain(config_id)
+            orientation = get_orientation(config_id)
 
             # get current and bias data from Langmuir probe, then form into array of Characteristic objects
             bias, currents, positions, sample_sec, ports = get_isweep_vsweep(
-                hdf5_path, vsweep_board_channel, langmuir_probes, voltage_gain)
+                hdf5_path, vsweep_board_channel, langmuir_probes, voltage_gain, orientation)
             characteristics, ramp_times = characterize_sweep_array(bias, currents, smoothing_margin, sample_sec)
 
             if chara_view_mode:
