@@ -10,7 +10,7 @@ from helper import *
 # matplotlib.use('QtAgg')
 
 
-def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagnostic, probes_choice,
+def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagnostic, isweep_choices,
                               steady_state_by_runs, attribute=None, tolerance=np.nan):
     # diagnostics_datasets is a list of different HDF5 datasets
 
@@ -48,7 +48,8 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
 
         color_map = matplotlib.colormaps["plasma"](np.linspace(0, 0.9, num_datasets))
         for inner_index in range(num_datasets):
-            dataset = port_selector(datasets[inner_index], probes_choice)  # TODO allow looping through multiple datasets returned
+            # TODO allow looping through multiple datasets returned
+            dataset = isweep_selector(datasets[inner_index], isweep_choices)
             inner_val = dataset.attrs[attributes[0]]
 
             linear_dimension = get_valid_linear_dimension(dataset.sizes)
@@ -57,7 +58,7 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
             linear_da_steady_state = steady_state_only(linear_da,
                                                        steady_state_plateaus=steady_state_by_runs[inner_index])
             linear_da_mean = linear_da_steady_state.mean(['shot', 'time'], keep_attrs=True)
-            linear_da_std = linear_da_steady_state.std(['shot', 'time'], ddof=1, keep_attrs=True)
+            linear_da_std = linear_da_steady_state.std(['shot',   'time'], ddof=1, keep_attrs=True)
             # 95% (~two standard deviation) confidence interval
             linear_da_error = linear_da_std * 1.96 / np.sqrt(linear_da_steady_state.sizes['shot']
                                                              * linear_da_steady_state.sizes['time'])
@@ -75,7 +76,7 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
 
             if "eV" in linear_da_mean.attrs['units']:  # TODO very hardcoded
                 pass
-                # ax.set_ylim((0, 13))
+                ax.set_ylim((0, 6))
             if "Pa" in linear_da_mean.attrs['units']:
                 pass
                 # ax.set_ylim((-1, 20))
