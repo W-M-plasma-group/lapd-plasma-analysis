@@ -85,7 +85,8 @@ if __name__ == "__main__":
         hdf5_chosen_ints = choose_multiple_list(hdf5_paths, "HDF5 file")
         hdf5_chosen_list = [hdf5_paths[choice] for choice in hdf5_chosen_ints]
 
-        chara_view_mode = (len(hdf5_chosen_list) == 1) and ask_yes_or_no("Start characteristic plotting mode? (y/n) ")
+        sweep_view_mode = (len(hdf5_chosen_list) == 1) and ask_yes_or_no("Use raw sweep plotting mode? (y/n) ")
+        chara_view_mode = (len(hdf5_chosen_list) == 1) and ask_yes_or_no("Use characteristic plotting mode? (y/n) ")
 
         datasets = []
         for hdf5_path in hdf5_chosen_list:
@@ -101,10 +102,15 @@ if __name__ == "__main__":
             voltage_gain = get_voltage_gain(config_id)
             orientation = get_orientation(config_id)
 
-            # get current and bias data from Langmuir probe, then form into array of Characteristic objects
-            bias, currents, positions, sample_sec, ports = get_isweep_vsweep(hdf5_path, vsweep_board_channel,
-                                                                             langmuir_probes, voltage_gain, orientation)
-            characteristics, ramp_times = characterize_sweep_array(bias, currents, smoothing_margin, sample_sec)
+            # get current and bias data from Langmuir probe
+            bias, currents, positions, dt, ports = get_isweep_vsweep(hdf5_path, vsweep_board_channel,
+                                                                     langmuir_probes, voltage_gain, orientation)
+
+            if sweep_view_mode:
+                display_raw_sweep(bias, currents, positions, ports, exp_params_dict, dt)
+
+            # organize sweep bias and current into an array of Characteristic objects
+            characteristics, ramp_times = characterize_sweep_array(bias, currents, smoothing_margin, dt)
 
             if chara_view_mode:
                 display_characteristics(characteristics, positions, ports, ramp_times, exp_params_dict,

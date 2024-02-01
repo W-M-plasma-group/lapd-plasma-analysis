@@ -24,8 +24,9 @@ def get_vsweep_bc(config_id):  # return (board, channel) for vsweep data
 
 
 def get_voltage_gain(config_id):
-    # TODO develop; get from HDF5 metadata someday
-    return 100.
+    # TODO get from HDF5 metadata?
+    return (100, 100, 100, 100)[config_id]
+    # Note: here, gain refers to the inverse gain applies. Multiply by this gain to undo.
 
 
 def get_langmuir_config(hdf5_path, config_id):

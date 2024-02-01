@@ -16,7 +16,8 @@ def get_isweep_vsweep(filename, vsweep_bc, isweep_metadatas, voltage_gain, orien
     for each isweep signal
     :param voltage_gain: numerical value of scaling constant for getting real bias voltages from abstract vsweep data
     :param orientation: +1 or -1, depending on if Isweep should be inverted before analysis
-    :return: bias, currents, x, y, dt: the relevant multidimensional v_sweep, i_sweeps, position, and timestep
+    :return: bias, currents, positions, dt, ports: v_sweep array, i_sweeps array, position array, timestep amount,
+    and port numbers array
     """
 
     with lapd.File(filename) as lapd_file:
