@@ -51,29 +51,27 @@ def get_diagnostic_keys_units(probe_area=1.*u.mm**2, ion_type="He-4+", bimaxwell
     return keys_units
 
 
-def port_selector(ds, vector):  # TODO should separate diagnostics_main and plot_main anyway!
+def isweep_selector(ds, vector):  # TODO should separate diagnostics_main and plot_main anyway!
     r"""
-    Select a port or linear combination of ports from a diagnostic dataset.
-    For example, on a dataset with two probes at different ports,
-    [1,  0] would return the data at the first (lowest-port-number) probe
-    [1, -1] would return the parallel difference (low port number minus high port number)
-    # [[1, 0], [1, -1]] would return a list containing both of the above [NOT YET IMPLEMENTED]
-    :param ds: The dataset to select from
-    :param vector: The linear combination of ports to compute
-    :return: Dataset containing data from the selected port or combination of ports
+    Select an isweep signal or linear combination of isweep signals from a diagnostic dataset.
+    For example, on a dataset with two isweep signals (e.g. from different probes or probe faces),
+        [1,  0] would return the data from the first isweep signal (listed first in preconfiguration.py)
+        [1, -1] would return the parallel difference (first-listed minus second-listed)
+        # [[1, 0], [1, -1]] would return a list containing both of the above [NOT YET IMPLEMENTED]
+    :param ds: The Dataset of Langmuir data to select from
+    :param vector: The linear combination of isweep signals to compute
+    :return: Dataset containing data from the selected isweep signal or combination of isweep signals
     """
 
-    # use "port_list = dataset.port" if switch to dataset.sel
     manual_attrs = ds.attrs  # TODO raise xarray issue about losing attrs even with xr.set_options(keep_attrs=True):
     manual_sub_attrs = {key: ds[key].attrs for key in ds}
-    ds_port_selected = 0 * ds.isel(port=0)
+    ds_isweep_selected = 0 * ds.isel(port=0)
     for i in range(ds.sizes['port']):
-        ds_port_selected += vector[i] * ds.isel(port=i)
+        ds_isweep_selected += vector[i] * ds.isel(port=i)
     for key in ds:
-        ds_port_selected[key] = ds_port_selected[key].assign_attrs(manual_sub_attrs[key])
-    return ds_port_selected.assign_attrs(manual_attrs)
-    # ask user for a linear transformation/matrix?
-    # Add a string attribute to the dataset to describe which port(s) comes from
+        ds_isweep_selected[key] = ds_isweep_selected[key].assign_attrs(manual_sub_attrs[key])
+    return ds_isweep_selected.assign_attrs(manual_attrs)
+    # Add a string attribute to the dataset to describe which port(s)/ISWEEPS comes from
 
 
 def array_lookup(array, value):

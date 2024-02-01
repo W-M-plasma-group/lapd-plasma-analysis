@@ -96,7 +96,8 @@ if __name__ == "__main__":
             ion_type = get_ion(exp_params_dict['Run name'])
             config_id = get_config_id(exp_params_dict['Exp name'])
             vsweep_board_channel = get_vsweep_bc(config_id)
-            langmuir_probes = get_langmuir_config(hdf5_path, config_id)
+
+            langmuir_probes = get_langmuir_config(hdf5_path, config_id)  # TODO print face strings in outputs
             voltage_gain = get_voltage_gain(config_id)
             orientation = get_orientation(config_id)
 
