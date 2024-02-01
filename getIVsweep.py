@@ -78,13 +78,30 @@ def get_shot_positions(isweep_motor_data):
     z_positions = shot_positions[:, 2]
     if np.amin(z_positions) != np.amax(z_positions):
         raise ValueError("Varying z-position when only x and/or y variation expected")
-    # save z-position for later?
-    positions = np.unique(shot_positions[:, :2], axis=0)  # list of all unique (x, y) positions
+    # Generate list of all unique (x, y) positions; save z-position for later?
+    positions, inverse, counts = np.unique(shot_positions[:, :2], axis=0, return_inverse=True, return_counts=True)
     num_positions = len(positions)
     if num_shots % num_positions != 0:
-        raise ValueError("Number of shots " + str(num_shots) +
-                         " does not evenly divide into " + str(num_positions) + " unique positions")
-    shots_per_position = int(num_shots // num_positions)
+
+        shots_per_position = np.min(counts)
+        message = (f"{num_shots} shots do not evenly divide into {num_positions} unique positions. "
+                   f"Only considering first {shots_per_position} shots per position; others are discarded.")
+        warn(message)
+        new_num_shots = num_positions * shots_per_position
+        selected_shots = np.zeros((new_num_shots,), dtype=int)
+        for i in range(len(positions)):
+            # For each unique position, return shot indices located at that position
+            shot_indices_for_position = np.all(shot_positions[:, :2] == positions[i], axis=1).nonzero()[0]
+
+            # Produce indices of shots that exclude those in excess of the first shots_per_position at that position
+            shot_indices_for_position = shot_indices_for_position[:shots_per_position]
+            selected_shots[shots_per_position * i:shots_per_position * (i + 1)] = shot_indices_for_position
+
+        shot_positions = shot_positions[selected_shots]
+
+    else:
+        shots_per_position = int(num_shots // num_positions)
+        selected_shots = np.arange(num_shots)
 
     xy_at_positions = shot_positions[:, :2].reshape((num_positions, shots_per_position, 2))  # (x, y) at shots by pos.
     if not (np.amax(xy_at_positions, axis=1) == np.amin(xy_at_positions, axis=1)).all():
