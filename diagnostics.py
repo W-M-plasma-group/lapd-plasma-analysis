@@ -147,6 +147,8 @@ def detect_steady_state_ramps(density: xr.DataArray, core_rad):
 
 
 def diagnose_char(characteristic, probe_area, ion_type, bimaxwellian, indices=None):
+    if characteristic is None:
+        return "characteristic is None"
     threshold = 8 * u.mA  # TODO hardcoded
     if np.max(characteristic.current.to(u.A).value) < threshold.to(u.A).value:
         return f"Probe current is below {str(threshold)}, which can lead to unreliable results"
