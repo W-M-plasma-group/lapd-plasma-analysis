@@ -65,13 +65,13 @@ def isweep_selector(ds, vector):  # TODO should separate diagnostics_main and pl
 
     manual_attrs = ds.attrs  # TODO raise xarray issue about losing attrs even with xr.set_options(keep_attrs=True):
     manual_sub_attrs = {key: ds[key].attrs for key in ds}
-    ds_isweep_selected = 0 * ds.isel(port=0)
-    for i in range(ds.sizes['port']):
-        ds_isweep_selected += vector[i] * ds.isel(port=i)
+    ds_isweep_selected = 0 * ds.isel(isweep=0)
+    for i in range(ds.sizes['isweep']):
+        ds_isweep_selected += vector[i] * ds.isel(isweep=i)
     for key in ds:
         ds_isweep_selected[key] = ds_isweep_selected[key].assign_attrs(manual_sub_attrs[key])
     return ds_isweep_selected.assign_attrs(manual_attrs)
-    # Add a string attribute to the dataset to describe which port(s)/ISWEEPS comes from
+    # TODO Add a string attribute to the dataset to describe which port/isweep was selected
 
 
 def array_lookup(array, value):
