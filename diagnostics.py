@@ -134,10 +134,10 @@ def get_pressure(lang_ds, calibrated_electron_density, bimaxwellian):
     return pressure.assign_attrs({'units': str(pressure_unit)})
 
 
-def detect_steady_state_ramps(density: xr.DataArray, core_rad):
+def detect_steady_state_ramps(density: xr.DataArray, core_rad, config_id=None):
     r"""Return start and end ramp indices for the steady-state period (density constant in time)"""
     # TODO hardcoded
-    core_density = density.where(np.logical_and(*in_core([density.x, density.y], core_radius)), drop=True)
+    core_density = density.where(np.logical_and(*in_core([density.x, density.y], core_rad)), drop=True)
     core_density_time = core_density.isel(isweep=0).mean(['x', 'y', 'shot']).squeeze()
     threshold = 0.9 * core_density_time.max()
     start_index = (core_density_time > threshold).argmax().item() + 1

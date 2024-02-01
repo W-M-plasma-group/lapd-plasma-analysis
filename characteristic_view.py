@@ -81,7 +81,7 @@ def display_raw_sweep(bias, currents, positions, ports, exp_params_dict, dt):
     isweep_x_y_shot_to_plot = [0, 0, 0, 0]
     variables_to_enter = ["isweep", "x position", "y position", "shot"]
     print("\nNotes: \tIndices are zero-based; choose an integer between 0 and n - 1, inclusive."
-          "\n \t \tEnter a non-integer below to quit characteristic plotting mode and continue to diagnostics.")
+          "\n \t \tEnter a non-integer below to quit raw sweep plotting mode and continue to diagnostics.")
     sweep_view_mode = True
     while sweep_view_mode:
         for i in range(len(isweep_x_y_shot_to_plot)):

@@ -76,7 +76,7 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
 
             if "eV" in linear_da_mean.attrs['units']:  # TODO very hardcoded
                 pass
-                ax.set_ylim((0, 6))
+                ax.set_ylim((0, 7))
             if "Pa" in linear_da_mean.attrs['units']:
                 pass
                 # ax.set_ylim((-1, 20))
