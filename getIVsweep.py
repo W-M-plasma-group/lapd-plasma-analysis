@@ -1,61 +1,72 @@
 import numpy as np
 import astropy.units as u
 from bapsflib import lapd
+from warnings import warn
 
 
-def get_isweep_vsweep(filename, vsweep_bc, langmuir_probes, voltage_gain, orientation):
+def get_isweep_vsweep(filename, vsweep_bc, isweep_metadatas, voltage_gain, orientation):
     r"""
     Reads all sweep data (V-sweep and I-sweep) from HDF5 file Langmuir code.
 
     Parameters
     ----------
-    :param filename: File path of HDF5 file from LAPD
-    :param vsweep_bc: Board and channel number of vsweep data in HDF5 file
-    :param langmuir_probes: structure array of board, channel, receptacle, port, resistance, and area for each probe
+    :param filename: file path of HDF5 file from LAPD
+    :param vsweep_bc: board and channel number of vsweep data in HDF5 file
+    :param isweep_metadatas: structured array of board, channel, receptacle, port, resistance, and area
+    for each isweep signal
     :param voltage_gain: numerical value of scaling constant for getting real bias voltages from abstract vsweep data
     :param orientation: +1 or -1, depending on if Isweep should be inverted before analysis
     :return: bias, currents, x, y, dt: the relevant multidimensional v_sweep, i_sweeps, position, and timestep
     """
 
-    lapd_file = lapd.File(filename)
+    with lapd.File(filename) as lapd_file:
+        isweep_bcs = np.atleast_1d(isweep_metadatas[['board', 'channel']])
 
-    isweep_bcs = np.atleast_1d(langmuir_probes[['board', 'channel']])
+        vsweep_data = lapd_file.read_data(*vsweep_bc, silent=True)
+        isweep_datas = [lapd_file.read_data(*isweep_bc, silent=True) for isweep_bc in isweep_bcs]
+        vsweep_signal = vsweep_data['signal']
+        isweep_signal = np.concatenate([isweep_data['signal'][np.newaxis, ...] for isweep_data in isweep_datas], axis=0)
+        # Above: isweep_signal has one extra dimension "in front" compared to vsweep signal,
+        #  to represent different probes or probe faces; ordered by (board, channel) as listed in isweep_metadatas
+        signal_length = vsweep_signal.shape[-1]
 
-    vsweep_data = lapd_file.read_data(*vsweep_bc, silent=True)
-    isweep_datas = [lapd_file.read_data(*isweep_bc, silent=True) for isweep_bc in isweep_bcs]
-    vsweep_signal = vsweep_data['signal']
-    isweep_signal = np.concatenate([isweep_data['signal'][np.newaxis, ...] for isweep_data in isweep_datas], axis=0)
-    signal_length = vsweep_signal.shape[-1]
-    # Above: isweep_signal has one extra dimension "in front" compared to vsweep signal, to represent different *probes*
+        # List of motor data about the probe associated with each isweep signal.
+        #   Motor data may be repeated, for example if two isweep signals were taken using two faces on the same probe.
+        motor_datas = [lapd_file.read_controls([("6K Compumotor", isweep_metadata['receptacle'])], silent=True)
+                       for isweep_metadata in isweep_metadatas]
 
-    motor_datas = [lapd_file.read_controls([("6K Compumotor", langmuir_probe['receptacle'])], silent=True)
-                   for langmuir_probe in langmuir_probes]
-    # TODO allow isweep motor datas to be different or check; for now, assume identical, and use only first motor data
-    # for isweep_motor_data in motor_datas:
-    positions, num_positions, shots_per_position = get_shot_positions(motor_datas[0])
-    lapd_file.close()
+    # TODO allow isweep motor datas to be different or check
+    #
+    #  for now, assume identical and use only first motor data
+    num_isweep = len(isweep_metadatas)
+    positions, num_positions, shots_per_position, selected_shots = get_shot_positions(motor_datas[0])
+    vsweep_signal = vsweep_signal[selected_shots,    ...]
+    isweep_signal = isweep_signal[:, selected_shots, ...]
 
-    vsweep_signal = vsweep_signal.reshape(num_positions, shots_per_position, signal_length)
-    isweep_signal = isweep_signal.reshape((-1, num_positions, shots_per_position, signal_length))
+    vsweep_signal = vsweep_signal.reshape(num_positions,              shots_per_position, signal_length)
+    isweep_signal = isweep_signal.reshape((num_isweep, num_positions, shots_per_position, signal_length))
 
-    ports = np.array([motor_data.info['controls']['6K Compumotor']['probe']['port'] for motor_data in motor_datas])
-    resistances_shape = [len(ports)] + [1 for _ in range(len(isweep_signal.shape) - 1)]
-    resistances = np.reshape([langmuir_probes['resistance'][langmuir_probes['port'] == port] for port in ports], resistances_shape)
+    scale_shape = [num_isweep] + [1 for _ in range(len(isweep_signal.shape) - 1)]
+    resistances = np.reshape(isweep_metadatas['resistance'], scale_shape)
+    gains = np.reshape(isweep_metadatas['gain'],             scale_shape)
 
     # Convert to real units (not abstract)
     bias = vsweep_signal * voltage_gain * u.V
-    currents = isweep_signal / resistances * u.A
-    # bias, currents = to_real_sweep_units(vsweep_signal, isweep_signal, resistances)
+    currents = isweep_signal / resistances / gains * u.A
 
+    # Subtract out average of last thousand current measurements for each isweep signal,
+    #   as this should be a while after the plasma has dissipated and thus be equal to zero.
+    #   This eliminates any persistent DC offset current from the probe.
     currents_dc_offset = np.mean(currents[..., -1000:], axis=-1, keepdims=True)
     currents -= currents_dc_offset
 
-    # bias dimensions:             position, shot, frame   (e.g.    (71, 15, 55296))
-    # currents dimensions:   port, position, shot, frame   (e.g. (1, 71, 15, 55296))
+    # bias dimensions:               position, shot, frame   (e.g.    (71, 15, 55296))
+    # currents dimensions:   isweep, position, shot, frame   (e.g. (1, 71, 15, 55296))
 
     # Up-down orientation of sweep is hardcoded for an entire experiment, e.g. November_2022, in preconfiguration.py
     currents *= orientation
 
+    ports = np.array([motor_data.info['controls']['6K Compumotor']['probe']['port'] for motor_data in motor_datas])
     dt = vsweep_data.dt
     return bias, currents, positions, dt, ports
 
@@ -77,6 +88,6 @@ def get_shot_positions(isweep_motor_data):
 
     xy_at_positions = shot_positions[:, :2].reshape((num_positions, shots_per_position, 2))  # (x, y) at shots by pos.
     if not (np.amax(xy_at_positions, axis=1) == np.amin(xy_at_positions, axis=1)).all():
-        raise ValueError("Non-uniform position values when grouping Langmuir probe data by position")
+        raise ValueError("Non-uniform position values when grouping sweep data by position")
 
-    return positions, num_positions, shots_per_position
+    return positions, num_positions, shots_per_position, selected_shots

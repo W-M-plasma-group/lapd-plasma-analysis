@@ -28,55 +28,55 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, ports, pr
     y = np.unique(positions[:, 1])
     num_plateaus = characteristic_arrays.shape[-1]
     num_shots = characteristic_arrays.shape[2]
-    num_ports = characteristic_arrays.shape[0]
+    num_isweep = characteristic_arrays.shape[0]
     ports_z = np.array([portnum_to_z(port).to(u.cm).value for port in ports])
 
     probe_areas = np.atleast_1d(probe_area)
     if len(probe_areas) == 1:
-        probe_areas = np.repeat(probe_areas, num_ports)
+        probe_areas = np.repeat(probe_areas, num_isweep)
     keys_units = get_diagnostic_keys_units(probe_areas[0], ion_type, bimaxwellian=bimaxwellian)
 
     # num_x * num_y * num_shots * num_plateaus template numpy_array
-    templates = {key: np.full(shape=(num_ports, len(x), len(y), num_shots, num_plateaus),
+    templates = {key: np.full(shape=(num_isweep, len(x), len(y), num_shots, num_plateaus),
                               fill_value=np.nan, dtype=float)
                  for key in keys_units.keys()}
     diagnostics_ds = xr.Dataset({key: xr.DataArray(data=templates[key],
-                                                   dims=['port', 'x', 'y', 'shot', 'time'],
-                                                   coords=(('port', ports),
+                                                   dims=['isweep', 'x', 'y', 'shot', 'time'],
+                                                   coords=(('isweep', np.arange(num_isweep)),
                                                            ('x', x, {"units": str(u.cm)}),
                                                            ('y', y, {"units": str(u.cm)}),
                                                            ('shot', np.arange(num_shots)),
                                                            ('time', ramp_times.to(u.ms).value, {"units": str(u.ms)}))
                                                    ).assign_coords({'plateau': ('time', np.arange(num_plateaus) + 1),
-                                                                    'z': ('port', ports_z, {"units": str(u.cm)})}
+                                                                    'port': ('isweep', ports),
+                                                                    'z': ('isweep', ports_z, {"units": str(u.cm)})}
                                                                    ).assign_attrs({"units": keys_units[key]})
                                  for key in keys_units.keys()})
 
-    num_characteristics = (diagnostics_ds.sizes['port'] * diagnostics_ds.sizes['x'] * diagnostics_ds.sizes['y']
+    num_characteristics = (diagnostics_ds.sizes['isweep'] * diagnostics_ds.sizes['x'] * diagnostics_ds.sizes['y']
                            * diagnostics_ds.sizes['shot'] * diagnostics_ds.sizes['time'])
 
     # TODO Leo debug!
     # """
     error_types = []
-    error_chart = np.zeros(shape=(num_ports, len(x), len(y), num_shots, num_plateaus))
-    print(f"Calculating Langmuir diagnostics...")
+    error_chart = np.zeros(shape=(num_isweep, len(x), len(y), num_shots, num_plateaus))
     # """
 
+    print(f"Calculating Langmuir diagnostics...")
     warnings.simplefilter(action='ignore')  # Suppress warnings to not break progress bar
     with tqdm(total=num_characteristics, unit="characteristic", file=sys.stdout) as pbar:
-        for p in range(characteristic_arrays.shape[0]):  # probe
-            port = ports[p]
+        for i in range(characteristic_arrays.shape[0]):  # isweep
             for l in range(characteristic_arrays.shape[1]):  # location  # noqa
                 for s in range(characteristic_arrays.shape[2]):  # shot
                     for r in range(characteristic_arrays.shape[3]):  # ramp
-                        characteristic = characteristic_arrays[p, l, s, r]
-                        diagnostics = diagnose_char(characteristic, probe_areas[p], ion_type, bimaxwellian=bimaxwellian)
+                        characteristic = characteristic_arrays[i, l, s, r]
+                        diagnostics = diagnose_char(characteristic, probe_areas[i], ion_type, bimaxwellian=bimaxwellian)
                         pbar.update(1)
                         if isinstance(diagnostics, str):  # error with diagnostics
-                            # print(p, l, s, r, ": ", diagnostics)
+                            # print(i, l, s, r, ": ", diagnostics)
                             if diagnostics not in error_types:
                                 error_types.append(diagnostics)
-                            error_chart[p,
+                            error_chart[i,
                                         np.where(x == positions[l, 0])[0][0],
                                         np.where(y == positions[l, 1])[0][0], s, r] = error_types.index(diagnostics) + 1
                             continue
@@ -85,7 +85,7 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, ports, pr
                         for key in diagnostics.keys():
                             # REMOVED: crop diagnostics with "T_e" in name because otherwise skew averages/pressure data
                             val = value_safe(diagnostics[key])  # if "T_e" not in / crop_value(diagnostics[key], 0, 10)
-                            diagnostics_ds[key].loc[port, positions[l, 0], positions[l, 1], s, ramp_times[r]] = val
+                            diagnostics_ds[key].loc[i, positions[l, 0], positions[l, 1], s, ramp_times[r]] = val
 
     warnings.simplefilter(action='default')  # Restore warnings to default handling
 
@@ -110,8 +110,20 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, ports, pr
     return diagnostics_ds
 
 
-def in_core(pos_list, core_radius):
-    return [abs(pos) < core_radius.to(u.cm).value for pos in pos_list]
+def filter_characteristic(characteristic) -> bool:
+    bias = characteristic.bias
+    current = characteristic.current
+
+    # reject characteristic if V_F > 0
+    if np.max(bias[current < 0]) > 0 * u.V:
+        return False
+
+    # reject characteristic if
+    return True
+
+
+def in_core(pos_list, core_rad):
+    return [np.abs(pos) < core_rad.to(u.cm).value for pos in pos_list]
 
 
 def get_pressure(lang_ds, calibrated_electron_density, bimaxwellian):
@@ -122,9 +134,11 @@ def get_pressure(lang_ds, calibrated_electron_density, bimaxwellian):
     return pressure.assign_attrs({'units': str(pressure_unit)})
 
 
-def detect_steady_state_ramps(density: xr.DataArray, core_radius):
+def detect_steady_state_ramps(density: xr.DataArray, core_rad):
+    r"""Return start and end ramp indices for the steady-state period (density constant in time)"""
+    # TODO hardcoded
     core_density = density.where(np.logical_and(*in_core([density.x, density.y], core_radius)), drop=True)
-    core_density_time = core_density.isel(port=0).mean(['x', 'y', 'shot']).squeeze()
+    core_density_time = core_density.isel(isweep=0).mean(['x', 'y', 'shot']).squeeze()
     threshold = 0.9 * core_density_time.max()
     start_index = (core_density_time > threshold).argmax().item() + 1
     end_index = core_density_time.sizes['time'] - np.nanargmax(
@@ -155,6 +169,5 @@ def debug_char(characteristic, error_str, *pos):
 
 
 def crop_value(diagnostic, minimum, maximum):  # discard diagnostic values (e.g. T_e) outside specified range
-
     value = value_safe(diagnostic)
     return value if minimum <= value <= maximum else np.nan

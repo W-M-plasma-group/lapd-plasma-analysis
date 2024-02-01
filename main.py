@@ -18,18 +18,21 @@ from characteristic_view import *
 """ End directory paths with a slash """
 # hdf5_folder = "/Users/leomurphy/lapd-data/April_2018/"
 # hdf5_folder = "/Users/leomurphy/lapd-data/March_2022/"
-hdf5_folder = "/Users/leomurphy/lapd-data/November_2022/"
+# hdf5_folder = "/Users/leomurphy/lapd-data/November_2022/"
+hdf5_folder = "/Users/leomurphy/lapd-data/January_2024/"
 
 langmuir_nc_folder = hdf5_folder + "lang_nc/"
 
 """ Set to False or equivalent if interferometry calibration is not desired """
-interferometry_folder = hdf5_folder
+interferometry_folder = False       # TODO set to False to avoid interferometry calibration
+# interferometry_folder = hdf5_folder
 # interferometry_folder = "/Users/leomurphy/lapd-data/November_2022/uwave_288_GHz_waveforms/"
 
 """ User parameters """
-probes_choice = [1, 0]                                  # TODO user choice for probe or linear combination to use
+probes_choice = [1, 0, 0, 0]                                  # TODO user choice for probe or linear combination to use
+# probes_choice = [1, 0]
 bimaxwellian = False                                    # TODO perform both and store in same NetCDF file?
-smoothing_margin = 200                                  # Optimal values in range 100-400 if "median" smoothing method
+smoothing_margin = 1 * 200                                  # Optimal values in range 100-400 if "median" smoothing method
 plot_tolerance = np.nan   # was 2                       # Optimal values are np.nan (plot all points) or >= 0.5
 
 # QUESTION: can we calibrate both Langmuir probes using an interferometry ratio depending only on one of them?
@@ -98,8 +101,8 @@ if __name__ == "__main__":
             orientation = get_orientation(config_id)
 
             # get current and bias data from Langmuir probe, then form into array of Characteristic objects
-            bias, currents, positions, sample_sec, ports = get_isweep_vsweep(
-                hdf5_path, vsweep_board_channel, langmuir_probes, voltage_gain, orientation)
+            bias, currents, positions, sample_sec, ports = get_isweep_vsweep(hdf5_path, vsweep_board_channel,
+                                                                             langmuir_probes, voltage_gain, orientation)
             characteristics, ramp_times = characterize_sweep_array(bias, currents, smoothing_margin, sample_sec)
 
             if chara_view_mode:
@@ -156,7 +159,7 @@ if __name__ == "__main__":
     if ask_yes_or_no("Generate contour plot of selected diagnostics over time and radial position? (y/n) "):
         for plot_diagnostic in diagnostic_to_plot_list:
             for i in range(len(datasets)):
-                plot_line_diagnostic(port_selector(datasets[i], probes_choice), plot_diagnostic, 'contour',
+                plot_line_diagnostic(isweep_selector(datasets[i], probes_choice), plot_diagnostic, 'contour',
                                      steady_state_plateaus_runs[i], tolerance=plot_tolerance)
 
     """
@@ -165,7 +168,7 @@ if __name__ == "__main__":
     """
     if ask_yes_or_no("Generate line plot of selected diagnostics over radial position? (y/n) "):
         for plot_diagnostic in diagnostic_to_plot_list:
-            multiplot_line_diagnostic(datasets, plot_diagnostic, probes_choice,
-                                      steady_state_plateaus_runs, tolerance=plot_tolerance)
+            multiplot_line_diagnostic(datasets, plot_diagnostic, probes_choice, steady_state_plateaus_runs,
+                                      tolerance=plot_tolerance)
 
 # TODO Not all MATLAB code has been transferred (e.g. neutrals, ExB)

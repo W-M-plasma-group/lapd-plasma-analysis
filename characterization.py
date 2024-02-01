@@ -108,12 +108,12 @@ def ensure_sweep_units(bias, current):
 
 
 def characteristic_array(bias, currents, ramp_bounds):
-    # 4D: probe * unique_position * shot * plateau_num
-    # "currents" has "probe" dimension in front; may have size 1
+    # 4D: num_isweep * unique_position * shot * plateau_num
+    # "currents" has "isweep" dimension in front; may have size 1
 
     ramp_slices = np.array([slice(ramp[0], ramp[1]) for ramp in ramp_bounds])
 
-    num_probe = len(currents)
+    num_isweep = len(currents)
     num_loc = bias.shape[0]
     num_shot = bias.shape[1]
     num_ramp = len(ramp_slices)
@@ -122,16 +122,16 @@ def characteristic_array(bias, currents, ramp_bounds):
     warnings.simplefilter(action='ignore', category=FutureWarning)  # Suppress FutureWarnings to not break loading bar
     print("\t(plasmapy.langmuir.diagnostics pending deprecation FutureWarning suppressed)")
 
-    num_characteristics = num_probe * num_loc * num_shot * num_ramp
+    num_characteristics = num_isweep * num_loc * num_shot * num_ramp
     chara_array = np.empty((len(currents), num_loc, num_shot, len(ramp_slices)), dtype=Characteristic)
     with tqdm(total=num_characteristics, unit="characteristic", file=sys.stdout) as pbar:
-        for probe in range(num_probe):
+        for swp in range(num_isweep):
             for loc in range(num_loc):
                 for shot in range(num_shot):
                     for ramp in range(num_ramp):
-                        chara_array[probe, loc, shot, ramp] = Characteristic(
-                            bias[loc,            shot, ramp_slices[ramp]],
-                            currents[probe, loc, shot, ramp_slices[ramp]])
+                        chara_array[swp,  loc, shot, ramp] = Characteristic(
+                            bias[loc,          shot, ramp_slices[ramp]],
+                            currents[swp, loc, shot, ramp_slices[ramp]])
                         pbar.update(1)
 
     return chara_array
