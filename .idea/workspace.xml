@@ -4,9 +4,11 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="99051048-4239-4d54-a2e8-6a0399c265e9" name="Changes" comment="Update dataset selector to select a single isweep signal">
+    <list default="true" id="99051048-4239-4d54-a2e8-6a0399c265e9" name="Changes" comment="Correct number of fields of isweep metadata array in preconfiguration.py">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/characteristic_view.py" beforeDir="false" afterPath="$PROJECT_DIR$/characteristic_view.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/characterization.py" beforeDir="false" afterPath="$PROJECT_DIR$/characterization.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/getIVsweep.py" beforeDir="false" afterPath="$PROJECT_DIR$/getIVsweep.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/preconfiguration.py" beforeDir="false" afterPath="$PROJECT_DIR$/preconfiguration.py" afterDir="false" />
     </list>
@@ -65,29 +67,30 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;WebServerToolWindowFactoryState&quot;: &quot;false&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;leo&quot;,
-    &quot;last.edited.regexp&quot;: &quot;08_radial_line_25press_3500A.hdf5&quot;,
-    &quot;last_opened_file_path&quot;: &quot;/Users/leomurphy/Library/Application Support/JetBrains/PyCharm2023.2/scratches&quot;,
-    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
-    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
-    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
-    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable&quot;,
-    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "RunOnceActivity.OpenProjectViewOnStart": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "WebServerToolWindowFactoryState": "false",
+    "git-widget-placeholder": "leo",
+    "last.edited.regexp": "08_radial_line_25press_3500A.hdf5",
+    "last_opened_file_path": "/Users/leomurphy/Desktop/January_2024 plots",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "settings.editor.selected.configurable": "com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable",
+    "vue.rearranger.settings.migration": "true"
   },
-  &quot;keyToStringList&quot;: {
-    &quot;com.intellij.ide.scratch.ScratchImplUtil$2/New Scratch File&quot;: [
-      &quot;Python&quot;
+  "keyToStringList": {
+    "com.intellij.ide.scratch.ScratchImplUtil$2/New Scratch File": [
+      "Python"
     ]
   }
-}</component>
+}]]></component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="$USER_HOME$/Desktop/January_2024 plots" />
       <recent name="$APPLICATION_CONFIG_DIR$/scratches" />
       <recent name="$PROJECT_DIR$/venv/lib/python3.11/site-packages/plasmapy/diagnostics" />
       <recent name="$PROJECT_DIR$" />
@@ -268,7 +271,7 @@
       <workItem from="1704921169352" duration="5608000" />
       <workItem from="1704982886633" duration="48971000" />
       <workItem from="1705639084143" duration="35455000" />
-      <workItem from="1706409106561" duration="51762000" />
+      <workItem from="1706409106561" duration="54679000" />
     </task>
     <task id="LOCAL-00001" summary="Switch plots to using QtAgg instead of TkAgg backend">
       <created>1680657801669</created>
@@ -290,14 +293,6 @@
       <option name="presentableId" value="LOCAL-00003" />
       <option name="project" value="LOCAL" />
       <updated>1688410592147</updated>
-    </task>
-    <task id="LOCAL-00007" summary="Allow probes to have different surface areas; recognition of separate shot data; code cleanup">
-      <option name="closed" value="true" />
-      <created>1688699359716</created>
-      <option name="number" value="00007" />
-      <option name="presentableId" value="LOCAL-00007" />
-      <option name="project" value="LOCAL" />
-      <updated>1688699359716</updated>
     </task>
     <task id="LOCAL-00008" summary="Increase number of loadable files to 52 from 26">
       <option name="closed" value="true" />
@@ -659,7 +654,15 @@
       <option name="project" value="LOCAL" />
       <updated>1706804396736</updated>
     </task>
-    <option name="localTasksCounter" value="53" />
+    <task id="LOCAL-00053" summary="Correct number of fields of isweep metadata array in preconfiguration.py">
+      <option name="closed" value="true" />
+      <created>1706809996594</created>
+      <option name="number" value="00053" />
+      <option name="presentableId" value="LOCAL-00053" />
+      <option name="project" value="LOCAL" />
+      <updated>1706809996594</updated>
+    </task>
+    <option name="localTasksCounter" value="54" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -723,7 +726,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="Move port_selector function to helper.py to simplify user interface in main.py" />
     <MESSAGE value="Change name of probe_config in preconfiguration.py to langmuir_config to better describe scope" />
     <MESSAGE value="Add ask_yes_or_no function to file_access.py to ease user choice of plots to generate" />
     <MESSAGE value="Display error messages on plots in characteristic view mode" />
@@ -748,19 +750,20 @@
     <MESSAGE value="Discard excessive shots taken at a single position" />
     <MESSAGE value="Add isweep metadata for January_2024 runs" />
     <MESSAGE value="Update dataset selector to select a single isweep signal" />
-    <option name="LAST_COMMIT_MESSAGE" value="Update dataset selector to select a single isweep signal" />
+    <MESSAGE value="Correct number of fields of isweep metadata array in preconfiguration.py" />
+    <option name="LAST_COMMIT_MESSAGE" value="Correct number of fields of isweep metadata array in preconfiguration.py" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
       <breakpoints>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/main.py</url>
-          <line>123</line>
+          <line>126</line>
           <option name="timeStamp" value="7" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/main.py</url>
-          <line>110</line>
+          <line>116</line>
           <option name="timeStamp" value="8" />
         </line-breakpoint>
       </breakpoints>
@@ -769,7 +772,7 @@
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/lapd_plasma_analysis$scratch_4.coverage" NAME="scratch_4 Coverage Results" MODIFIED="1692131134620" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$APPLICATION_CONFIG_DIR$/scratches" />
     <SUITE FILE_PATH="coverage/lapd_plasma_analysis$fourier.coverage" NAME="fourier Coverage Results" MODIFIED="1695663830302" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/lapd_plasma_analysis$main.coverage" NAME="main Coverage Results" MODIFIED="1706809930217" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/lapd_plasma_analysis$main.coverage" NAME="main Coverage Results" MODIFIED="1706812450946" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/lapd_plasma_analysis$scratch_2.coverage" NAME="scratch_2 Coverage Results" MODIFIED="1691534973579" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$APPLICATION_CONFIG_DIR$/scratches" />
     <SUITE FILE_PATH="coverage/lapd_plasma_analysis$scratch_6.coverage" NAME="scratch_6 Coverage Results" MODIFIED="1696432972127" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$APPLICATION_CONFIG_DIR$/scratches" />
     <SUITE FILE_PATH="coverage/lapd_plasma_analysis$scratch.coverage" NAME="scratch Coverage Results" MODIFIED="1689972569303" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$APPLICATION_CONFIG_DIR$/scratches" />
