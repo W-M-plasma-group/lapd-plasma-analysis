@@ -51,6 +51,7 @@ def get_langmuir_config(hdf5_path, config_id):
                                                                                 ('channel', int),
                                                                                 ('port', int),
                                                                                 ('receptacle', int),
+                                                                                ('face', str),
                                                                                 ('resistance', float),
                                                                                 ('area', u.Quantity),
                                                                                 ('gain', float)])  # see note below
