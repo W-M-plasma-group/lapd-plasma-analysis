@@ -122,7 +122,11 @@ if __name__ == "__main__":
             diagnostics_dataset = diagnostics_dataset.assign_attrs(exp_params_dict)
             datasets.append(diagnostics_dataset)
 
-    steady_state_plateaus_runs = [detect_steady_state_ramps(dataset['n_e'], core_radius) for dataset in datasets]
+    # TODO this is extremely hardcoded
+    if "january" in hdf5_folder.lower():
+        steady_state_plateaus_runs = [(16, 24) for dataset in datasets]
+    else:
+        steady_state_plateaus_runs = [detect_steady_state_ramps(dataset['n_e'], core_radius) for dataset in datasets]
 
     if len(nc_paths_to_open_ints) == 0:
         # External interferometry calibration for electron density
