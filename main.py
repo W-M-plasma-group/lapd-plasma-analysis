@@ -85,7 +85,8 @@ if __name__ == "__main__":
         hdf5_chosen_ints = choose_multiple_list(hdf5_paths, "HDF5 file")
         hdf5_chosen_list = [hdf5_paths[choice] for choice in hdf5_chosen_ints]
 
-        chara_view_mode = (len(hdf5_chosen_list) == 1) and ask_yes_or_no("Start characteristic plotting mode? (y/n) ")
+        sweep_view_mode = (len(hdf5_chosen_list) == 1) and ask_yes_or_no("Use raw sweep plotting mode? (y/n) ")
+        chara_view_mode = (len(hdf5_chosen_list) == 1) and ask_yes_or_no("Use characteristic plotting mode? (y/n) ")
 
         datasets = []
         for hdf5_path in hdf5_chosen_list:

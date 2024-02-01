@@ -7,7 +7,7 @@ from tqdm import tqdm
 import sys
 
 
-def characterize_sweep_array(unsmooth_bias, unsmooth_currents, margin, sample_sec):
+def characterize_sweep_array(unsmooth_bias, unsmooth_currents, margin, dt):
     r"""
     Function that processes bias and current data into a DataArray of distinct Characteristics.
     Takes in bias and current arrays, smooths them, divides them into separate ramp sections, 
@@ -18,7 +18,7 @@ def characterize_sweep_array(unsmooth_bias, unsmooth_currents, margin, sample_se
     :param unsmooth_bias: array, units of voltage
     :param unsmooth_currents: array, units of current
     :param margin: int, positive
-    :param sample_sec: float, units of time
+    :param dt: float, units of time
     :return: 2D array of Characteristic objects by shot number and plateau number
     """
 
@@ -30,7 +30,7 @@ def characterize_sweep_array(unsmooth_bias, unsmooth_currents, margin, sample_se
     # trim bad, distorted averaged ends in isolated plateaus
     ramp_bounds = isolate_plateaus(bias, margin=margin)
 
-    ramp_times = ramp_bounds[:, 1] * sample_sec.to(u.ms)
+    ramp_times = ramp_bounds[:, 1] * dt.to(u.ms)
     # NOTE: MATLAB code stores peak voltage time (end of plateaus), then only uses plateau times for very first position
     # This uses the time of the peak voltage for the average of all shots ("top of the average ramp")
 
