@@ -4,15 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="99051048-4239-4d54-a2e8-6a0399c265e9" name="Changes" comment="Categorize isweep signals by unique isweep id, not by probe, to allow signals from different faces on the same probe">
+    <list default="true" id="99051048-4239-4d54-a2e8-6a0399c265e9" name="Changes" comment="Update dataset selector to select a single isweep signal">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/characteristic_view.py" beforeDir="false" afterPath="$PROJECT_DIR$/characteristic_view.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/characterization.py" beforeDir="false" afterPath="$PROJECT_DIR$/characterization.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/diagnostics.py" beforeDir="false" afterPath="$PROJECT_DIR$/diagnostics.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/getIVsweep.py" beforeDir="false" afterPath="$PROJECT_DIR$/getIVsweep.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/helper.py" beforeDir="false" afterPath="$PROJECT_DIR$/helper.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/plots.py" beforeDir="false" afterPath="$PROJECT_DIR$/plots.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/preconfiguration.py" beforeDir="false" afterPath="$PROJECT_DIR$/preconfiguration.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -273,7 +268,7 @@
       <workItem from="1704921169352" duration="5608000" />
       <workItem from="1704982886633" duration="48971000" />
       <workItem from="1705639084143" duration="35455000" />
-      <workItem from="1706409106561" duration="48344000" />
+      <workItem from="1706409106561" duration="51762000" />
     </task>
     <task id="LOCAL-00001" summary="Switch plots to using QtAgg instead of TkAgg backend">
       <created>1680657801669</created>
@@ -295,30 +290,6 @@
       <option name="presentableId" value="LOCAL-00003" />
       <option name="project" value="LOCAL" />
       <updated>1688410592147</updated>
-    </task>
-    <task id="LOCAL-00004" summary="Make list of plot categorization attributes optional; when blank, will categorize plots by all &quot;Nominal&quot; experimental parameters possible to maximize flexibility with different experiment runs">
-      <option name="closed" value="true" />
-      <created>1688596105547</created>
-      <option name="number" value="00004" />
-      <option name="presentableId" value="LOCAL-00004" />
-      <option name="project" value="LOCAL" />
-      <updated>1688596105547</updated>
-    </task>
-    <task id="LOCAL-00005" summary="Detect experimental series (e.g. April_2018) automatically and set up probes using hardcoded configuration data in new preconfiguration.py; replaces old manual user-input configuration, which is highly prone to mistakes">
-      <option name="closed" value="true" />
-      <created>1688596256120</created>
-      <option name="number" value="00005" />
-      <option name="presentableId" value="LOCAL-00005" />
-      <option name="project" value="LOCAL" />
-      <updated>1688596256120</updated>
-    </task>
-    <task id="LOCAL-00006" summary="Preserve separate sweep arrays, Characteristics, and diagnostic results for separate shots, instead of averaging together shots taken at the same location, and instead use variation of diagnostics between shots to plot errorbars and allow removal of inconsistent/noisy data points">
-      <option name="closed" value="true" />
-      <created>1688699160322</created>
-      <option name="number" value="00006" />
-      <option name="presentableId" value="LOCAL-00006" />
-      <option name="project" value="LOCAL" />
-      <updated>1688699160322</updated>
     </task>
     <task id="LOCAL-00007" summary="Allow probes to have different surface areas; recognition of separate shot data; code cleanup">
       <option name="closed" value="true" />
@@ -656,7 +627,39 @@
       <option name="project" value="LOCAL" />
       <updated>1706740710820</updated>
     </task>
-    <option name="localTasksCounter" value="49" />
+    <task id="LOCAL-00049" summary="Categorize isweep signals by unique isweep id, not by probe, to allow signals from different faces on the same probe">
+      <option name="closed" value="true" />
+      <created>1706804091600</created>
+      <option name="number" value="00049" />
+      <option name="presentableId" value="LOCAL-00049" />
+      <option name="project" value="LOCAL" />
+      <updated>1706804091600</updated>
+    </task>
+    <task id="LOCAL-00050" summary="Discard excessive shots taken at a single position">
+      <option name="closed" value="true" />
+      <created>1706804128610</created>
+      <option name="number" value="00050" />
+      <option name="presentableId" value="LOCAL-00050" />
+      <option name="project" value="LOCAL" />
+      <updated>1706804128610</updated>
+    </task>
+    <task id="LOCAL-00051" summary="Add isweep metadata for January_2024 runs">
+      <option name="closed" value="true" />
+      <created>1706804192373</created>
+      <option name="number" value="00051" />
+      <option name="presentableId" value="LOCAL-00051" />
+      <option name="project" value="LOCAL" />
+      <updated>1706804192373</updated>
+    </task>
+    <task id="LOCAL-00052" summary="Update dataset selector to select a single isweep signal">
+      <option name="closed" value="true" />
+      <created>1706804396736</created>
+      <option name="number" value="00052" />
+      <option name="presentableId" value="LOCAL-00052" />
+      <option name="project" value="LOCAL" />
+      <updated>1706804396736</updated>
+    </task>
+    <option name="localTasksCounter" value="53" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -720,9 +723,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="Reorganize main.py" />
-    <MESSAGE value="Improve errorbar calculations" />
-    <MESSAGE value="Detect ion type from HDF5 filename" />
     <MESSAGE value="Move port_selector function to helper.py to simplify user interface in main.py" />
     <MESSAGE value="Change name of probe_config in preconfiguration.py to langmuir_config to better describe scope" />
     <MESSAGE value="Add ask_yes_or_no function to file_access.py to ease user choice of plots to generate" />
@@ -745,14 +745,17 @@
     <MESSAGE value="Hardcode isweep orientation (polarity) for each experiment in preconfiguration.py" />
     <MESSAGE value="Complete adding hardcoded isweep orientation (polarity) for each experiment in preconfiguration.py" />
     <MESSAGE value="Categorize isweep signals by unique isweep id, not by probe, to allow signals from different faces on the same probe" />
-    <option name="LAST_COMMIT_MESSAGE" value="Categorize isweep signals by unique isweep id, not by probe, to allow signals from different faces on the same probe" />
+    <MESSAGE value="Discard excessive shots taken at a single position" />
+    <MESSAGE value="Add isweep metadata for January_2024 runs" />
+    <MESSAGE value="Update dataset selector to select a single isweep signal" />
+    <option name="LAST_COMMIT_MESSAGE" value="Update dataset selector to select a single isweep signal" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
       <breakpoints>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/main.py</url>
-          <line>120</line>
+          <line>123</line>
           <option name="timeStamp" value="7" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
@@ -766,7 +769,7 @@
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/lapd_plasma_analysis$scratch_4.coverage" NAME="scratch_4 Coverage Results" MODIFIED="1692131134620" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$APPLICATION_CONFIG_DIR$/scratches" />
     <SUITE FILE_PATH="coverage/lapd_plasma_analysis$fourier.coverage" NAME="fourier Coverage Results" MODIFIED="1695663830302" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/lapd_plasma_analysis$main.coverage" NAME="main Coverage Results" MODIFIED="1706803205881" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/lapd_plasma_analysis$main.coverage" NAME="main Coverage Results" MODIFIED="1706809930217" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/lapd_plasma_analysis$scratch_2.coverage" NAME="scratch_2 Coverage Results" MODIFIED="1691534973579" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$APPLICATION_CONFIG_DIR$/scratches" />
     <SUITE FILE_PATH="coverage/lapd_plasma_analysis$scratch_6.coverage" NAME="scratch_6 Coverage Results" MODIFIED="1696432972127" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$APPLICATION_CONFIG_DIR$/scratches" />
     <SUITE FILE_PATH="coverage/lapd_plasma_analysis$scratch.coverage" NAME="scratch Coverage Results" MODIFIED="1689972569303" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$APPLICATION_CONFIG_DIR$/scratches" />
