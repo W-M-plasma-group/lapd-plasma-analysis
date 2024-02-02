@@ -29,10 +29,11 @@ interferometry_folder = False       # TODO set to False to avoid interferometry 
 # interferometry_folder = "/Users/leomurphy/lapd-data/November_2022/uwave_288_GHz_waveforms/"
 
 """ User parameters """
-probes_choice = [1, 0, 0, 0]                                  # TODO user choice for probe or linear combination to use
+isweep_choice = [[1, 0, 0, 0], [0, 0, 1, 0]]                # TODO user choice for probe or linear combination to use
 # probes_choice = [1, 0]
+# TODO for quick explanation of the above, see isweep_selector function in helper.py
 bimaxwellian = False                                    # TODO perform both and store in same NetCDF file?
-smoothing_margin = 1 * 200                                  # Optimal values in range 100-400 if "median" smoothing method
+smoothing_margin = 1 * 200                                # Optimal values in range 100-400 if "median" smoothing method
 plot_tolerance = np.nan   # was 2                       # Optimal values are np.nan (plot all points) or >= 0.5
 
 # QUESTION: can we calibrate both Langmuir probes using an interferometry ratio depending only on one of them?
@@ -61,12 +62,13 @@ if __name__ == "__main__":
 
     interferometry_calibrate = bool(interferometry_folder)
     if not interferometry_calibrate:
-        print("Interferometry calibration is OFF. "
+        print("\nInterferometry calibration is OFF. "
               "Interferometry-calibrated electron density ('n_e_cal') is not available.")
 
-    print("Current HDF5 directory path:\t\t\t", repr(hdf5_folder),
-          "\nCurrent NetCDF directory path:\t\t\t", repr(langmuir_nc_folder),
-          "\nCurrent interferometry directory path:\t", repr(interferometry_folder),
+    print("Current HDF5 directory path:             \t", repr(hdf5_folder),
+          "\nCurrent NetCDF directory path:         \t", repr(langmuir_nc_folder),
+          "\nCurrent interferometry directory path: \t", repr(interferometry_folder),
+          "\nLinear combinations of isat sources:   \t", repr(probes_choice),
           "\nThese can be changed in main.py.")
     input("Enter any key to continue: ")
 
