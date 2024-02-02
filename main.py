@@ -30,7 +30,7 @@ interferometry_folder = False       # TODO set to False to avoid interferometry 
 
 """ User parameters """
 isweep_choice = [[1, 0, 0, 0], [0, 0, 1, 0]]                # TODO user choice for probe or linear combination to use
-# probes_choice = [1, 0]
+# isweep_choice = [1, 0]
 # TODO for quick explanation of the above, see isweep_selector function in helper.py
 bimaxwellian = False                                    # TODO perform both and store in same NetCDF file?
 smoothing_margin = 1 * 200                                # Optimal values in range 100-400 if "median" smoothing method
@@ -65,10 +65,10 @@ if __name__ == "__main__":
         print("\nInterferometry calibration is OFF. "
               "Interferometry-calibrated electron density ('n_e_cal') is not available.")
 
-    print("Current HDF5 directory path:             \t", repr(hdf5_folder),
+    print("Current HDF5 directory path:           \t",   repr(hdf5_folder),
           "\nCurrent NetCDF directory path:         \t", repr(langmuir_nc_folder),
           "\nCurrent interferometry directory path: \t", repr(interferometry_folder),
-          "\nLinear combinations of isat sources:   \t", repr(probes_choice),
+          "\nLinear combinations of isat sources:   \t", repr(isweep_choice),
           "\nThese can be changed in main.py.")
     input("Enter any key to continue: ")
 
@@ -172,7 +172,7 @@ if __name__ == "__main__":
     if ask_yes_or_no("Generate contour plot of selected diagnostics over time and radial position? (y/n) "):
         for plot_diagnostic in diagnostic_to_plot_list:
             for i in range(len(datasets)):
-                plot_line_diagnostic(isweep_selector(datasets[i], probes_choice), plot_diagnostic, 'contour',
+                plot_line_diagnostic(isweep_selector(datasets[i], isweep_choice), plot_diagnostic, 'contour',
                                      steady_state_plateaus_runs[i], tolerance=plot_tolerance)
 
     """
@@ -181,7 +181,7 @@ if __name__ == "__main__":
     """
     if ask_yes_or_no("Generate line plot of selected diagnostics over radial position? (y/n) "):
         for plot_diagnostic in diagnostic_to_plot_list:
-            multiplot_line_diagnostic(datasets, plot_diagnostic, probes_choice, steady_state_plateaus_runs,
+            multiplot_line_diagnostic(datasets, plot_diagnostic, isweep_choice, steady_state_plateaus_runs,
                                       tolerance=plot_tolerance)
 
 # TODO Not all MATLAB code has been transferred (e.g. neutrals, ExB)
