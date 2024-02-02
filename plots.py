@@ -9,6 +9,8 @@ from helper import *
 # matplotlib.use('TkAgg')
 # matplotlib.use('QtAgg')
 
+linestyles = ["solid", "dotted", "dashed", "dashdot"]
+
 
 def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagnostic, isweep_choices,
                               steady_state_by_runs, attribute=None, tolerance=np.nan):
@@ -18,17 +20,18 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
         attribute = [attr for attr in diagnostics_datasets[0].attrs if "Nominal" in attr]
     attributes = np.atleast_1d(attribute)
     if len(attributes) > 2:
-        raise ValueError("Cannot currently categorize line plots by more than two attributes")
+        # TODO detect/fix
+        # raise ValueError("Cannot currently categorize line plots that differ in more than two attributes")
+        warn(f"Can currently only categorize line plots by two attributes. Selecting last two: {attributes[-2:]}")
+        attributes = attributes[-2:]
 
-    # outer_inverses = np.argsort([dataset[attributes[1]] for dataset in diagnostics_datasets]) if two_attrs else [None]
-    # diagnostics_datasets_sorted = np.sort(diagnostics_datasets, order=np.flip(attribute))
     diagnostics_datasets_sorted = diagnostics_datasets  # not sorted yet
     for attr in attributes:
         try:
             diagnostics_datasets_sorted.sort(key=lambda d: d.attrs[attr])
         except KeyError:
             raise KeyError("Key error for key " + repr(attr))
-    outer_values = [dataset.attrs[attributes[1]] for dataset in diagnostics_datasets_sorted]
+    outer_values = [dataset.attrs[attributes[-1]] for dataset in diagnostics_datasets_sorted]
     outer_quants = u.Quantity([value_safe(value) for value in outer_values], unit_safe(outer_values[0]))
     outer_unique, outer_indexes = np.unique(outer_quants, return_index=True) if len(attributes) == 2 else ([None], [0])
     outer_bounds = np.append(outer_indexes, len(outer_values))
@@ -48,68 +51,77 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
 
         color_map = matplotlib.colormaps["plasma"](np.linspace(0, 0.9, num_datasets))
         for inner_index in range(num_datasets):
-            # TODO allow looping through multiple datasets returned
-            dataset = isweep_selector(datasets[inner_index], isweep_choices)
-            inner_val = dataset.attrs[attributes[0]]
 
-            linear_dimension = get_valid_linear_dimension(dataset.sizes)
-            linear_da = dataset.squeeze()[plot_diagnostic]
+            ds_s = isweep_selector(datasets[inner_index], isweep_choices)
+            for i in range(len(ds_s)):  # isweep index
+                dataset = ds_s[i]
 
-            linear_da_steady_state = steady_state_only(linear_da,
-                                                       steady_state_plateaus=steady_state_by_runs[inner_index])
-            linear_da_mean = linear_da_steady_state.mean(['shot', 'time'], keep_attrs=True)
-            linear_da_std = linear_da_steady_state.std(['shot',   'time'], ddof=1, keep_attrs=True)
-            # 95% (~two standard deviation) confidence interval
-            linear_da_error = linear_da_std * 1.96 / np.sqrt(linear_da_steady_state.sizes['shot']
-                                                             * linear_da_steady_state.sizes['time'])
+                inner_val = dataset.attrs[attributes[0]]
 
-            # Filter out certain points due to inconsistent data (likely random noise that skews average higher)
-            if np.isfinite(tolerance):
-                da_median = linear_da_mean.median(keep_attrs=True)
-                linear_da_mean = linear_da_mean.where(linear_da_std < tolerance * da_median)  # TODO hardcoded
+                linear_dimension = get_valid_linear_dimension(dataset.sizes)
+                linear_da = dataset.squeeze()[plot_diagnostic]
 
-            if np.isfinite(linear_da_mean).any():
-                ax.errorbar(linear_da_mean.coords[linear_dimension], linear_da_mean, yerr=linear_da_error,
-                            fmt="-", color=color_map[inner_index], label=str(inner_val))
-            ax.set_xlabel(linear_da_mean.coords[linear_dimension].attrs['units'])
-            ax.set_ylabel(linear_da_mean.attrs['units'])
+                linear_da_steady_state = steady_state_only(linear_da,
+                                                           steady_state_plateaus=steady_state_by_runs[inner_index])
+                linear_da_mean = linear_da_steady_state.mean(['shot', 'time'], keep_attrs=True)
+                linear_da_std = linear_da_steady_state.std(['shot',   'time'], ddof=1, keep_attrs=True)
+                # 95% (~two standard deviation) confidence interval
+                linear_da_error = linear_da_std * 1.96 / np.sqrt(linear_da_steady_state.sizes['shot']
+                                                                 * linear_da_steady_state.sizes['time'])
 
-            if "eV" in linear_da_mean.attrs['units']:  # TODO very hardcoded
-                pass
-                ax.set_ylim((0, 7))
-            if "Pa" in linear_da_mean.attrs['units']:
-                pass
-                # ax.set_ylim((-1, 20))
-            # ax.set_ylim((-0.4e18, 8e18))
+                # Filter out certain points due to inconsistent data (likely random noise that skews average higher)
+                if np.isfinite(tolerance):
+                    da_median = linear_da_mean.median(keep_attrs=True)
+                    linear_da_mean = linear_da_mean.where(linear_da_std < tolerance * da_median)  # TODO hardcoded
+
+                if np.isfinite(linear_da_mean).any():
+                    ax.errorbar(linear_da_mean.coords[linear_dimension], linear_da_mean, yerr=linear_da_error,
+                                color=color_map[inner_index], linestyle=linestyles[i], label=str(inner_val))
+                ax.set_xlabel(linear_da_mean.coords[linear_dimension].attrs['units'])
+                ax.set_ylabel(linear_da_mean.attrs['units'])
+
+                if "eV" in linear_da_mean.attrs['units']:  # TODO very hardcoded
+                    pass
+                    ax.set_ylim((0, 13))
+                if "Pa" in linear_da_mean.attrs['units']:
+                    pass
+                    # ax.set_ylim((-1, 20))
+                # ax.set_ylim((-0.4e18, 8e18))
         ax.tick_params(axis="y", left=True, labelleft=True)
-        ax.title.set_text((attribute[1] + ": " + str(outer_val) if len(attribute) == 2 else "")
-                          + "\nColor: " + attribute[0])
+        ax.title.set_text(((str(attribute[1]) + ": " + str(outer_val)) if len(attribute) == 2 else '')
+                          + f"\nColor: {attribute[0]}"
+                          + f"\nIsweep linear combo. styles: {linestyles}")
         ax.legend()
     plt.tight_layout()
     plt.show()
 
 
-def plot_line_diagnostic(diagnostics_ds: xr.Dataset, diagnostic, plot_type, steady_state, show=True,
+def plot_line_diagnostic(diagnostics_ds_s: list[xr.Dataset], diagnostic, plot_type, steady_state, show=True,
                          shot_mode="mean", tolerance=np.nan):
     # Plots the given diagnostic(s) from the dataset in the given style
 
-    run_name = f"{diagnostics_ds.attrs['Exp name']}, {diagnostics_ds.attrs['Run name']}"
+    linear_ds_s = []
+    linear_dimensions = []
+    run_names = []
+    for diagnostics_ds in diagnostics_ds_s:
+        run_names += [f"{diagnostics_ds.attrs['Exp name']}, {diagnostics_ds.attrs['Run name']}"]
 
-    linear_dimension = get_valid_linear_dimension(diagnostics_ds.sizes)
-    pre_linear_ds = diagnostics_ds.squeeze()
-    linear_ds_std = pre_linear_ds.std(dim='shot', ddof=1, keep_attrs=True)
+        linear_dimensions += [get_valid_linear_dimension(diagnostics_ds.sizes)]
+        pre_linear_ds = diagnostics_ds.squeeze()
+        linear_ds_std = pre_linear_ds.std(dim='shot', ddof=1, keep_attrs=True)
 
-    if shot_mode == "mean":
-        linear_ds = pre_linear_ds.mean(dim='shot', keep_attrs=True).squeeze()
-    elif shot_mode == "all":
-        raise NotImplementedError("Shot handling mode 'all' not yet supported for plotting")
-    else:
-        raise NotImplementedError("Shot handling mode " + repr(shot_mode) + " not currently implemented for plotting")
+        if shot_mode == "mean":
+            linear_ds = pre_linear_ds.mean(dim='shot', keep_attrs=True).squeeze()
+        elif shot_mode == "all":
+            raise NotImplementedError("Shot handling mode 'all' not yet supported for plotting")
+        else:
+            raise NotImplementedError(f"Shot handling mode {repr(shot_mode)} not currently implemented for plotting")
 
-    # Filter out certain points due to inconsistent data (likely random noise that skews average higher)
-    if np.isfinite(tolerance):  # note: an insidious error was made here with (tolerance != np.nan)
-        da_mean = linear_ds.mean()
-        linear_ds = linear_ds.where(linear_ds_std < tolerance * da_mean)
+        # Filter out certain points due to inconsistent data (likely random noise that skews average higher)
+        if np.isfinite(tolerance):  # note: an insidious error was made here with (tolerance != np.nan)
+            da_mean = linear_ds.mean()
+            linear_ds = linear_ds.where(linear_ds_std < tolerance * da_mean)
+        linear_ds_s += [linear_ds]
 
     diagnostic_list = np.atleast_1d(diagnostic)
 
@@ -123,23 +135,35 @@ def plot_line_diagnostic(diagnostics_ds: xr.Dataset, diagnostic, plot_type, stea
         plot_type = 'contour'
     # 1D plot type
     if plot_type in plot_types_1d:
-        linear_ds_1d = steady_state_only(linear_ds, steady_state_plateaus=steady_state).mean('time')
+        linear_ds_s_1d = [steady_state_only(linear_ds, steady_state_plateaus=steady_state).mean('time')
+                          for linear_ds in linear_ds_s]
         for key in diagnostic_list:
-            linear_plot_1d(linear_ds_1d[key], linear_dimension)
-            plt.title(run_name + "\n" + get_title(key) + " " + plot_type + " plot")
+            for d in range(len(linear_ds_s_1d)):
+                linear_ds_1d = linear_ds_s_1d[d]
+                linear_plot_1d(linear_ds_1d[key], linear_dimensions[d])
+            plot_title = f"{run_names[0]}\n{get_title(key)} {plot_type} plot"
+            if hasattr(linear_ds_s_1d[0], "facevector"):
+                plot_title += f"\nLinear combination of faces: {linear_ds_s_1d[0].attrs['facevector']}"
+            plt.title(plot_title)
+            plt.tight_layout()
             if show:
                 plt.show()
     # 2D plot type
     elif plot_type in plot_types_2d:
         for key in diagnostic_list:
-            try:
-                linear_plot_2d(linear_ds[key], plot_type, linear_dimension)
-                plt.title(run_name + "\n" + get_title(key) + " " + plot_type + " plot (2D)")
-                if show:
-                    plt.show()
-            except ValueError as e:
-                print(f"Problem plotting {key} for {diagnostics_ds.attrs['Run name']}:"
-                      f"\n{repr(e)}")
+            for d in range(len(linear_ds_s)):
+                try:
+                    linear_plot_2d(linear_ds_s[d][key], plot_type, linear_dimensions[d])
+                    plot_title = f"{run_names[d]}\n{get_title(key)} {plot_type} plot (2D)"
+                    if hasattr(linear_ds_s[0], "facevector"):
+                        plot_title += f"\nLinear combination of faces: {linear_ds_s[d].attrs['facevector']}"
+                    plt.title(plot_title)
+                    plt.tight_layout()
+                    if show:
+                        plt.show()
+                except ValueError as e:
+                    print(f"Problem plotting {key} for {linear_ds_s[d].attrs['Run name']}:"
+                          f"\n{repr(e)}")
 
 
 def get_valid_linear_dimension(diagnostics_dataset_sizes):

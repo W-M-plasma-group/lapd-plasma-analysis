@@ -51,27 +51,32 @@ def get_diagnostic_keys_units(probe_area=1.*u.mm**2, ion_type="He-4+", bimaxwell
     return keys_units
 
 
-def isweep_selector(ds, vector):  # TODO should separate diagnostics_main and plot_main anyway!
+def isweep_selector(ds, vectors):  # TODO should separate diagnostics_main and plot_main anyway!
     r"""
-    Select an isweep signal or linear combination of isweep signals from a diagnostic dataset.
-    For example, on a dataset with two isweep signals (e.g. from different probes or probe faces),
+    Select an isweep signal, linear combination of isweep signals, or multiple such linear combinations from a
+    diagnostic dataset. For example, on a dataset with two isweep signals (e.g. from 2 different probes or probe faces),
         [1,  0] would return the data from the first isweep signal (listed first in preconfiguration.py)
         [1, -1] would return the parallel difference (first-listed minus second-listed)
-        # [[1, 0], [1, -1]] would return a list containing both of the above [NOT YET IMPLEMENTED]
+        [[1, 0], [1, -1]] would return a list containing both of the above
+    When multiple datasets are returned, they are placed on separate contour plots, but
+    the same line plot with different line styles.
     :param ds: The Dataset of Langmuir data to select from
-    :param vector: The linear combination of isweep signals to compute
+    :param vectors: The linear combination of isweep signals to compute
     :return: Dataset containing data from the selected isweep signal or combination of isweep signals
     """
 
     manual_attrs = ds.attrs  # TODO raise xarray issue about losing attrs even with xr.set_options(keep_attrs=True):
     manual_sub_attrs = {key: ds[key].attrs for key in ds}
     ds_isweep_selected = 0 * ds.isel(isweep=0)
-    for i in range(ds.sizes['isweep']):
-        ds_isweep_selected += vector[i] * ds.isel(isweep=i)
-    for key in ds:
-        ds_isweep_selected[key] = ds_isweep_selected[key].assign_attrs(manual_sub_attrs[key])
-    return ds_isweep_selected.assign_attrs(manual_attrs)
-    # TODO Add a string attribute to the dataset to describe which port/isweep was selected
+    vectors = np.atleast_2d(vectors)
+    ds_s = []
+    for vector in vectors:
+        for i in range(ds.sizes['isweep']):
+            ds_isweep_selected += vector[i] * ds.isel(isweep=i)
+        for key in ds:
+            ds_isweep_selected[key] = ds_isweep_selected[key].assign_attrs(manual_sub_attrs[key])
+        ds_s += [ds_isweep_selected.assign_attrs(manual_attrs | {"facevector": str(vector)})]
+    return ds_s
 
 
 def array_lookup(array, value):

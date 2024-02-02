@@ -6,9 +6,8 @@
   <component name="ChangeListManager">
     <list default="true" id="99051048-4239-4d54-a2e8-6a0399c265e9" name="Changes" comment="Modify hardcoded get_voltage_gain function">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/characteristic_view.py" beforeDir="false" afterPath="$PROJECT_DIR$/characteristic_view.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/diagnostics.py" beforeDir="false" afterPath="$PROJECT_DIR$/diagnostics.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/experimental.py" beforeDir="false" afterPath="$PROJECT_DIR$/experimental.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/helper.py" beforeDir="false" afterPath="$PROJECT_DIR$/helper.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/plots.py" beforeDir="false" afterPath="$PROJECT_DIR$/plots.py" afterDir="false" />
     </list>
@@ -272,7 +271,7 @@
       <workItem from="1704982886633" duration="48971000" />
       <workItem from="1705639084143" duration="35455000" />
       <workItem from="1706409106561" duration="60750000" />
-      <workItem from="1706822881275" duration="2174000" />
+      <workItem from="1706822881275" duration="5391000" />
     </task>
     <task id="LOCAL-00001" summary="Switch plots to using QtAgg instead of TkAgg backend">
       <created>1680657801669</created>
@@ -759,7 +758,7 @@
       <breakpoints>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/main.py</url>
-          <line>116</line>
+          <line>117</line>
           <option name="timeStamp" value="8" />
         </line-breakpoint>
       </breakpoints>
