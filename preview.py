@@ -1,7 +1,7 @@
 from helper import *
 
 
-def display_characteristics(characteristics_array, positions, ports, ramp_times, exp_params_dict, diagnostics=False,
+def preview_characteristics(characteristics_array, positions, ports, ramp_times, exp_params_dict, diagnostics=False,
                             areas=None, ion=None, bimaxwellian=False):
 
     plt.rcParams['figure.dpi'] = 300
@@ -19,7 +19,7 @@ def display_characteristics(characteristics_array, positions, ports, ramp_times,
     isweep_x_y_shot_ramp_to_plot = [0, 0, 0, 0, 0]
     variables_to_enter = ["isweep", "x position", "y position", "shot", "ramp"]
     print("\nNotes: \tIndices are zero-based; choose an integer between 0 and n - 1, inclusive."
-          "\n \t \tEnter a non-integer below to quit characteristic plotting mode and continue to diagnostics.")
+          "\n \t \tEnter a non-integer below to quit characteristic preview mode and continue to diagnostics.")
     chara_view_mode = True
     while chara_view_mode:
         for i in range(len(isweep_x_y_shot_ramp_to_plot)):
@@ -44,9 +44,10 @@ def display_characteristics(characteristics_array, positions, ports, ramp_times,
                       f"time: {ramp_times[isweep_x_y_shot_ramp_to_plot[4]]:.2f}")
         if diagnostics:
             if areas is None or ion is None:
-                raise ValueError("Area or ion not specified in characteristic display mode, but 'diagnostics' is True.")
+                raise ValueError("Area or ion not specified in characteristic preview mode, but 'diagnostics' is True.")
             try:
-                diagnostics = swept_probe_analysis(chara_to_plot, areas[isweep_x_y_shot_ramp_to_plot[0]], ion, bimaxwellian)
+                diagnostics = swept_probe_analysis(chara_to_plot, areas[isweep_x_y_shot_ramp_to_plot[0]], ion,
+                                                   bimaxwellian)
                 electron_temperature = diagnostics['T_e'] if not bimaxwellian \
                     else unpack_bimaxwellian(diagnostics)['T_e_avg']
                 plot_title += f"\nTemperature: {electron_temperature:.3f}"
@@ -66,7 +67,7 @@ def display_characteristics(characteristics_array, positions, ports, ramp_times,
             plt.show()
 
 
-def display_raw_sweep(bias, currents, positions, ports, exp_params_dict, dt):
+def preview_raw_sweep(bias, currents, positions, ports, exp_params_dict, dt):
     plt.rcParams['figure.dpi'] = 300
     plt.rcParams['figure.figsize'] = (60, 4)
 
@@ -81,7 +82,7 @@ def display_raw_sweep(bias, currents, positions, ports, exp_params_dict, dt):
     isweep_x_y_shot_to_plot = [0, 0, 0, 0]
     variables_to_enter = ["isweep", "x position", "y position", "shot"]
     print("\nNotes: \tIndices are zero-based; choose an integer between 0 and n - 1, inclusive."
-          "\n \t \tEnter a non-integer below to quit raw sweep plotting mode and continue to diagnostics.")
+          "\n \t \tEnter a non-integer below to quit raw sweep preview mode and continue to diagnostics.")
     sweep_view_mode = True
     while sweep_view_mode:
         for i in range(len(isweep_x_y_shot_to_plot)):

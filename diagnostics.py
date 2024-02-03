@@ -56,7 +56,6 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, ports, pr
     num_characteristics = (diagnostics_ds.sizes['isweep'] * diagnostics_ds.sizes['x'] * diagnostics_ds.sizes['y']
                            * diagnostics_ds.sizes['shot'] * diagnostics_ds.sizes['time'])
 
-    # TODO Leo debug!
     # """
     error_types = []
     error_chart = np.zeros(shape=(num_isweep, len(x), len(y), num_shots, num_plateaus))
@@ -73,7 +72,6 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, ports, pr
                         diagnostics = diagnose_char(characteristic, probe_areas[i], ion_type, bimaxwellian=bimaxwellian)
                         pbar.update(1)
                         if isinstance(diagnostics, str):  # error with diagnostics
-                            # print(i, l, s, r, ": ", diagnostics)
                             if diagnostics not in error_types:
                                 error_types.append(diagnostics)
                             error_chart[i,
@@ -90,22 +88,20 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, ports, pr
     warnings.simplefilter(action='default')  # Restore warnings to default handling
 
     # Leo debug below: display plots showing types of errors
-    """
-    for s in range(error_chart.shape[3]):
-        ax = plt.subplot()
-        im = ax.imshow(error_chart[0, :, 0, s, :],
-                       extent=(positions[:, 0].min(), positions[:, 0].max(),
-                               ramp_times.value.min(), ramp_times.value.max()),
-                       origin="lower")
-        cbar = plt.colorbar(im)
-        cbar.set_ticks(list(np.arange(len(error_types) + 1)))
-        cbar.set_ticklabels(["No error"] + [error_types[t] for t in np.arange(len(error_types))])
-        plt.title(f"Error types (s = {s})")
-        plt.tight_layout()
-        plt.show()
-        # raise ValueError
-    # """
-    # end Leo Debug
+    show_error_plot = False
+    if show_error_plot:
+        for s in range(error_chart.shape[3]):
+            ax = plt.subplot()
+            im = ax.imshow(error_chart[0, :, 0, s, :],
+                           extent=(positions[:, 0].min(), positions[:, 0].max(),
+                                   ramp_times.value.min(), ramp_times.value.max()),
+                           origin="lower")
+            cbar = plt.colorbar(im)
+            cbar.set_ticks(list(np.arange(len(error_types) + 1)))
+            cbar.set_ticklabels(["No error"] + [error_types[t] for t in np.arange(len(error_types))])
+            plt.title(f"Error types (s = {s})")
+            plt.tight_layout()
+            plt.show()
 
     return diagnostics_ds
 
@@ -126,15 +122,16 @@ def in_core(pos_list, core_rad):
     return [np.abs(pos) < core_rad.to(u.cm).value for pos in pos_list]
 
 
-def get_pressure(lang_ds, calibrated_electron_density, bimaxwellian):
+def get_pressure(lang_ds, calibrated_electron_density):
     r"""Calculate electron pressure from temperature and calibrated density"""
     pressure_unit = u.Pa
-    electron_temperature = lang_ds['T_e_avg'] if bimaxwellian else lang_ds['T_e']
+    bimaxwellian = ('T_e_avg' in lang_ds)  # TODO check this behavior
+    electron_temperature = lang_ds['T_e_avg'] if bimaxwellian else lang_ds['T_e']  # TODO check with advisor: avg/cold?
     pressure = (3 / 2) * electron_temperature * calibrated_electron_density * (1. * u.eV * u.m ** -3).to(pressure_unit)
     return pressure.assign_attrs({'units': str(pressure_unit)})
 
 
-def detect_steady_state_ramps(density: xr.DataArray, core_rad, config_id=None):
+def detect_steady_state_ramps(density: xr.DataArray, core_rad):
     r"""Return start and end ramp indices for the steady-state period (density constant in time)"""
     # TODO hardcoded
     core_density = density.where(np.logical_and(*in_core([density.x, density.y], core_rad)), drop=True)
@@ -149,7 +146,7 @@ def detect_steady_state_ramps(density: xr.DataArray, core_rad, config_id=None):
 def diagnose_char(characteristic, probe_area, ion_type, bimaxwellian, indices=None):
     if characteristic is None:
         return "characteristic is None"
-    threshold = 8 * u.mA  # TODO hardcoded
+    threshold = 8 * u.mA  # TODO hardcoded; use r^2 coefficient instead?
     if np.max(characteristic.current.to(u.A).value) < threshold.to(u.A).value:
         return f"Probe current is below {str(threshold)}, which can lead to unreliable results"
     try:
