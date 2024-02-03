@@ -88,22 +88,20 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, ports, pr
     warnings.simplefilter(action='default')  # Restore warnings to default handling
 
     # Leo debug below: display plots showing types of errors
-    """
-    for s in range(error_chart.shape[3]):
-        ax = plt.subplot()
-        im = ax.imshow(error_chart[0, :, 0, s, :],
-                       extent=(positions[:, 0].min(), positions[:, 0].max(),
-                               ramp_times.value.min(), ramp_times.value.max()),
-                       origin="lower")
-        cbar = plt.colorbar(im)
-        cbar.set_ticks(list(np.arange(len(error_types) + 1)))
-        cbar.set_ticklabels(["No error"] + [error_types[t] for t in np.arange(len(error_types))])
-        plt.title(f"Error types (s = {s})")
-        plt.tight_layout()
-        plt.show()
-        # raise ValueError
-    # """
-    # end Leo Debug
+    show_error_plot = False
+    if show_error_plot:
+        for s in range(error_chart.shape[3]):
+            ax = plt.subplot()
+            im = ax.imshow(error_chart[0, :, 0, s, :],
+                           extent=(positions[:, 0].min(), positions[:, 0].max(),
+                                   ramp_times.value.min(), ramp_times.value.max()),
+                           origin="lower")
+            cbar = plt.colorbar(im)
+            cbar.set_ticks(list(np.arange(len(error_types) + 1)))
+            cbar.set_ticklabels(["No error"] + [error_types[t] for t in np.arange(len(error_types))])
+            plt.title(f"Error types (s = {s})")
+            plt.tight_layout()
+            plt.show()
 
     return diagnostics_ds
 
@@ -147,7 +145,7 @@ def detect_steady_state_ramps(density: xr.DataArray, core_rad):
 def diagnose_char(characteristic, probe_area, ion_type, bimaxwellian, indices=None):
     if characteristic is None:
         return "characteristic is None"
-    threshold = 8 * u.mA  # TODO hardcoded
+    threshold = 8 * u.mA  # TODO hardcoded; use r^2 coefficient instead?
     if np.max(characteristic.current.to(u.A).value) < threshold.to(u.A).value:
         return f"Probe current is below {str(threshold)}, which can lead to unreliable results"
     try:

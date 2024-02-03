@@ -51,17 +51,13 @@ c) downstream cathode
 
 if __name__ == "__main__":
 
-    interferometry_calibrate = bool(interferometry_folder)
-    if not interferometry_calibrate:
-        print("\nInterferometry calibration is OFF. "
-              "Interferometry-calibrated electron density ('n_e_cal') is not available.")
+    # TODO list of hardcoded parameters
+    #    (16, 24) for January_2024 steady state period (main.py)
+    #
 
-    print("Current HDF5 directory path:           \t",   repr(hdf5_folder),
-          "\nCurrent NetCDF directory path:         \t", repr(langmuir_nc_folder),
-          "\nCurrent interferometry directory path: \t", repr(interferometry_folder),
-          "\nLinear combinations of isat sources:   \t", repr(isweep_choice),
-          "\nThese can be changed in main.py.")
-    input("Enter any key to continue: ")
+    # Debugging note: to save on application memory for large datasets, datasets are cleared as their values are used.
+    #    If you want to get an internal picture of e.g. bias or current, set breakpoints in debug mode,
+    #    or use the corresponding preview mode if it exists.
 
     netcdf_folder = ensure_directory(langmuir_nc_folder)  # Create folder to save NetCDF files if not yet existing
 
@@ -107,3 +103,5 @@ if __name__ == "__main__":
                                       tolerance=plot_tolerance)
 
 # TODO Not all MATLAB code has been transferred (e.g. neutrals, ExB)
+# QUESTION: can we calibrate both Langmuir probes using an interferometry ratio depending only on one of them?
+# TODO calculate collision freq/collisionality

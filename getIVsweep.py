@@ -65,7 +65,7 @@ def get_isweep_vsweep(filename, vsweep_bc, isweep_metadatas, voltage_gain, orien
     # bias dimensions:               position, shot, frame   (e.g.    (71, 15, 55296))
     # currents dimensions:   isweep, position, shot, frame   (e.g. (1, 71, 15, 55296))
 
-    # Up-down orientation of sweep is hardcoded for an entire experiment, e.g. November_2022, in preconfiguration.py
+    # Up-down orientation of sweep is hardcoded for an entire experiment, e.g. November_2022, in configurations.py
     currents *= orientation
 
     ports = np.array([motor_data.info['controls']['6K Compumotor']['probe']['port'] for motor_data in motor_datas])
