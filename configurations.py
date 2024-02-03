@@ -12,7 +12,7 @@ def get_config_id(exp_name):
         raise NotImplementedError("Configuration data has not yet been added for experiment series " + repr(exp_name)
                                   + ". Acceptable configurations are " + str(valid_configs)
                                   + ". Please contact the maintainer of this code repository to update the experiment "
-                                  + "configs or, if you like, you can manually update preconfiguration.py.")
+                                  + "configs or, if you like, you can manually update configurations.py.")
 
 
 def get_vsweep_bc(config_id):  # return (board, channel) for vsweep data

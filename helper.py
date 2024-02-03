@@ -55,7 +55,7 @@ def isweep_selector(ds, vectors):  # TODO should separate diagnostics_main and p
     r"""
     Select an isweep signal, linear combination of isweep signals, or multiple such linear combinations from a
     diagnostic dataset. For example, on a dataset with two isweep signals (e.g. from 2 different probes or probe faces),
-        [1,  0] would return the data from the first isweep signal (listed first in preconfiguration.py)
+        [1,  0] would return the data from the first isweep signal (listed first in configurations.py)
         [1, -1] would return the parallel difference (first-listed minus second-listed)
         [[1, 0], [1, -1]] would return a list containing both of the above
     When multiple datasets are returned, they are placed on separate contour plots, but
