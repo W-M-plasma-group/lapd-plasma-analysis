@@ -122,10 +122,11 @@ def in_core(pos_list, core_rad):
     return [np.abs(pos) < core_rad.to(u.cm).value for pos in pos_list]
 
 
-def get_pressure(lang_ds, calibrated_electron_density, bimaxwellian):
+def get_pressure(lang_ds, calibrated_electron_density):
     r"""Calculate electron pressure from temperature and calibrated density"""
     pressure_unit = u.Pa
-    electron_temperature = lang_ds['T_e_avg'] if bimaxwellian else lang_ds['T_e']
+    bimaxwellian = ('T_e_avg' in lang_ds)  # TODO check this behavior
+    electron_temperature = lang_ds['T_e_avg'] if bimaxwellian else lang_ds['T_e']  # TODO check with advisor: avg/cold?
     pressure = (3 / 2) * electron_temperature * calibrated_electron_density * (1. * u.eV * u.m ** -3).to(pressure_unit)
     return pressure.assign_attrs({'units': str(pressure_unit)})
 

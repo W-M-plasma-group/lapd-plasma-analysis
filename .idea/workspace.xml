@@ -4,12 +4,18 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="99051048-4239-4d54-a2e8-6a0399c265e9" name="Changes" comment="Modify hardcoded get_voltage_gain function">
+    <list default="true" id="99051048-4239-4d54-a2e8-6a0399c265e9" name="Changes" comment="Correct error and rename probes_choice to isweep_choice">
+      <change afterPath="$PROJECT_DIR$/load_datasets.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/characteristic_view.py" beforeDir="false" afterPath="$PROJECT_DIR$/preview.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/characterization.py" beforeDir="false" afterPath="$PROJECT_DIR$/characterization.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/diagnostics.py" beforeDir="false" afterPath="$PROJECT_DIR$/diagnostics.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/experimental.py" beforeDir="false" afterPath="$PROJECT_DIR$/experimental.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/file_access.py" beforeDir="false" afterPath="$PROJECT_DIR$/file_access.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/getIVsweep.py" beforeDir="false" afterPath="$PROJECT_DIR$/getIVsweep.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/helper.py" beforeDir="false" afterPath="$PROJECT_DIR$/helper.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/plots.py" beforeDir="false" afterPath="$PROJECT_DIR$/plots.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/preconfiguration.py" beforeDir="false" afterPath="$PROJECT_DIR$/configurations.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -73,7 +79,7 @@
     &quot;WebServerToolWindowFactoryState&quot;: &quot;false&quot;,
     &quot;git-widget-placeholder&quot;: &quot;leo&quot;,
     &quot;last.edited.regexp&quot;: &quot;08_radial_line_25press_3500A.hdf5&quot;,
-    &quot;last_opened_file_path&quot;: &quot;/Users/leomurphy/Desktop/January_2024 plots&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/Users/leomurphy/PycharmProjects/lapd-plasma-analysis&quot;,
     &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
     &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
     &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
@@ -271,7 +277,8 @@
       <workItem from="1704982886633" duration="48971000" />
       <workItem from="1705639084143" duration="35455000" />
       <workItem from="1706409106561" duration="60750000" />
-      <workItem from="1706822881275" duration="5391000" />
+      <workItem from="1706823028442" duration="96000" />
+      <workItem from="1706823876908" duration="13771000" />
     </task>
     <task id="LOCAL-00001" summary="Switch plots to using QtAgg instead of TkAgg backend">
       <created>1680657801669</created>
@@ -293,38 +300,6 @@
       <option name="presentableId" value="LOCAL-00003" />
       <option name="project" value="LOCAL" />
       <updated>1688410592147</updated>
-    </task>
-    <task id="LOCAL-00011" summary="Create new file characteristic_view.py to reduce clutter in main.py">
-      <option name="closed" value="true" />
-      <created>1689635323365</created>
-      <option name="number" value="00011" />
-      <option name="presentableId" value="LOCAL-00011" />
-      <option name="project" value="LOCAL" />
-      <updated>1689635323365</updated>
-    </task>
-    <task id="LOCAL-00012" summary="Insert LAPD diagram">
-      <option name="closed" value="true" />
-      <created>1689702000224</created>
-      <option name="number" value="00012" />
-      <option name="presentableId" value="LOCAL-00012" />
-      <option name="project" value="LOCAL" />
-      <updated>1689702000224</updated>
-    </task>
-    <task id="LOCAL-00013" summary="Add diagnostic viewing to characteristic_view.py">
-      <option name="closed" value="true" />
-      <created>1689712677765</created>
-      <option name="number" value="00013" />
-      <option name="presentableId" value="LOCAL-00013" />
-      <option name="project" value="LOCAL" />
-      <updated>1689712677765</updated>
-    </task>
-    <task id="LOCAL-00014" summary="Replace custom smoothing functions with fast, existing bottleneck.move_mean function">
-      <option name="closed" value="true" />
-      <created>1689712761093</created>
-      <option name="number" value="00014" />
-      <option name="presentableId" value="LOCAL-00014" />
-      <option name="project" value="LOCAL" />
-      <updated>1689712761093</updated>
     </task>
     <task id="LOCAL-00015" summary="Move diagnostic helper functions to helper.py">
       <option name="closed" value="true" />
@@ -662,7 +637,39 @@
       <option name="project" value="LOCAL" />
       <updated>1706813121982</updated>
     </task>
-    <option name="localTasksCounter" value="57" />
+    <task id="LOCAL-00057" summary="Correctly extract nominal discharge current and gas puff from January_2024 data">
+      <option name="closed" value="true" />
+      <created>1706825123562</created>
+      <option name="number" value="00057" />
+      <option name="presentableId" value="LOCAL-00057" />
+      <option name="project" value="LOCAL" />
+      <updated>1706825123562</updated>
+    </task>
+    <task id="LOCAL-00058" summary="Introduce hardcoded steady_state indices for January_2024 data">
+      <option name="closed" value="true" />
+      <created>1706825214637</created>
+      <option name="number" value="00058" />
+      <option name="presentableId" value="LOCAL-00058" />
+      <option name="project" value="LOCAL" />
+      <updated>1706825214637</updated>
+    </task>
+    <task id="LOCAL-00059" summary="Allow multiple linear combinations of diagnostic data from different isweep sources to be specified and plotted">
+      <option name="closed" value="true" />
+      <created>1706832246102</created>
+      <option name="number" value="00059" />
+      <option name="presentableId" value="LOCAL-00059" />
+      <option name="project" value="LOCAL" />
+      <updated>1706832246102</updated>
+    </task>
+    <task id="LOCAL-00060" summary="Correct error and rename probes_choice to isweep_choice">
+      <option name="closed" value="true" />
+      <created>1706832481420</created>
+      <option name="number" value="00060" />
+      <option name="presentableId" value="LOCAL-00060" />
+      <option name="project" value="LOCAL" />
+      <updated>1706832481420</updated>
+    </task>
+    <option name="localTasksCounter" value="61" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -726,10 +733,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="Begin implementing tight_layout for plots" />
-    <MESSAGE value="Implement tight_layout for plots" />
-    <MESSAGE value="Introduce rolling-median pre-smoothing, which allows smoothing over a much longer range of data than rolling-mean smoothing while accurately preserving the shape and slope of the I-V sweep curve" />
-    <MESSAGE value="More robustly check probe units before performing diagnostics; convert to volts and amps if possible" />
     <MESSAGE value="Discard sweep curves where the current fails to rise above 10 mA, due to large noise effects" />
     <MESSAGE value="Vary plot tolerance and smoothing margin to reflect new rolling-median smoothing method" />
     <MESSAGE value="Save plasma diagnostics even in the event of a failure in interferometry density calibration" />
@@ -751,23 +754,16 @@
     <MESSAGE value="Add raw sweep plotting mode" />
     <MESSAGE value="Change name of sample_sec to dt" />
     <MESSAGE value="Modify hardcoded get_voltage_gain function" />
-    <option name="LAST_COMMIT_MESSAGE" value="Modify hardcoded get_voltage_gain function" />
-  </component>
-  <component name="XDebuggerManager">
-    <breakpoint-manager>
-      <breakpoints>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/main.py</url>
-          <line>117</line>
-          <option name="timeStamp" value="8" />
-        </line-breakpoint>
-      </breakpoints>
-    </breakpoint-manager>
+    <MESSAGE value="Correctly extract nominal discharge current and gas puff from January_2024 data" />
+    <MESSAGE value="Introduce hardcoded steady_state indices for January_2024 data" />
+    <MESSAGE value="Allow multiple linear combinations of diagnostic data from different isweep sources to be specified and plotted" />
+    <MESSAGE value="Correct error and rename probes_choice to isweep_choice" />
+    <option name="LAST_COMMIT_MESSAGE" value="Correct error and rename probes_choice to isweep_choice" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/lapd_plasma_analysis$scratch_4.coverage" NAME="scratch_4 Coverage Results" MODIFIED="1692131134620" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$APPLICATION_CONFIG_DIR$/scratches" />
     <SUITE FILE_PATH="coverage/lapd_plasma_analysis$fourier.coverage" NAME="fourier Coverage Results" MODIFIED="1695663830302" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/lapd_plasma_analysis$main.coverage" NAME="main Coverage Results" MODIFIED="1706823671581" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/lapd_plasma_analysis$main.coverage" NAME="main Coverage Results" MODIFIED="1706937932870" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/lapd_plasma_analysis$scratch_2.coverage" NAME="scratch_2 Coverage Results" MODIFIED="1691534973579" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$APPLICATION_CONFIG_DIR$/scratches" />
     <SUITE FILE_PATH="coverage/lapd_plasma_analysis$scratch_6.coverage" NAME="scratch_6 Coverage Results" MODIFIED="1696432972127" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$APPLICATION_CONFIG_DIR$/scratches" />
     <SUITE FILE_PATH="coverage/lapd_plasma_analysis$scratch.coverage" NAME="scratch Coverage Results" MODIFIED="1689972569303" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$APPLICATION_CONFIG_DIR$/scratches" />
