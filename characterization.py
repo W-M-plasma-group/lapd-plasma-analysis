@@ -7,7 +7,7 @@ from tqdm import tqdm
 import sys
 
 
-def characterize_sweep_array(unsmooth_bias, unsmooth_currents, margin, dt):
+def characterize_sweep_array(bias, currents, dt):
     r"""
     Function that processes bias and current data into a DataArray of distinct Characteristics.
     Takes in bias and current arrays, smooths them, divides them into separate ramp sections, 
@@ -15,17 +15,13 @@ def characterize_sweep_array(unsmooth_bias, unsmooth_currents, margin, dt):
 
     Parameters
     ----------
-    :param unsmooth_bias: array, units of voltage
-    :param unsmooth_currents: array, units of current
-    :param margin: int, positive
+    :param bias: array, units of voltage
+    :param currents: array, units of current
     :param dt: float, units of time
     :return: 2D array of Characteristic objects by shot number and plateau number
     """
 
-    unsmooth_bias, unsmooth_currents = ensure_sweep_units(unsmooth_bias, unsmooth_currents)
-
-    bias = smooth_array(unsmooth_bias.value,         margin, "median") * u.V
-    currents = smooth_array(unsmooth_currents.value, margin, "median") * u.A
+    bias, currents = ensure_sweep_units(bias, currents)
 
     # trim bad, distorted averaged ends in isolated plateaus
     ramp_bounds = isolate_plateaus(bias, margin=margin)

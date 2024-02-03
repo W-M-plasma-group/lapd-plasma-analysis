@@ -23,13 +23,15 @@ def get_isweep_vsweep(filename, vsweep_bc, isweep_metadatas, voltage_gain, orien
     with lapd.File(filename) as lapd_file:
         isweep_bcs = np.atleast_1d(isweep_metadatas[['board', 'channel']])
 
-        vsweep_data = lapd_file.read_data(*vsweep_bc, silent=True)
-        isweep_datas = [lapd_file.read_data(*isweep_bc, silent=True) for isweep_bc in isweep_bcs]
-        vsweep_signal = vsweep_data['signal']
-        isweep_signal = np.concatenate([isweep_data['signal'][np.newaxis, ...] for isweep_data in isweep_datas], axis=0)
+        vsweep = lapd_file.read_data(*vsweep_bc, silent=True)
+        isweep = [lapd_file.read_data(*isweep_bc, silent=True) for isweep_bc in isweep_bcs]
+        dt = vsweep.dt
+
+        vsweep = vsweep['signal']
+        isweep = np.concatenate([isweep_signal['signal'][np.newaxis, ...] for isweep_signal in isweep], axis=0)
         # Above: isweep_signal has one extra dimension "in front" compared to vsweep signal,
         #  to represent different probes or probe faces; ordered by (board, channel) as listed in isweep_metadatas
-        signal_length = vsweep_signal.shape[-1]
+        signal_length = vsweep.shape[-1]
 
         # List of motor data about the probe associated with each isweep signal.
         #   Motor data may be repeated, for example if two isweep signals were taken using two faces on the same probe.
@@ -41,25 +43,24 @@ def get_isweep_vsweep(filename, vsweep_bc, isweep_metadatas, voltage_gain, orien
     #  for now, assume identical and use only first motor data
     num_isweep = len(isweep_metadatas)
     positions, num_positions, shots_per_position, selected_shots = get_shot_positions(motor_datas[0])
-    vsweep_signal = vsweep_signal[selected_shots,    ...]
-    isweep_signal = isweep_signal[:, selected_shots, ...]
+    vsweep = vsweep[selected_shots,    ...]
+    isweep = isweep[:, selected_shots, ...]
 
-    vsweep_signal = vsweep_signal.reshape(num_positions,              shots_per_position, signal_length)
-    isweep_signal = isweep_signal.reshape((num_isweep, num_positions, shots_per_position, signal_length))
+    vsweep = vsweep.reshape(num_positions,              shots_per_position, signal_length)
+    isweep = isweep.reshape((num_isweep, num_positions, shots_per_position, signal_length))
 
-    scale_shape = [num_isweep] + [1 for _ in range(len(isweep_signal.shape) - 1)]
+    scale_shape = [num_isweep] + [1 for _ in range(len(isweep.shape) - 1)]
     resistances = np.reshape(isweep_metadatas['resistance'], scale_shape)
     gains = np.reshape(isweep_metadatas['gain'],             scale_shape)
 
     # Convert to real units (not abstract)
-    bias = vsweep_signal * voltage_gain * u.V
-    currents = isweep_signal / resistances / gains * u.A
+    bias = vsweep * voltage_gain * u.V
+    currents = isweep / resistances / gains * u.A
 
     # Subtract out average of last thousand current measurements for each isweep signal,
     #   as this should be a while after the plasma has dissipated and thus be equal to zero.
     #   This eliminates any persistent DC offset current from the probe.
-    currents_dc_offset = np.mean(currents[..., -1000:], axis=-1, keepdims=True)
-    currents -= currents_dc_offset
+    currents -= np.mean(currents[..., -1000:], axis=-1, keepdims=True)
 
     # bias dimensions:               position, shot, frame   (e.g.    (71, 15, 55296))
     # currents dimensions:   isweep, position, shot, frame   (e.g. (1, 71, 15, 55296))
@@ -68,7 +69,6 @@ def get_isweep_vsweep(filename, vsweep_bc, isweep_metadatas, voltage_gain, orien
     currents *= orientation
 
     ports = np.array([motor_data.info['controls']['6K Compumotor']['probe']['port'] for motor_data in motor_datas])
-    dt = vsweep_data.dt
     return bias, currents, positions, dt, ports
 
 
