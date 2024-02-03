@@ -19,7 +19,8 @@ def get_exp_params(hdf5_path):
                               get_nominal_pressure_0]
     exp_params_functions_12 = [get_nominal_discharge_12,
                                get_nominal_gas_puff_12]
-    exp_params_functions_3 = [get_nominal_discharge_03,
+    exp_params_functions_3 = [get_nominal_magnetic_field,
+                              get_nominal_discharge_03,
                               get_nominal_gas_puff_3]
     # Units are given in MATLAB code
     exp_params_names_values = {}
@@ -58,6 +59,13 @@ def get_gas_pressure(file):
 def get_magnetic_field(file):
     return {"Peak magnetic field": np.mean(file.read_msi("Magnetic field", silent=True)['meta']['peak magnetic field']
                                            ) * u.gauss}
+
+
+def get_nominal_magnetic_field(file):
+    magnetic_field = get_magnetic_field(file)["Peak magnetic field"]
+    # Round magnetic field to nearest 500 Gauss
+    nominal_magnetic_field = 500 * int(np.round(magnetic_field.to(u.gauss).value / 500)) * u.gauss
+    return {"Nominal magnetic field": nominal_magnetic_field}
 
 
 def get_nominal_gas_puff_3(file):
