@@ -65,85 +65,19 @@ if __name__ == "__main__":
 
     netcdf_folder = ensure_directory(langmuir_nc_folder)  # Create folder to save NetCDF files if not yet existing
 
-    print("\nThe following NetCDF files were found in the NetCDF folder (specified in main.py): ")
-    nc_paths = sorted(search_folder(netcdf_folder, 'nc', limit=52))
-    nc_paths_to_open_ints = choose_multiple_list(nc_paths, "NetCDF file",
-                                                 null_action="perform diagnostics on HDF5 files")
+    datasets, generate_new = load_datasets(hdf5_folder, netcdf_folder, interferometry_folder, isweep_choice,
+                                           bimaxwellian)
 
-    if len(nc_paths_to_open_ints) > 0:
-        datasets = [xr.open_dataset(nc_paths[choice]) for choice in nc_paths_to_open_ints]
-    else:
-        print("\nThe following HDF5 files were found in the HDF5 folder (specified in main.py): ")
-        hdf5_paths = sorted(search_folder(hdf5_folder, "hdf5", limit=52))
-        hdf5_chosen_ints = choose_multiple_list(hdf5_paths, "HDF5 file")
-        hdf5_chosen_list = [hdf5_paths[choice] for choice in hdf5_chosen_ints]
+    # Get ramp indices for beginning and end of steady state period in plasma; TODO hardcoded
+    steady_state_plateaus_runs = ([(16, 24) for dataset in datasets] if "january" in hdf5_folder.lower()
+                                  else [detect_steady_state_ramps(dataset['n_e'], core_radius) for dataset in datasets])
 
-        sweep_view_mode = (len(hdf5_chosen_list) == 1) and ask_yes_or_no("Use raw sweep plotting mode? (y/n) ")
-        chara_view_mode = (len(hdf5_chosen_list) == 1) and ask_yes_or_no("Use characteristic plotting mode? (y/n) ")
+    # If new diagnostics were generated from HDF5 files, calibrate electron densities using interferometry data
+    if generate_new:
+        datasets = interferometry_calibrate_datasets(datasets, interferometry_folder, steady_state_plateaus_runs)
 
-        datasets = []
-        for hdf5_path in hdf5_chosen_list:
-
-            print("\nOpening file", repr(hdf5_path), "...")
-
-            exp_params_dict = get_exp_params(hdf5_path)  # list of experimental parameters
-            ion_type = get_ion(exp_params_dict['Run name'])
-            config_id = get_config_id(exp_params_dict['Exp name'])
-            vsweep_board_channel = get_vsweep_bc(config_id)
-
-            langmuir_probes = get_langmuir_config(hdf5_path, config_id)  # TODO print face strings in outputs
-            voltage_gain = get_voltage_gain(config_id)
-            orientation = get_orientation(config_id)
-
-            # get current and bias data from Langmuir probe
-            bias, currents, positions, dt, ports = get_isweep_vsweep(hdf5_path, vsweep_board_channel,
-                                                                     langmuir_probes, voltage_gain, orientation)
-
-            if sweep_view_mode:
-                display_raw_sweep(bias, currents, positions, ports, exp_params_dict, dt)
-
-            # organize sweep bias and current into an array of Characteristic objects
-            characteristics, ramp_times = characterize_sweep_array(bias, currents, smoothing_margin, dt)
-
-            if chara_view_mode:
-                display_characteristics(characteristics, positions, ports, ramp_times, exp_params_dict,
-                                        diagnostics=True, areas=langmuir_probes['area'],
-                                        ion=ion_type, bimaxwellian=bimaxwellian)
-
-            diagnostics_dataset = langmuir_diagnostics(characteristics, positions, ramp_times, ports,
-                                                       langmuir_probes['area'], ion_type, bimaxwellian=bimaxwellian)
-            diagnostics_dataset = diagnostics_dataset.assign_attrs(exp_params_dict)
-            datasets.append(diagnostics_dataset)
-
-    # TODO this is extremely hardcoded
-    if "january" in hdf5_folder.lower():
-        steady_state_plateaus_runs = [(16, 24) for dataset in datasets]
-    else:
-        steady_state_plateaus_runs = [detect_steady_state_ramps(dataset['n_e'], core_radius) for dataset in datasets]
-
-    if len(nc_paths_to_open_ints) == 0:
-        # External interferometry calibration for electron density
-        for i in range(len(datasets)):
-            if interferometry_calibrate:
-                try:
-                    calibrated_electron_density = interferometry_calibration(datasets[i]['n_e'].copy(),
-                                                                             datasets[i].attrs,          # exp params
-                                                                             interferometry_folder,
-                                                                             steady_state_plateaus_runs[i],
-                                                                             core_radius=core_radius)
-                    datasets[i] = datasets[i].assign({"n_e_cal": calibrated_electron_density})
-                except (IndexError, ValueError, TypeError, AttributeError, KeyError) as e:
-                    print(f"Error in calibrating electron density: \n{str(e)}")
-                    calibrated_electron_density = datasets[i]['n_e'].copy()
-            else:
-                calibrated_electron_density = datasets[i]['n_e'].copy()
-
-            datasets[i] = datasets[i].assign({'P_e': get_pressure(datasets[i], calibrated_electron_density,
-                                                                  bimaxwellian)})
-            datasets[i] = datasets[i].assign_attrs({"Interferometry calibrated": interferometry_calibrate})
-
-            save_diagnostic_path = make_path(netcdf_folder, datasets[i].attrs['Run name'] + "_lang", "nc")
-            write_netcdf(datasets[i], save_diagnostic_path)
+    # Save diagnostics datasets to folder
+    save_datasets(datasets, netcdf_folder, bimaxwellian)
 
     # Get possible diagnostics and their full names, e.g. "n_e" and "Electron density"
     diagnostic_name_dict = {key: get_title(key)
