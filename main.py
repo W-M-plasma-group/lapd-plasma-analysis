@@ -19,7 +19,7 @@ hdf5_folder = "/Users/leomurphy/lapd-data/January_2024/"
 langmuir_nc_folder = hdf5_folder + "lang_nc/"
 
 """ Set to False or equivalent if interferometry calibration is not desired """
-interferometry_folder = False       # TODO set to False to avoid interferometry calibration
+interferometry_folder = False                               # TODO set to False to avoid interferometry calibration
 # interferometry_folder = hdf5_folder
 # interferometry_folder = "/Users/leomurphy/lapd-data/November_2022/uwave_288_GHz_waveforms/"
 
@@ -80,8 +80,7 @@ if __name__ == "__main__":
     save_datasets(datasets, netcdf_folder, bimaxwellian)
 
     # Get possible diagnostics and their full names, e.g. "n_e" and "Electron density"
-    diagnostic_name_dict = {key: get_title(key)
-                            for key in set.intersection(*[set(dataset) for dataset in datasets])}
+    diagnostic_name_dict = {key: get_title(key) for key in set.intersection(*[set(dataset) for dataset in datasets])}
 
     # Ask users for list of diagnostics to plot
     print("The following diagnostics are available to plot: ")
@@ -93,17 +92,15 @@ if __name__ == "__main__":
                                for choice in diagnostics_to_plot_ints]
     print("Diagnostics selected:", diagnostic_to_plot_list)
 
-    """Plot chosen diagnostics for each individual dataset"""
+    # Plot chosen diagnostics for each individual dataset
     if ask_yes_or_no("Generate contour plot of selected diagnostics over time and radial position? (y/n) "):
         for plot_diagnostic in diagnostic_to_plot_list:
             for i in range(len(datasets)):
                 plot_line_diagnostic(isweep_selector(datasets[i], isweep_choice), plot_diagnostic, 'contour',
                                      steady_state_plateaus_runs[i], tolerance=plot_tolerance)
 
-    """
-    Plot radial profiles of diagnostic (steady-state time average), with color corresponding to first attribute
-        and plot position on multiplot corresponding to second attribute
-    """
+    # Plot radial profiles of diagnostic (steady-state time average), with color corresponding to first attribute
+    #    and plot position on multiplot corresponding to second attribute
     if ask_yes_or_no("Generate line plot of selected diagnostics over radial position? (y/n) "):
         for plot_diagnostic in diagnostic_to_plot_list:
             multiplot_line_diagnostic(datasets, plot_diagnostic, isweep_choice, steady_state_plateaus_runs,

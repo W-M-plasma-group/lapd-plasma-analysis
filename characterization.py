@@ -109,9 +109,9 @@ def characteristic_array(bias, currents, ramp_bounds):
 
     ramp_slices = np.array([slice(ramp[0], ramp[1]) for ramp in ramp_bounds])
 
-    num_isweep = len(currents)
-    num_loc = bias.shape[0]
-    num_shot = bias.shape[1]
+    num_isweep = currents.shape[0]
+    num_loc = currents.shape[1]
+    num_shot = currents.shape[2]
     num_ramp = len(ramp_slices)
 
     print(f"Creating characteristics ...")

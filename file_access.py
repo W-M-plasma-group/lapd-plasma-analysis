@@ -75,7 +75,7 @@ def search_folder(directory, ext, limit=None) -> list[str]:
         for filename in files:
             if filename.endswith(ext):
                 paths_found.append(os.path.join(path, filename))
-                if type(limit) == int and len(paths_found) >= limit:
+                if isinstance(limit, int) and len(paths_found) >= limit:
                     return paths_found
     return paths_found
 

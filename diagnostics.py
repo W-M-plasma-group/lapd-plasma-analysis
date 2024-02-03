@@ -56,7 +56,6 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, ports, pr
     num_characteristics = (diagnostics_ds.sizes['isweep'] * diagnostics_ds.sizes['x'] * diagnostics_ds.sizes['y']
                            * diagnostics_ds.sizes['shot'] * diagnostics_ds.sizes['time'])
 
-    # TODO Leo debug!
     # """
     error_types = []
     error_chart = np.zeros(shape=(num_isweep, len(x), len(y), num_shots, num_plateaus))
@@ -73,7 +72,6 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, ports, pr
                         diagnostics = diagnose_char(characteristic, probe_areas[i], ion_type, bimaxwellian=bimaxwellian)
                         pbar.update(1)
                         if isinstance(diagnostics, str):  # error with diagnostics
-                            # print(i, l, s, r, ": ", diagnostics)
                             if diagnostics not in error_types:
                                 error_types.append(diagnostics)
                             error_chart[i,
@@ -134,7 +132,7 @@ def get_pressure(lang_ds, calibrated_electron_density, bimaxwellian):
     return pressure.assign_attrs({'units': str(pressure_unit)})
 
 
-def detect_steady_state_ramps(density: xr.DataArray, core_rad, config_id=None):
+def detect_steady_state_ramps(density: xr.DataArray, core_rad):
     r"""Return start and end ramp indices for the steady-state period (density constant in time)"""
     # TODO hardcoded
     core_density = density.where(np.logical_and(*in_core([density.x, density.y], core_rad)), drop=True)
