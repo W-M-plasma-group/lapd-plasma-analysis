@@ -29,15 +29,11 @@ interferometry_folder = False       # TODO set to False to avoid interferometry 
 # interferometry_folder = "/Users/leomurphy/lapd-data/November_2022/uwave_288_GHz_waveforms/"
 
 """ User parameters """
-isweep_choice = [[1, 0, 0, 0], [0, 0, 1, 0]]                # TODO user choice for probe or linear combination to use
-# isweep_choice = [1, 0]
-# TODO for quick explanation of the above, see isweep_selector function in helper.py
-bimaxwellian = False                                    # TODO perform both and store in same NetCDF file?
-smoothing_margin = 1 * 200                                # Optimal values in range 100-400 if "median" smoothing method
-plot_tolerance = np.nan   # was 2                       # Optimal values are np.nan (plot all points) or >= 0.5
-
-# QUESTION: can we calibrate both Langmuir probes using an interferometry ratio depending only on one of them?
-core_radius = 26. * u.cm                                         # From MATLAB code
+isweep_choice = [[1, 0, 0, 0], [0, 0, 1, 0]]                # TODO user choice for probe or linear combination to use;
+#                                                             see isweep_selector in helper.py for brief explanation
+bimaxwellian = False                                        # TODO perform both and store in same NetCDF file?
+plot_tolerance = np.nan   # was 2                           # Optimal values are np.nan (plot all points) or >= 0.5
+core_radius = 26. * u.cm                                    # From MATLAB code
 
 
 # Diagram of LAPD

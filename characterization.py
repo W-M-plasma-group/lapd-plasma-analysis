@@ -24,7 +24,7 @@ def characterize_sweep_array(bias, currents, dt):
     bias, currents = ensure_sweep_units(bias, currents)
 
     # trim bad, distorted averaged ends in isolated plateaus
-    ramp_bounds = isolate_plateaus(bias, margin=margin)
+    ramp_bounds = isolate_plateaus(bias)
 
     ramp_times = ramp_bounds[:, 1] * dt.to(u.ms)
     # NOTE: MATLAB code stores peak voltage time (end of plateaus), then only uses plateau times for very first position
