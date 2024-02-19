@@ -5,17 +5,12 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="99051048-4239-4d54-a2e8-6a0399c265e9" name="Changes" comment="Correct error and rename probes_choice to isweep_choice">
-      <change afterPath="$PROJECT_DIR$/load_datasets.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/characteristic_view.py" beforeDir="false" afterPath="$PROJECT_DIR$/preview.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/characterization.py" beforeDir="false" afterPath="$PROJECT_DIR$/characterization.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/diagnostics.py" beforeDir="false" afterPath="$PROJECT_DIR$/diagnostics.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/experimental.py" beforeDir="false" afterPath="$PROJECT_DIR$/experimental.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/file_access.py" beforeDir="false" afterPath="$PROJECT_DIR$/file_access.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/getIVsweep.py" beforeDir="false" afterPath="$PROJECT_DIR$/getIVsweep.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/helper.py" beforeDir="false" afterPath="$PROJECT_DIR$/helper.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/configurations.py" beforeDir="false" afterPath="$PROJECT_DIR$/configurations.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/interferometry.py" beforeDir="false" afterPath="$PROJECT_DIR$/interferometry.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/load_datasets.py" beforeDir="false" afterPath="$PROJECT_DIR$/load_datasets.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/preconfiguration.py" beforeDir="false" afterPath="$PROJECT_DIR$/configurations.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/plots.py" beforeDir="false" afterPath="$PROJECT_DIR$/plots.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -79,7 +74,7 @@
     &quot;WebServerToolWindowFactoryState&quot;: &quot;false&quot;,
     &quot;git-widget-placeholder&quot;: &quot;leo&quot;,
     &quot;last.edited.regexp&quot;: &quot;08_radial_line_25press_3500A.hdf5&quot;,
-    &quot;last_opened_file_path&quot;: &quot;/Users/leomurphy/PycharmProjects/lapd-plasma-analysis&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/Users/leomurphy/Desktop/January_2024 plots&quot;,
     &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
     &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
     &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
@@ -278,7 +273,8 @@
       <workItem from="1705639084143" duration="35455000" />
       <workItem from="1706409106561" duration="60750000" />
       <workItem from="1706823028442" duration="96000" />
-      <workItem from="1706823876908" duration="13771000" />
+      <workItem from="1706823876908" duration="20806000" />
+      <workItem from="1707448686262" duration="7507000" />
     </task>
     <task id="LOCAL-00001" summary="Switch plots to using QtAgg instead of TkAgg backend">
       <created>1680657801669</created>
@@ -763,7 +759,7 @@
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/lapd_plasma_analysis$scratch_4.coverage" NAME="scratch_4 Coverage Results" MODIFIED="1692131134620" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$APPLICATION_CONFIG_DIR$/scratches" />
     <SUITE FILE_PATH="coverage/lapd_plasma_analysis$fourier.coverage" NAME="fourier Coverage Results" MODIFIED="1695663830302" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/lapd_plasma_analysis$main.coverage" NAME="main Coverage Results" MODIFIED="1706937932870" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/lapd_plasma_analysis$main.coverage" NAME="main Coverage Results" MODIFIED="1708364851287" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/lapd_plasma_analysis$scratch_2.coverage" NAME="scratch_2 Coverage Results" MODIFIED="1691534973579" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$APPLICATION_CONFIG_DIR$/scratches" />
     <SUITE FILE_PATH="coverage/lapd_plasma_analysis$scratch_6.coverage" NAME="scratch_6 Coverage Results" MODIFIED="1696432972127" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$APPLICATION_CONFIG_DIR$/scratches" />
     <SUITE FILE_PATH="coverage/lapd_plasma_analysis$scratch.coverage" NAME="scratch Coverage Results" MODIFIED="1689972569303" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$APPLICATION_CONFIG_DIR$/scratches" />

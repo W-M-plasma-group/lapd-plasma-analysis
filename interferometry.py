@@ -10,6 +10,7 @@ from astropy import constants as const
 from bapsflib import lapd
 
 from file_access import search_folder
+from configurations import get_config_id
 
 
 # "interferometry" is abbreviated as "itfm" throughout
@@ -20,7 +21,8 @@ def interferometry_calibration(density_da: xr.DataArray,
                                core_radius: u.Quantity = 26. * u.cm,
                                ) -> xr.DataArray:
 
-    itfm_id = ["April_2018", "March_2022", "November_2022"].index(exp_attrs['Exp name'])  # hardcoded
+    # itfm_id = ["April_2018", "March_2022", "November_2022"].index(exp_attrs['Exp name'])
+    itfm_id = get_config_id(exp_attrs['Exp name'])
 
     # All calculations are in cm, as coordinates are labeled in cm
     density_da *= (1 / u.m ** 3).to(1 / u.cm ** 3).value  # density in 1/cm^3
@@ -57,6 +59,12 @@ def interferometry_calibration(density_da: xr.DataArray,
         itfm_paths = itfm_file_search_288ghz(run_str, itfm_folder)
         itfm_density_da = itfm_density_288ghz(*itfm_paths)
         density_scale_factor = itfm_calib_288ghz(core_density, itfm_density_da, spatial_dims, core_radius)
+
+    elif itfm_id == 3:  # January 2024
+        itfm_file = lapd.File(itfm_file_search_hdf5(run_str, itfm_folder))
+        itfm_raw = np.array(itfm_file.read_msi("Interferometer array")['signal'][:, 0, :])
+        density_scale_factor = itfm_calib_56ghz(core_density, itfm_raw, spatial_dims).expand_dims("port")
+        itfm_file.close()
 
     else:
         raise NotImplementedError("Unsupported interferometry id " + repr(itfm_id))
