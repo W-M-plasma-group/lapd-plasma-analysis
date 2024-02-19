@@ -23,8 +23,9 @@ interferometry_folder = False                               # TODO set to False 
 # interferometry_folder = "/Users/leomurphy/lapd-data/November_2022/uwave_288_GHz_waveforms/"
 
 """ User parameters """
-isweep_choice = [[1, 0, 0, 0], [0, 0, 1, 0]]                # TODO user choice for probe or linear combination to use;
-#                                                             see isweep_selector in helper.py for brief explanation
+isweep_choice = [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]                # TODO user choice for probe or linear combination to use;
+# isweep_choice = [1, 0]                                      # see isweep_selector in helper.py for brief explanation
+# isweep_choice = [0]
 bimaxwellian = False                                        # TODO perform both and store in same NetCDF file?
 plot_tolerance = np.nan   # was 2                           # Optimal values are np.nan (plot all points) or >= 0.5
 core_radius = 26. * u.cm                                    # From MATLAB code

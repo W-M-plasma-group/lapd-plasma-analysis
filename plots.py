@@ -66,6 +66,7 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
                 linear_da_mean = linear_da_steady_state.mean(['shot', 'time'], keep_attrs=True)
                 linear_da_std = linear_da_steady_state.std(['shot',   'time'], ddof=1, keep_attrs=True)
                 # 95% (~two standard deviation) confidence interval
+                # TODO fix this. Need to consider number of non-NaN entries only
                 linear_da_error = linear_da_std * 1.96 / np.sqrt(linear_da_steady_state.sizes['shot']
                                                                  * linear_da_steady_state.sizes['time'])
 
@@ -82,7 +83,7 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
 
                 if "eV" in linear_da_mean.attrs['units']:  # TODO very hardcoded
                     pass
-                    ax.set_ylim((0, 13))
+                    ax.set_ylim((0, 32))
                 if "Pa" in linear_da_mean.attrs['units']:
                     pass
                     # ax.set_ylim((-1, 20))
