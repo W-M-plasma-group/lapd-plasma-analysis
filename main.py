@@ -5,10 +5,9 @@ Comments are added inline. A separate documentation page is not yet complete.
 """
 
 from helper import *
-from file_access import choose_multiple_list, ask_yes_or_no, ensure_directory
-from load_datasets import load_datasets, interferometry_calibrate_datasets, save_datasets
-from diagnostics import detect_steady_state_ramps
-from plots import multiplot_line_diagnostic, plot_line_diagnostic, get_title
+from file_access import choose_multiple_list, ask_yes_or_no
+from load_datasets import setup_datasets
+from plots import multiplot_line_diagnostic, plot_line_diagnostic
 
 """ End directory paths with a slash """
 # hdf5_folder = "/Users/leomurphy/lapd-data/April_2018/"
@@ -53,30 +52,9 @@ if __name__ == "__main__":
 
     # TODO list of hardcoded parameters
     #    (16, 24) for January_2024 steady state period (main.py)
-    #
 
-    # Debugging note: to save on application memory for large datasets, datasets are cleared as their values are used.
-    #    If you want to get an internal picture of e.g. bias or current, set breakpoints in debug mode,
-    #    or use the corresponding preview mode if it exists.
-
-    netcdf_folder = ensure_directory(langmuir_nc_folder)  # Create folder to save NetCDF files if not yet existing
-
-    datasets, generate_new = load_datasets(hdf5_folder, netcdf_folder, interferometry_folder, isweep_choice,
-                                           bimaxwellian)
-
-    # Get ramp indices for beginning and end of steady state period in plasma; TODO hardcoded
-    steady_state_plateaus_runs = ([(16, 24) for dataset in datasets] if "january" in hdf5_folder.lower()
-                                  else [detect_steady_state_ramps(dataset['n_e'], core_radius) for dataset in datasets])
-
-    # If new diagnostics were generated from HDF5 files, calibrate electron densities using interferometry data
-    if generate_new:
-        datasets = interferometry_calibrate_datasets(datasets, interferometry_folder, steady_state_plateaus_runs)
-
-    # Save diagnostics datasets to folder
-    save_datasets(datasets, netcdf_folder, bimaxwellian)
-
-    # Get possible diagnostics and their full names, e.g. "n_e" and "Electron density"
-    diagnostic_name_dict = {key: get_title(key) for key in set.intersection(*[set(dataset) for dataset in datasets])}
+    datasets, steady_state_plateaus_runs, diagnostic_name_dict = setup_datasets(
+        langmuir_nc_folder, hdf5_folder, interferometry_folder, isweep_choice, bimaxwellian)
 
     # Ask users for list of diagnostics to plot
     print("The following diagnostics are available to plot: ")

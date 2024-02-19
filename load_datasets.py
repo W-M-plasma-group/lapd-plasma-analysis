@@ -5,8 +5,34 @@ from experimental import get_exp_params
 from getIVsweep import get_isweep_vsweep
 from characterization import characterize_sweep_array
 from preview import preview_raw_sweep, preview_characteristics
-from diagnostics import langmuir_diagnostics, get_pressure
+from diagnostics import langmuir_diagnostics, get_pressure, detect_steady_state_ramps
 from interferometry import interferometry_calibration
+from plots import get_title
+
+
+def setup_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder, isweep_choice, bimaxwellian):
+    netcdf_folder = ensure_directory(langmuir_nc_folder)  # Create folder to save NetCDF files if not yet existing
+
+    datasets, generate_new = load_datasets(hdf5_folder, netcdf_folder, interferometry_folder, isweep_choice,
+                                           bimaxwellian)
+
+    # Get ramp indices for beginning and end of steady state period in plasma; TODO hardcoded
+    if "january" in hdf5_folder.lower():
+        steady_state_plateaus_runs = [(16, 24) for dataset in datasets]
+    else:
+        steady_state_plateaus_runs = [detect_steady_state_ramps(dataset['n_e'], core_radius) for dataset in datasets]
+
+    # If new diagnostics were generated from HDF5 files, calibrate electron densities using interferometry data
+    if generate_new:
+        datasets = interferometry_calibrate_datasets(datasets, interferometry_folder, steady_state_plateaus_runs)
+
+    # Save diagnostics datasets to folder
+    save_datasets(datasets, netcdf_folder, bimaxwellian)
+
+    # Get possible diagnostics and their full names, e.g. "n_e" and "Electron density"
+    diagnostic_name_dict = {key: get_title(key) for key in set.intersection(*[set(dataset) for dataset in datasets])}
+
+    return datasets, steady_state_plateaus_runs, diagnostic_name_dict
 
 
 def load_datasets(hdf5_folder, lang_nc_folder, interferometry_folder, isweep_choice, bimaxwellian):
