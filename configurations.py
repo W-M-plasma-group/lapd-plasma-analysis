@@ -81,4 +81,4 @@ def get_ion(run_name: str):
 def get_orientation(config_id):
     # Return 1 if data is stored with I_es positive and I_is negative (no need to invert),
     #  or return -1 if is stored with I_es negative and I_is positive (need to invert)
-    return (1, -1, -1, -1)[config_id]
+    return (-1, 1, 1, -1)[config_id]
