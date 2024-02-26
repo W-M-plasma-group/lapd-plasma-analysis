@@ -124,19 +124,17 @@ def load_datasets(hdf5_folder, lang_nc_folder, interferometry_folder, isweep_cho
 def interferometry_calibrate_datasets(datasets, interferometry_folder, steady_state_ramps):
 
     for i in range(len(datasets)):
-        if bool(interferometry_folder):
-            try:
-                calibrated_electron_density = interferometry_calibration(datasets[i]['n_e'].copy(),
-                                                                         datasets[i].attrs,          # exp params
-                                                                         interferometry_folder,
-                                                                         steady_state_ramps[i],
-                                                                         core_radius=core_radius)
-                datasets[i] = datasets[i].assign({"n_e_cal": calibrated_electron_density})
-            except (IndexError, ValueError, TypeError, AttributeError, KeyError) as e:
-                print(f"Error in calibrating electron density: \n{str(e)}")
-                calibrated_electron_density = datasets[i]['n_e'].copy()
-        else:
+        calibrated_electron_density = interferometry_calibration(datasets[i]['n_e'].copy(),
+                                                                 datasets[i].attrs,          # exp params
+                                                                 interferometry_folder,
+                                                                 steady_state_ramps[i],
+                                                                 core_radius=core_radius)
+        datasets[i] = datasets[i].assign({"n_e_cal": calibrated_electron_density})
+        """
+        except (IndexError, ValueError, TypeError, AttributeError, KeyError) as e:
+            print(f"Error in calibrating electron density: \n{str(e)}")
             calibrated_electron_density = datasets[i]['n_e'].copy()
+        """
 
         datasets[i] = datasets[i].assign_attrs({"Interferometry calibrated": True})
 
