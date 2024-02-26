@@ -131,6 +131,23 @@ def get_pressure(lang_ds, calibrated_electron_density):
     return pressure.assign_attrs({'units': str(pressure_unit)})
 
 
+def get_electron_ion_collision_frequency(lang_ds, ion_type="H+"):  # TODO CHECK THIS FOR SURE!
+    # TODO all very hardcoded
+    T_e = (lang_ds['T_e_avg'] if 'T_e_avg' in lang_ds else lang_ds['T_e']).data * u.eV  # noqa
+    n_e = lang_ds['n_e_cal'] if not np.isnan(lang_ds['n_e_cal']).all() else lang_ds['n_e'].data * u.m ** -3
+    coulomb_logarithm = Coulomb_logarithm(T_e, n_e, ('e-', ion_type))
+    electron_ion_collisions = MaxwellianCollisionFrequencies(
+        "e-",
+        ion_type,
+        v_drift=0 * u.m / u.s,
+        n_a=n_e,
+        T_a=T_e,
+        n_b=lang_ds['n_i_OML'].data * u.mm ** -3,  # check this too
+        T_b=0 * u.eV,
+        Coulomb_log=coulomb_logarithm * u.dimensionless_unscaled)
+    return electron_ion_collisions.Maxwellian_avg_ei_collision_freq
+
+
 def detect_steady_state_ramps(density: xr.DataArray, core_rad):
     r"""Return start and end ramp indices for the steady-state period (density constant in time)"""
     # TODO hardcoded

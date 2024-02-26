@@ -81,6 +81,16 @@ if __name__ == "__main__":
             multiplot_line_diagnostic(datasets, plot_diagnostic, isweep_choice, steady_state_plateaus_runs,
                                       tolerance=plot_tolerance)
 
+    # TODO Shot plot! Multiplot line diagnostics at specific time, with x axis = x pos and curve color = shot #
+    """if ask_yes_or_no("Generate line shot plot of selected diagnostics over radial position? (y/n) "):
+        for plot_diagnostic in diagnostic_to_plot_list:
+            multiplot_line_diagnostic(datasets, plot_diagnostic, isweep_choice, steady_state_plateaus_runs,
+                                      tolerance=plot_tolerance)
+    """
+
+    for lang_ds in datasets:
+        print(lang_ds.attrs['nu_ei'])
+
 # TODO Not all MATLAB code has been transferred (e.g. neutrals, ExB)
 # QUESTION: can we calibrate both Langmuir probes using an interferometry ratio depending only on one of them?
 # TODO calculate collision freq/collisionality

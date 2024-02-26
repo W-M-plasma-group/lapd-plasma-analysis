@@ -5,7 +5,8 @@ from experimental import get_exp_params
 from getIVsweep import get_isweep_vsweep
 from characterization import characterize_sweep_array
 from preview import preview_raw_sweep, preview_characteristics
-from diagnostics import langmuir_diagnostics, get_pressure, detect_steady_state_ramps
+from diagnostics import (langmuir_diagnostics, detect_steady_state_ramps, get_pressure,
+                         get_electron_ion_collision_frequency)
 from interferometry import interferometry_calibration
 from plots import get_title
 
@@ -25,6 +26,12 @@ def setup_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder, iswee
     # If new diagnostics were generated from HDF5 files, calibrate electron densities using interferometry data
     if generate_new:
         datasets = interferometry_calibrate_datasets(datasets, interferometry_folder, steady_state_plateaus_runs)
+
+    # NEW: calculate collision frequency
+    for i in range(len(datasets)):
+        datasets[i] = datasets[i].assign_attrs({'nu_ei': get_electron_ion_collision_frequency(
+            datasets[i][{"isweep": 0, "x": 27, "y": 0, "shot": 0, "time": 16}], ion_type="H+")})  # TODO very hardcoded!
+        # TODO make assign() because it will be a dataset!
 
     # Save diagnostics datasets to folder
     save_datasets(datasets, netcdf_folder, bimaxwellian)
