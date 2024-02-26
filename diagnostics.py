@@ -5,6 +5,9 @@ import warnings
 from tqdm import tqdm
 from bapsflib.lapd.tools import portnum_to_z
 
+from plasmapy.formulary.collisions import Coulomb_logarithm
+from plasmapy.formulary.collisions.frequencies import MaxwellianCollisionFrequencies
+
 from helper import *
 
 
@@ -51,7 +54,7 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, ports, pr
                                                                     'port': ('isweep', ports),
                                                                     'z': ('isweep', ports_z, {"units": str(u.cm)})}
                                                                    ).assign_attrs({"units": keys_units[key]})
-                                 for key in keys_units.keys()})
+                                 for key in keys_units.keys()}).assign_attrs({"Interferometry calibrated": False})
 
     num_characteristics = (diagnostics_ds.sizes['isweep'] * diagnostics_ds.sizes['x'] * diagnostics_ds.sizes['y']
                            * diagnostics_ds.sizes['shot'] * diagnostics_ds.sizes['time'])

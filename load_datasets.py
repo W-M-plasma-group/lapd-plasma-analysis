@@ -14,8 +14,9 @@ from plots import get_title
 def setup_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder, isweep_choice, bimaxwellian):
     netcdf_folder = ensure_directory(langmuir_nc_folder)  # Create folder to save NetCDF files if not yet existing
 
-    datasets, generate_new = load_datasets(hdf5_folder, netcdf_folder, interferometry_folder, isweep_choice,
-                                           bimaxwellian)
+    # Ask user to choose either NetCDF files or HDF5 files, then create datasets from them
+    datasets, generate_new_itfm = load_datasets(hdf5_folder, netcdf_folder, interferometry_folder, isweep_choice,
+                                                bimaxwellian)
 
     # Get ramp indices for beginning and end of steady state period in plasma; TODO hardcoded
     if "january" in hdf5_folder.lower():
@@ -23,8 +24,8 @@ def setup_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder, iswee
     else:
         steady_state_plateaus_runs = [detect_steady_state_ramps(dataset['n_e'], core_radius) for dataset in datasets]
 
-    # If new diagnostics were generated from HDF5 files, calibrate electron densities using interferometry data
-    if generate_new:
+    # Only calibrate electron densities using interferometry data if new diagnostics were generated from HDF5 files
+    if generate_new_itfm:
         datasets = interferometry_calibrate_datasets(datasets, interferometry_folder, steady_state_plateaus_runs)
 
     # NEW: calculate collision frequency
