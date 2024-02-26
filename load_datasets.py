@@ -28,6 +28,10 @@ def setup_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder, iswee
     if generate_new_itfm:
         datasets = interferometry_calibrate_datasets(datasets, interferometry_folder, steady_state_plateaus_runs)
 
+    # Calculate pressure from calibrated electron density and electron temperature
+    for i in range(len(datasets)):
+        datasets[i] = datasets[i].assign({"P_e": get_pressure(datasets[i])})
+
     # NEW: calculate collision frequency
     for i in range(len(datasets)):
         datasets[i] = datasets[i].assign_attrs({'nu_ei': get_electron_ion_collision_frequency(
@@ -134,8 +138,7 @@ def interferometry_calibrate_datasets(datasets, interferometry_folder, steady_st
         else:
             calibrated_electron_density = datasets[i]['n_e'].copy()
 
-        datasets[i] = datasets[i].assign({'P_e': get_pressure(datasets[i], calibrated_electron_density)})
-        datasets[i] = datasets[i].assign_attrs({"Interferometry calibrated": bool(interferometry_folder)})
+        datasets[i] = datasets[i].assign_attrs({"Interferometry calibrated": True})
 
     return datasets
 
