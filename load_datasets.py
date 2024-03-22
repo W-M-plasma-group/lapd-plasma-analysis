@@ -48,7 +48,7 @@ def setup_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder, iswee
             {"units": str(electron_ion_collision_frequencies.unit)})
         datasets[i] = datasets[i].assign({'nu_ei': electron_ion_collision_frequencies_da})
 
-    # Save diagnostics datasets to folder
+    # Final save diagnostics datasets to folder (after earlier save point in load_datasets function)
     save_datasets(datasets, netcdf_folder, bimaxwellian)
 
     # Get possible diagnostics and their full names, e.g. "n_e" and "Electron density"
@@ -134,9 +134,13 @@ def load_datasets(hdf5_folder, lang_nc_folder, interferometry_folder, isweep_cho
             del characteristics, positions
 
             diagnostics_dataset = diagnostics_dataset.assign_attrs(exp_params_dict)
+
+            # Intermediate save point in case diagnostics are interrupted later
+            save_datasets([diagnostics_dataset], lang_nc_folder, bimaxwellian)
             datasets.append(diagnostics_dataset)
 
-    return datasets, len(nc_paths_to_open_ints) == 0
+    calibrate_new_interferometry = len(nc_paths_to_open_ints) == 0 and interferometry_folder
+    return datasets, calibrate_new_interferometry
 
 
 def interferometry_calibrate_datasets(datasets, interferometry_folder, steady_state_ramps):
@@ -146,6 +150,7 @@ def interferometry_calibrate_datasets(datasets, interferometry_folder, steady_st
                                                                  datasets[i].attrs,          # exp params
                                                                  interferometry_folder,
                                                                  steady_state_ramps[i],
+                                                                 # datasets[i].attrs['Steady state plateau indices']
                                                                  core_radius=core_radius)
         datasets[i] = datasets[i].assign({"n_e_cal": calibrated_electron_density})
         """
