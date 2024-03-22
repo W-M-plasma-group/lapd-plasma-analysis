@@ -20,12 +20,16 @@ def setup_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder, iswee
                                                 bimaxwellian)
 
     # Get ramp indices for beginning and end of steady state period in plasma; TODO hardcoded
-    if "january" in hdf5_folder.lower():
-        steady_state_plateaus_runs = [(16, 24) for dataset in datasets]
-    else:
-        steady_state_plateaus_runs = [detect_steady_state_ramps(dataset['n_e'], core_radius) for dataset in datasets]
+    """
+    for dataset in datasets:
+        steady_state_plateau_indices = (16, 24) if "january" in hdf5_folder.lower(
+            ) else detect_steady_state_ramps(dataset['n_e'], core_radius)
+        dataset = dataset.assign_attrs({"Steady state plateaus indices": steady_state_plateau_indices})
+    """
 
-    # Only calibrate electron densities using interferometry data if new diagnostics were generated from HDF5 files
+    steady_state_plateaus_runs = [detect_steady_state_ramps(dataset, core_radius) for dataset in datasets]
+
+    # Calibrate electron densities using interferometry data only if diagnostics were newly generated from HDF5 files
     if generate_new_itfm:
         datasets = interferometry_calibrate_datasets(datasets, interferometry_folder, steady_state_plateaus_runs)
 

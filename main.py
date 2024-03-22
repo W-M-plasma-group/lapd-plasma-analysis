@@ -53,7 +53,7 @@ c) downstream cathode
 if __name__ == "__main__":
 
     # TODO list of hardcoded parameters
-    #    (16, 24) for January_2024 steady state period (main.py)
+    #    (16, 24) for January_2024 steady state period (detect_steady_state_period in diagnostics.py)
 
     datasets, steady_state_plateaus_runs, diagnostic_name_dict, diagnostics_to_plot_list = setup_datasets(
         langmuir_nc_folder, hdf5_folder, interferometry_folder, isweep_choice, bimaxwellian)

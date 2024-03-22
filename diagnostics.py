@@ -147,16 +147,21 @@ def get_electron_ion_collision_frequencies(lang_ds: xr.Dataset, ion_type="He-4+"
     return electron_ion_collision_frequencies
 
 
-def detect_steady_state_ramps(density: xr.DataArray, core_rad):
-    r"""Return start and end ramp indices for the steady-state period (density constant in time)"""
-    # TODO hardcoded
-    core_density = density.where(np.logical_and(*in_core([density.x, density.y], core_rad)), drop=True)
-    core_density_time = core_density.isel(isweep=0).mean(['x', 'y', 'shot']).squeeze()
-    threshold = 0.9 * core_density_time.max()
-    start_index = (core_density_time > threshold).argmax().item() + 1
-    end_index = core_density_time.sizes['time'] - np.nanargmax(
-            core_density_time.reindex(time=core_density_time.time[::-1]) > threshold).item()
-    return start_index, end_index
+def detect_steady_state_ramps(langmuir_dataset: xr.Dataset, core_rad):
+    r"""Return start and end ramp indices for the steady-state period (where density is ~constant in time)"""
+    # TODO very hardcoded!
+    exp_name = langmuir_dataset.attrs['Exp name']
+    if "january" in exp_name.lower():
+        return 16, 24
+    else:
+        density = langmuir_dataset['n_e']
+        core_density = density.where(np.logical_and(*in_core([density.x, density.y], core_rad)), drop=True)
+        core_density_time = core_density.isel(isweep=0).mean(['x', 'y', 'shot']).squeeze()
+        threshold = 0.9 * core_density_time.max()
+        start_index = (core_density_time > threshold).argmax().item() + 1
+        end_index = core_density_time.sizes['time'] - np.nanargmax(
+                core_density_time.reindex(time=core_density_time.time[::-1]) > threshold).item()
+        return start_index, end_index
 
 
 def diagnose_char(characteristic, probe_area, ion_type, bimaxwellian, indices=None):
