@@ -5,7 +5,7 @@ Comments are added inline. A separate documentation page is not yet complete.
 """
 
 from helper import *
-from file_access import choose_multiple_list, ask_yes_or_no
+from file_access import ask_yes_or_no
 from load_datasets import setup_datasets
 from plots import multiplot_line_diagnostic, plot_line_diagnostic
 
@@ -33,7 +33,6 @@ bimaxwellian = False                                        # TODO perform both 
 plot_tolerance = np.nan   # was 2                           # Optimal values are np.nan (plot all points) or >= 0.5
 core_radius = 26. * u.cm                                    # From MATLAB code
 
-
 # Diagram of LAPD
 """
        <- ~18m plasma length -> 
@@ -51,28 +50,18 @@ b) downstream mesh anode
 c) downstream cathode
 """
 
-
 if __name__ == "__main__":
 
     # TODO list of hardcoded parameters
     #    (16, 24) for January_2024 steady state period (main.py)
 
-    datasets, steady_state_plateaus_runs, diagnostic_name_dict = setup_datasets(
+    datasets, steady_state_plateaus_runs, diagnostic_name_dict, diagnostics_to_plot_list = setup_datasets(
         langmuir_nc_folder, hdf5_folder, interferometry_folder, isweep_choice, bimaxwellian)
-
-    # Ask users for list of diagnostics to plot
-    print("The following diagnostics are available to plot: ")
-    diagnostics_sort_indices = np.argsort(list(diagnostic_name_dict.keys()))
-    diagnostics_to_plot_ints = choose_multiple_list(np.array(list(diagnostic_name_dict.values())
-                                                             )[diagnostics_sort_indices],
-                                                    "diagnostic", null_action="end")
-    diagnostic_to_plot_list = [np.array(list(diagnostic_name_dict.keys()))[diagnostics_sort_indices][choice]
-                               for choice in diagnostics_to_plot_ints]
-    print("Diagnostics selected:", diagnostic_to_plot_list)
+    print("Diagnostics selected:", diagnostics_to_plot_list)
 
     # Plot chosen diagnostics for each individual dataset
     if ask_yes_or_no("Generate contour plot of selected diagnostics over time and radial position? (y/n) "):
-        for plot_diagnostic in diagnostic_to_plot_list:
+        for plot_diagnostic in diagnostics_to_plot_list:
             for i in range(len(datasets)):
                 plot_line_diagnostic(isweep_selector(datasets[i], isweep_choice), plot_diagnostic, 'contour',
                                      steady_state_plateaus_runs[i], tolerance=plot_tolerance)
@@ -80,9 +69,9 @@ if __name__ == "__main__":
     # Plot radial profiles of diagnostic (steady-state time average), with color corresponding to first attribute
     #    and plot position on multiplot corresponding to second attribute
     if ask_yes_or_no("Generate line plot of selected diagnostics over radial position? (y/n) "):
-        for plot_diagnostic in diagnostic_to_plot_list:
+        for plot_diagnostic in diagnostics_to_plot_list:
             multiplot_line_diagnostic(datasets, plot_diagnostic, isweep_choice, steady_state_plateaus_runs,
-                                      tolerance=plot_tolerance)
+                                      core_rad=core_radius, tolerance=plot_tolerance)
 
     # TODO Shot plot! Multiplot line diagnostics at specific time, with x axis = x pos and curve color = shot #
     """if ask_yes_or_no("Generate line shot plot of selected diagnostics over radial position? (y/n) "):
