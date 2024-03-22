@@ -230,11 +230,3 @@ def get_title(diagnostic: str) -> str:
         diagnostic = diagnostic.replace(key, full_names[key])
 
     return diagnostic
-
-
-# TODO remove?
-def steady_state_only(diagnostics_dataset, steady_state_plateaus: tuple):
-
-    # return diagnostics_dataset[{'time': slice(*steady_state_plateaus)}]
-    return diagnostics_dataset.where(np.logical_and(diagnostics_dataset.plateau >= steady_state_plateaus[0],
-                                                    diagnostics_dataset.plateau <= steady_state_plateaus[1]), drop=True)

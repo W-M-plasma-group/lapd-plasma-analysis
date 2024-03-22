@@ -121,10 +121,6 @@ def filter_characteristic(characteristic) -> bool:
     return True
 
 
-def in_core(pos_list, core_rad):
-    return [np.abs(pos) < core_rad.to(u.cm).value for pos in pos_list]
-
-
 def get_pressure(lang_ds):
     r"""Calculate electron pressure from temperature and calibrated density"""
     pressure_unit = u.Pa

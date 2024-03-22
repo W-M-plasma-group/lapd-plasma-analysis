@@ -1,8 +1,8 @@
 import numpy as np
+import xarray as xr
 import matplotlib.pyplot as plt
 import astropy.units as u
 from plasmapy.diagnostics.langmuir import swept_probe_analysis, reduce_bimaxwellian_temperature, Characteristic
-
 
 plt.rcParams["figure.dpi"] = 160
 core_radius = 26. * u.cm
@@ -81,3 +81,31 @@ def isweep_selector(ds, vectors):  # TODO should separate diagnostics_main and p
 
 def array_lookup(array, value):
     return np.argmin(np.abs(array - value))
+
+
+def in_core(pos_list, core_rad):
+    return [np.abs(pos) < core_rad.to(u.cm).value for pos in pos_list]
+
+
+def steady_state_only(diagnostics_dataset, steady_state_plateaus: tuple):
+
+    # return diagnostics_dataset[{'time': slice(*steady_state_plateaus)}]
+    return diagnostics_dataset.where(np.logical_and(diagnostics_dataset.plateau >= steady_state_plateaus[0],
+                                                    diagnostics_dataset.plateau <= steady_state_plateaus[1]), drop=True)
+
+
+def core_steady_state_mean(da: xr.DataArray, core_rad=None, steady_state_plateaus=None, dims_to_keep=()) -> xr.DataArray:
+    r"""
+        # TODO use
+    :param da: xarray DataArray with x and y dimensions
+    :param core_rad: astropy Quantity convertible to centimeters giving radius of core
+    :param steady_state_plateaus: tuple or list giving indices of start and end of steady-state period
+    :param dims_to_keep: optional list of dimensions not to calculate mean across
+    :return: DataArray with dimensions dims_to_keep
+    """
+    da_mean = da.copy()
+    if core_rad is not None:
+        da_mean = da_mean.where(np.logical_and(*in_core([da_mean.x, da_mean.y], core_rad)), drop=True)
+    if steady_state_plateaus is not None:
+        da_mean = steady_state_only(da_mean, steady_state_plateaus=steady_state_plateaus)
+    return da_mean.mean(dim=[dim for dim in da_mean.dims if dim not in dims_to_keep])
