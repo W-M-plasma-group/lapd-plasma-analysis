@@ -73,7 +73,38 @@ if __name__ == "__main__":
             multiplot_line_diagnostic(datasets, plot_diagnostic, isweep_choice, steady_state_plateaus_runs,
                                       core_rad=core_radius, tolerance=plot_tolerance)
 
-    # TODO Shot plot! Multiplot line diagnostics at specific time, with x axis = x pos and curve color = shot #
+    if ask_yes_or_no("Generate parallel pressure plot? (y/n) "):
+        from diagnostics import in_core
+        from plots import steady_state_only
+        import matplotlib
+        color_map = matplotlib.colormaps["plasma"](np.linspace(0, 0.9, len(datasets)))
+        for i in range(len(datasets)):
+            isweep_choices = (0, 2) if datasets[i].attrs['Exp name'] == "January_2024" else (0, 1)
+            pressures = []
+            ports = []
+            pressure = datasets[i]['P_e']
+            pressure_core = pressure.where(np.logical_and(*in_core([pressure.x, pressure.y], core_radius)), drop=True)
+            pressure_core_steady_state = steady_state_only(pressure,
+                                                           steady_state_plateaus=steady_state_plateaus_runs[i])
+            # """
+            collision_freq = datasets[i]['nu_ei']
+            collision_freq_core = collision_freq.where(np.logical_and(*in_core([pressure.x, pressure.y], core_radius)), drop=True)
+            collision_freq_core_steady_state = steady_state_only(collision_freq_core,
+                                                           steady_state_plateaus=steady_state_plateaus_runs[i])
+            # """
+            for j in range(len(isweep_choices)):
+                isweep_choice = isweep_choices[j]
+                pressures += [pressure_core_steady_state[{"isweep": isweep_choice}].mean().item()]   # median??
+                ports += [-pressure_core_steady_state[{"isweep": isweep_choice}].coords['z'].item()]
+            collision_freq_mean = collision_freq_core_steady_state[{"isweep": 0}].mean().item()
+            plt.plot(ports, pressures, marker="o", label=f"{datasets[i].attrs['Run name']}"
+                                                         f"\n{collision_freq_mean:.0f} Hz",
+                     color=color_map[i])
+        plt.title("Pressure versus port (z-position)")
+        plt.legend()
+        plt.show()
+
+    # (UNFINISHED) Shot plot: multiplot line diagnostics at specific time, with x-axis = x pos and curve color = shot #
     """if ask_yes_or_no("Generate line shot plot of selected diagnostics over radial position? (y/n) "):
         for plot_diagnostic in diagnostic_to_plot_list:
             multiplot_line_diagnostic(datasets, plot_diagnostic, isweep_choice, steady_state_plateaus_runs,
