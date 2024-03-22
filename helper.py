@@ -68,10 +68,10 @@ def isweep_selector(ds, vectors):  # TODO should separate diagnostics_main and p
 
     manual_attrs = ds.attrs  # TODO raise xarray issue about losing attrs even with xr.set_options(keep_attrs=True):
     manual_sub_attrs = {key: ds[key].attrs for key in ds}
-    ds_isweep_selected = 0 * ds.isel(isweep=0)
     vectors = np.atleast_2d(vectors)
     ds_s = []
     for vector in vectors:
+        ds_isweep_selected = 0 * ds.isel(isweep=0).copy()
         for i in range(ds.sizes['isweep']):
             ds_isweep_selected += vector[i] * ds.isel(isweep=i)
         for key in ds:
