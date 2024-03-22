@@ -28,7 +28,7 @@ def setup_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder, iswee
     if generate_new_itfm:
         datasets = interferometry_calibrate_datasets(datasets, interferometry_folder, steady_state_plateaus_runs)
 
-    # Calculate pressure from calibrated electron density and electron temperature
+    # Calculate pressure
     for i in range(len(datasets)):
         datasets[i] = datasets[i].assign({"P_e": get_pressure(datasets[i])})
 

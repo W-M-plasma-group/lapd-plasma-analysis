@@ -11,11 +11,12 @@ from plots import multiplot_line_diagnostic, plot_line_diagnostic
 
 """ End directory paths with a slash """
 # hdf5_folder = "/Users/leomurphy/lapd-data/April_2018/"
-# hdf5_folder = "/Users/leomurphy/lapd-data/March_2022/"
+hdf5_folder = "/Users/leomurphy/lapd-data/March_2022/"
 # hdf5_folder = "/Users/leomurphy/lapd-data/November_2022/"
-hdf5_folder = "/Users/leomurphy/lapd-data/January_2024/"
+# hdf5_folder = "/Users/leomurphy/lapd-data/January_2024/January_2024_all_working/"
+# hdf5_folder = "/Users/leomurphy/lapd-data/all_lang_nc/"
 
-langmuir_nc_folder = hdf5_folder + "lang_nc/"
+langmuir_nc_folder = hdf5_folder + ("lang_nc/" if hdf5_folder.endswith("/") else "/lang_nc/")
 
 """ Set to False or equivalent if interferometry calibration is not desired """
 interferometry_folder = False                               # TODO set to False to avoid interferometry calibration
@@ -23,8 +24,10 @@ interferometry_folder = False                               # TODO set to False 
 # interferometry_folder = "/Users/leomurphy/lapd-data/November_2022/uwave_288_GHz_waveforms/"
 
 """ User parameters """
-isweep_choice = [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]                # TODO user choice for probe or linear combination to use;
-# isweep_choice = [1, 0]                                      # see isweep_selector in helper.py for brief explanation
+# TODO isweep_choice is user choice for probe or linear combination to use; see isweep_selector in helper.py for more
+# isweep_choice = [[1, 0, 0, 0], [0, 0, 1, 0]]
+# isweep_choice = [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]
+isweep_choice = [[1, 0], [0, 1]]
 # isweep_choice = [0]
 bimaxwellian = False                                        # TODO perform both and store in same NetCDF file?
 plot_tolerance = np.nan   # was 2                           # Optimal values are np.nan (plot all points) or >= 0.5

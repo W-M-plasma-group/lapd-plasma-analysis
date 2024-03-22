@@ -1,6 +1,5 @@
 from warnings import warn
 
-import xarray as xr
 import matplotlib
 from astropy import visualization
 
@@ -13,8 +12,19 @@ linestyles = ["solid", "dotted", "dashed", "dashdot"]
 
 
 def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagnostic, isweep_choices,
-                              steady_state_by_runs, attribute=None, tolerance=np.nan):
-    # diagnostics_datasets is a list of different HDF5 datasets
+                              steady_state_by_runs, core_rad=None, attribute=None, tolerance=np.nan):
+    r"""
+
+    :param diagnostics_datasets: list of xarray Datasets
+    :param plot_diagnostic: string identifying label of desired diagnostics
+    :param isweep_choices:
+    :param steady_state_by_runs:
+    :param core_rad:
+    :param attribute:
+    :param tolerance:
+    :return:
+    """
+    # TODO generalize steady_state_by_runs, add curve_dimension to control what different colors represent
 
     if attribute is None:
         attribute = [attr for attr in diagnostics_datasets[0].attrs if "Nominal" in attr]
@@ -89,9 +99,9 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
                                                                 dims_to_keep=["isweep"]).max().item()])]
         ax.set_ylim(0, np.max(y_limits))
         ax.tick_params(axis="y", left=True, labelleft=True)
-        ax.title.set_text(((str(attribute[1]) + ": " + str(outer_val)) if len(attribute) == 2 else '')
-                          + f"\nColor: {attribute[0]}"
-                          + f"\nIsweep linear combo. styles: {linestyles}")
+        ax.title.set_text(((str(attributes[1]) + ": " + str(outer_val)) if len(attributes) == 2 else '')
+                          + f"\nColor: {attributes[0]}"
+                          + f"\nIsweep styles: {linestyles}")
         ax.legend()
     plt.tight_layout()
     plt.show()
