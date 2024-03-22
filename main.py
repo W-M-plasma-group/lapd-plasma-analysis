@@ -9,6 +9,8 @@ from file_access import ask_yes_or_no
 from load_datasets import setup_datasets
 from plots import multiplot_line_diagnostic, plot_line_diagnostic
 
+import matplotlib
+
 """ End directory paths with a slash """
 # hdf5_folder = "/Users/leomurphy/lapd-data/April_2018/"
 hdf5_folder = "/Users/leomurphy/lapd-data/March_2022/"
@@ -76,32 +78,30 @@ if __name__ == "__main__":
     if ask_yes_or_no("Generate parallel pressure plot? (y/n) "):
         from diagnostics import in_core
         from plots import steady_state_only
-        import matplotlib
+
+        plt.rcParams['figure.figsize'] = (10, 4)
         color_map = matplotlib.colormaps["plasma"](np.linspace(0, 0.9, len(datasets)))
         for i in range(len(datasets)):
             isweep_choices = (0, 2) if datasets[i].attrs['Exp name'] == "January_2024" else (0, 1)
             pressures = []
             ports = []
-            pressure = datasets[i]['P_e']
-            pressure_core = pressure.where(np.logical_and(*in_core([pressure.x, pressure.y], core_radius)), drop=True)
-            pressure_core_steady_state = steady_state_only(pressure,
-                                                           steady_state_plateaus=steady_state_plateaus_runs[i])
-            # """
-            collision_freq = datasets[i]['nu_ei']
-            collision_freq_core = collision_freq.where(np.logical_and(*in_core([pressure.x, pressure.y], core_radius)), drop=True)
-            collision_freq_core_steady_state = steady_state_only(collision_freq_core,
-                                                           steady_state_plateaus=steady_state_plateaus_runs[i])
-            # """
+
+            pressure_means = core_steady_state_mean(datasets[i]['P_e'],         core_radius,
+                                                    steady_state_plateaus_runs[i],       dims_to_keep=("isweep",))
+            collision_freq_means = core_steady_state_mean(datasets[i]['nu_ei'], core_radius,
+                                                          steady_state_plateaus_runs[i], dims_to_keep=("isweep",))
+
             for j in range(len(isweep_choices)):
                 isweep_choice = isweep_choices[j]
-                pressures += [pressure_core_steady_state[{"isweep": isweep_choice}].mean().item()]   # median??
-                ports += [-pressure_core_steady_state[{"isweep": isweep_choice}].coords['z'].item()]
-            collision_freq_mean = collision_freq_core_steady_state[{"isweep": 0}].mean().item()
-            plt.plot(ports, pressures, marker="o", label=f"{datasets[i].attrs['Run name']}"
-                                                         f"\n{collision_freq_mean:.0f} Hz",
+                pressures += [pressure_means[{"isweep": isweep_choice}].item()]   # median??
+                ports += [-pressure_means[{"isweep": isweep_choice}].coords['z'].item()]
+            collision_freq_mean = collision_freq_means[{"isweep": 0}].mean().item()
+            plt.plot(ports, pressures, marker="o", label=f"{datasets[i].attrs['Run name']}:     "
+                                                         f"{collision_freq_mean:.2E} Hz",
                      color=color_map[i])
         plt.title("Pressure versus port (z-position)")
-        plt.legend()
+        plt.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left')
+        plt.tight_layout()
         plt.show()
 
     # (UNFINISHED) Shot plot: multiplot line diagnostics at specific time, with x-axis = x pos and curve color = shot #
