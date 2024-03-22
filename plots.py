@@ -50,6 +50,8 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
         num_datasets = outer_bounds[outer_index + 1] - outer_bounds[outer_index]
 
         color_map = matplotlib.colormaps["plasma"](np.linspace(0, 0.9, num_datasets))
+
+        y_limits = []
         for inner_index in range(num_datasets):
 
             ds_s = isweep_selector(datasets[inner_index], isweep_choices)
@@ -81,13 +83,11 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
                 ax.set_xlabel(linear_da_mean.coords[linear_dimension].attrs['units'])
                 ax.set_ylabel(linear_da_mean.attrs['units'])
 
-                if "eV" in linear_da_mean.attrs['units']:  # TODO very hardcoded
-                    pass
-                    ax.set_ylim((0, 32))
-                if "Pa" in linear_da_mean.attrs['units']:
-                    pass
-                    # ax.set_ylim((-1, 20))
-                # ax.set_ylim((-0.4e18, 8e18))
+                # TODO a bit hardcoded
+                y_limits += [np.min([1.1 * linear_da_steady_state.max().item(),
+                                     2 * core_steady_state_mean(linear_da_steady_state, core_rad=core_rad,
+                                                                dims_to_keep=["isweep"]).max().item()])]
+        ax.set_ylim(0, np.max(y_limits))
         ax.tick_params(axis="y", left=True, labelleft=True)
         ax.title.set_text(((str(attribute[1]) + ": " + str(outer_val)) if len(attribute) == 2 else '')
                           + f"\nColor: {attribute[0]}"
