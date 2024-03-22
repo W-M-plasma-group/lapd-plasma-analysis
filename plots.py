@@ -1,6 +1,5 @@
 from warnings import warn
 
-import xarray as xr
 import matplotlib
 from astropy import visualization
 
@@ -13,8 +12,19 @@ linestyles = ["solid", "dotted", "dashed", "dashdot"]
 
 
 def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagnostic, isweep_choices,
-                              steady_state_by_runs, attribute=None, tolerance=np.nan):
-    # diagnostics_datasets is a list of different HDF5 datasets
+                              steady_state_by_runs, core_rad=None, attribute=None, tolerance=np.nan):
+    r"""
+
+    :param diagnostics_datasets: list of xarray Datasets
+    :param plot_diagnostic: string identifying label of desired diagnostics
+    :param isweep_choices:
+    :param steady_state_by_runs:
+    :param core_rad:
+    :param attribute:
+    :param tolerance:
+    :return:
+    """
+    # TODO generalize steady_state_by_runs, add curve_dimension to control what different colors represent
 
     if attribute is None:
         attribute = [attr for attr in diagnostics_datasets[0].attrs if "Nominal" in attr]
@@ -50,6 +60,8 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
         num_datasets = outer_bounds[outer_index + 1] - outer_bounds[outer_index]
 
         color_map = matplotlib.colormaps["plasma"](np.linspace(0, 0.9, num_datasets))
+
+        y_limits = []
         for inner_index in range(num_datasets):
 
             ds_s = isweep_selector(datasets[inner_index], isweep_choices)
@@ -81,17 +93,15 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
                 ax.set_xlabel(linear_da_mean.coords[linear_dimension].attrs['units'])
                 ax.set_ylabel(linear_da_mean.attrs['units'])
 
-                if "eV" in linear_da_mean.attrs['units']:  # TODO very hardcoded
-                    pass
-                    ax.set_ylim((0, 32))
-                if "Pa" in linear_da_mean.attrs['units']:
-                    pass
-                    # ax.set_ylim((-1, 20))
-                # ax.set_ylim((-0.4e18, 8e18))
+                # TODO a bit hardcoded
+                y_limits += [np.min([1.1 * linear_da_steady_state.max().item(),
+                                     2 * core_steady_state_mean(linear_da_steady_state, core_rad=core_rad,
+                                                                dims_to_keep=["isweep"]).max().item()])]
+        ax.set_ylim(0, np.max(y_limits))
         ax.tick_params(axis="y", left=True, labelleft=True)
-        ax.title.set_text(((str(attribute[1]) + ": " + str(outer_val)) if len(attribute) == 2 else '')
-                          + f"\nColor: {attribute[0]}"
-                          + f"\nIsweep linear combo. styles: {linestyles}")
+        ax.title.set_text(((str(attributes[1]) + ": " + str(outer_val)) if len(attributes) == 2 else '')
+                          + f"\nColor: {attributes[0]}"
+                          + f"\nIsweep styles: {linestyles}")
         ax.legend()
     plt.tight_layout()
     plt.show()
@@ -224,17 +234,10 @@ def get_title(diagnostic: str) -> str:
                   'T_e_hot': "Hot electron temperature",
                   'T_e_avg': "Average bimaxwellian electron temperature",
                   'P_e': "Electron pressure",
-                  'n_e_cal': "Calibrated electron density"}
+                  'n_e_cal': "Calibrated electron density",
+                  'nu_ei': "Electron-ion collision frequency"}
 
     for key in sorted(list(full_names.keys()), key=len, reverse=True):
         diagnostic = diagnostic.replace(key, full_names[key])
 
     return diagnostic
-
-
-# TODO remove?
-def steady_state_only(diagnostics_dataset, steady_state_plateaus: tuple):
-
-    # return diagnostics_dataset[{'time': slice(*steady_state_plateaus)}]
-    return diagnostics_dataset.where(np.logical_and(diagnostics_dataset.plateau >= steady_state_plateaus[0],
-                                                    diagnostics_dataset.plateau <= steady_state_plateaus[1]), drop=True)

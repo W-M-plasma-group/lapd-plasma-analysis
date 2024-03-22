@@ -61,6 +61,8 @@ def interferometry_calibration(density_da: xr.DataArray,
         density_scale_factor = itfm_calib_288ghz(core_density, itfm_density_da, spatial_dims, core_radius)
 
     elif itfm_id == 3:  # January 2024
+        # TODO complete
+        raise ValueError
         itfm_file = lapd.File(itfm_file_search_hdf5(run_str, itfm_folder))
         itfm_raw = np.array(itfm_file.read_msi("Interferometer array")['signal'][:, 0, :])
         density_scale_factor = itfm_calib_56ghz(core_density, itfm_raw, spatial_dims).expand_dims("port")

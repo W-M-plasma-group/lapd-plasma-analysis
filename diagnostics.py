@@ -5,6 +5,9 @@ import warnings
 from tqdm import tqdm
 from bapsflib.lapd.tools import portnum_to_z
 
+from plasmapy.formulary.collisions import Coulomb_logarithm
+from plasmapy.formulary.collisions.frequencies import MaxwellianCollisionFrequencies
+
 from helper import *
 
 
@@ -51,7 +54,7 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, ports, pr
                                                                     'port': ('isweep', ports),
                                                                     'z': ('isweep', ports_z, {"units": str(u.cm)})}
                                                                    ).assign_attrs({"units": keys_units[key]})
-                                 for key in keys_units.keys()})
+                                 for key in keys_units.keys()}).assign_attrs({"Interferometry calibrated": False})
 
     num_characteristics = (diagnostics_ds.sizes['isweep'] * diagnostics_ds.sizes['x'] * diagnostics_ds.sizes['y']
                            * diagnostics_ds.sizes['shot'] * diagnostics_ds.sizes['time'])
@@ -118,29 +121,47 @@ def filter_characteristic(characteristic) -> bool:
     return True
 
 
-def in_core(pos_list, core_rad):
-    return [np.abs(pos) < core_rad.to(u.cm).value for pos in pos_list]
-
-
-def get_pressure(lang_ds, calibrated_electron_density):
+def get_pressure(lang_ds):
     r"""Calculate electron pressure from temperature and calibrated density"""
     pressure_unit = u.Pa
-    bimaxwellian = ('T_e_avg' in lang_ds)  # TODO check this behavior
-    electron_temperature = lang_ds['T_e_avg'] if bimaxwellian else lang_ds['T_e']  # TODO check with advisor: avg/cold?
+    calibrated_electron_density = lang_ds['n_e'] if np.isnan(lang_ds['n_e_cal']).all() else lang_ds['n_e_cal']
+    electron_temperature = lang_ds['T_e_avg'] if 'T_e_avg' in lang_ds else lang_ds['T_e']  # TODO check w Dr.: avg/cold?
     pressure = (3 / 2) * electron_temperature * calibrated_electron_density * (1. * u.eV * u.m ** -3).to(pressure_unit)
     return pressure.assign_attrs({'units': str(pressure_unit)})
 
 
-def detect_steady_state_ramps(density: xr.DataArray, core_rad):
-    r"""Return start and end ramp indices for the steady-state period (density constant in time)"""
-    # TODO hardcoded
-    core_density = density.where(np.logical_and(*in_core([density.x, density.y], core_rad)), drop=True)
-    core_density_time = core_density.isel(isweep=0).mean(['x', 'y', 'shot']).squeeze()
-    threshold = 0.9 * core_density_time.max()
-    start_index = (core_density_time > threshold).argmax().item() + 1
-    end_index = core_density_time.sizes['time'] - np.nanargmax(
-            core_density_time.reindex(time=core_density_time.time[::-1]) > threshold).item()
-    return start_index, end_index
+def get_electron_ion_collision_frequencies(lang_ds: xr.Dataset, ion_type="He-4+"):
+    T_e = (lang_ds['T_e_avg'] if 'T_e_avg' in lang_ds else lang_ds['T_e']).data * u.eV  # noqa
+    n_e = (lang_ds['n_e_cal'] if not np.isnan(lang_ds['n_e_cal']).all() else lang_ds['n_e']).data * u.m ** -3
+    coulomb_logarithm = Coulomb_logarithm(T_e, n_e, ('e-', ion_type), z_mean=0.5, method="hls_full_interp")
+    electron_ion_collision_frequencies = MaxwellianCollisionFrequencies(
+        "e-",
+        ion_type,
+        v_drift=lang_ds['n_i_OML'].data * 0 * u.m / u.s,
+        n_a=n_e,
+        T_a=T_e,
+        n_b=lang_ds['n_i_OML'].data * u.m ** -3,  # check this too
+        T_b=0 * u.eV,
+        Coulomb_log=coulomb_logarithm * u.dimensionless_unscaled
+    ).Maxwellian_avg_ei_collision_freq
+    return electron_ion_collision_frequencies
+
+
+def detect_steady_state_ramps(langmuir_dataset: xr.Dataset, core_rad):
+    r"""Return start and end ramp indices for the steady-state period (where density is ~constant in time)"""
+    # TODO very hardcoded!
+    exp_name = langmuir_dataset.attrs['Exp name']
+    if "january" in exp_name.lower():
+        return 16, 24
+    else:
+        density = langmuir_dataset['n_e']
+        core_density = density.where(np.logical_and(*in_core([density.x, density.y], core_rad)), drop=True)
+        core_density_time = core_density.isel(isweep=0).mean(['x', 'y', 'shot']).squeeze()
+        threshold = 0.9 * core_density_time.max()
+        start_index = (core_density_time > threshold).argmax().item() + 1
+        end_index = core_density_time.sizes['time'] - np.nanargmax(
+                core_density_time.reindex(time=core_density_time.time[::-1]) > threshold).item()
+        return start_index, end_index
 
 
 def diagnose_char(characteristic, probe_area, ion_type, bimaxwellian, indices=None):

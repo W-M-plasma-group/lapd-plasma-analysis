@@ -5,34 +5,64 @@ from experimental import get_exp_params
 from getIVsweep import get_isweep_vsweep
 from characterization import characterize_sweep_array
 from preview import preview_raw_sweep, preview_characteristics
-from diagnostics import langmuir_diagnostics, get_pressure, detect_steady_state_ramps
+from diagnostics import (langmuir_diagnostics, detect_steady_state_ramps, get_pressure,
+                         get_electron_ion_collision_frequencies)
 from interferometry import interferometry_calibration
 from plots import get_title
 
 
-def setup_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder, isweep_choice, bimaxwellian):
+def setup_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder, isweep_choice, bimaxwellian) -> (
+        list[xr.Dataset], list[tuple], dict, list[np.ndarray]):
     netcdf_folder = ensure_directory(langmuir_nc_folder)  # Create folder to save NetCDF files if not yet existing
 
-    datasets, generate_new = load_datasets(hdf5_folder, netcdf_folder, interferometry_folder, isweep_choice,
-                                           bimaxwellian)
+    # Ask user to choose either NetCDF files or HDF5 files, then create datasets from them
+    datasets, generate_new_itfm = load_datasets(hdf5_folder, netcdf_folder, interferometry_folder, isweep_choice,
+                                                bimaxwellian)
 
     # Get ramp indices for beginning and end of steady state period in plasma; TODO hardcoded
-    if "january" in hdf5_folder.lower():
-        steady_state_plateaus_runs = [(16, 24) for dataset in datasets]
-    else:
-        steady_state_plateaus_runs = [detect_steady_state_ramps(dataset['n_e'], core_radius) for dataset in datasets]
+    """
+    for dataset in datasets:
+        steady_state_plateau_indices = (16, 24) if "january" in hdf5_folder.lower(
+            ) else detect_steady_state_ramps(dataset['n_e'], core_radius)
+        dataset = dataset.assign_attrs({"Steady state plateaus indices": steady_state_plateau_indices})
+    """
 
-    # If new diagnostics were generated from HDF5 files, calibrate electron densities using interferometry data
-    if generate_new:
+    steady_state_plateaus_runs = [detect_steady_state_ramps(dataset, core_radius) for dataset in datasets]
+
+    # Calibrate electron densities using interferometry data only if diagnostics were newly generated from HDF5 files
+    if generate_new_itfm:
         datasets = interferometry_calibrate_datasets(datasets, interferometry_folder, steady_state_plateaus_runs)
 
-    # Save diagnostics datasets to folder
+    # Calculate pressure
+    for i in range(len(datasets)):
+        datasets[i] = datasets[i].assign({"P_e": get_pressure(datasets[i])})
+
+    # Calculate collision frequency
+    for i in range(len(datasets)):
+        electron_ion_collision_frequencies_da = datasets[i]['n_e'].copy().rename("nu_ei")   # DataArray
+        electron_ion_collision_frequencies = get_electron_ion_collision_frequencies(        # Quantity array
+            datasets[i],
+            ion_type=get_ion(datasets[i].attrs['Run name']))
+        electron_ion_collision_frequencies_da[...] = electron_ion_collision_frequencies
+        electron_ion_collision_frequencies_da = electron_ion_collision_frequencies_da.assign_attrs(
+            {"units": str(electron_ion_collision_frequencies.unit)})
+        datasets[i] = datasets[i].assign({'nu_ei': electron_ion_collision_frequencies_da})
+
+    # Final save diagnostics datasets to folder (after earlier save point in load_datasets function)
     save_datasets(datasets, netcdf_folder, bimaxwellian)
 
     # Get possible diagnostics and their full names, e.g. "n_e" and "Electron density"
     diagnostic_name_dict = {key: get_title(key) for key in set.intersection(*[set(dataset) for dataset in datasets])}
+    # Ask users for list of diagnostics to plot
+    print("The following diagnostics are available to plot: ")
+    diagnostics_sort_indices = np.argsort(list(diagnostic_name_dict.keys()))
+    diagnostics_to_plot_ints = choose_multiple_list(
+        np.array(list(diagnostic_name_dict.values()))[diagnostics_sort_indices],
+        "diagnostic", null_action="skip")
+    diagnostics_to_plot_list = [np.array(list(diagnostic_name_dict.keys()))[diagnostics_sort_indices][choice]
+                                for choice in diagnostics_to_plot_ints]
 
-    return datasets, steady_state_plateaus_runs, diagnostic_name_dict
+    return datasets, steady_state_plateaus_runs, diagnostic_name_dict, diagnostics_to_plot_list
 
 
 def load_datasets(hdf5_folder, lang_nc_folder, interferometry_folder, isweep_choice, bimaxwellian):
@@ -104,30 +134,32 @@ def load_datasets(hdf5_folder, lang_nc_folder, interferometry_folder, isweep_cho
             del characteristics, positions
 
             diagnostics_dataset = diagnostics_dataset.assign_attrs(exp_params_dict)
+
+            # Intermediate save point in case diagnostics are interrupted later
+            save_datasets([diagnostics_dataset], lang_nc_folder, bimaxwellian)
             datasets.append(diagnostics_dataset)
 
-    return datasets, len(nc_paths_to_open_ints) == 0
+    calibrate_new_interferometry = len(nc_paths_to_open_ints) == 0 and interferometry_folder
+    return datasets, calibrate_new_interferometry
 
 
 def interferometry_calibrate_datasets(datasets, interferometry_folder, steady_state_ramps):
 
     for i in range(len(datasets)):
-        if bool(interferometry_folder):
-            try:
-                calibrated_electron_density = interferometry_calibration(datasets[i]['n_e'].copy(),
-                                                                         datasets[i].attrs,          # exp params
-                                                                         interferometry_folder,
-                                                                         steady_state_ramps[i],
-                                                                         core_radius=core_radius)
-                datasets[i] = datasets[i].assign({"n_e_cal": calibrated_electron_density})
-            except (IndexError, ValueError, TypeError, AttributeError, KeyError) as e:
-                print(f"Error in calibrating electron density: \n{str(e)}")
-                calibrated_electron_density = datasets[i]['n_e'].copy()
-        else:
+        calibrated_electron_density = interferometry_calibration(datasets[i]['n_e'].copy(),
+                                                                 datasets[i].attrs,          # exp params
+                                                                 interferometry_folder,
+                                                                 steady_state_ramps[i],
+                                                                 # datasets[i].attrs['Steady state plateau indices']
+                                                                 core_radius=core_radius)
+        datasets[i] = datasets[i].assign({"n_e_cal": calibrated_electron_density})
+        """
+        except (IndexError, ValueError, TypeError, AttributeError, KeyError) as e:
+            print(f"Error in calibrating electron density: \n{str(e)}")
             calibrated_electron_density = datasets[i]['n_e'].copy()
+        """
 
-        datasets[i] = datasets[i].assign({'P_e': get_pressure(datasets[i], calibrated_electron_density)})
-        datasets[i] = datasets[i].assign_attrs({"Interferometry calibrated": bool(interferometry_folder)})
+        datasets[i] = datasets[i].assign_attrs({"Interferometry calibrated": True})
 
     return datasets
 
