@@ -234,7 +234,8 @@ def get_title(diagnostic: str) -> str:
                   'T_e_hot': "Hot electron temperature",
                   'T_e_avg': "Average bimaxwellian electron temperature",
                   'P_e': "Electron pressure",
-                  'n_e_cal': "Calibrated electron density"}
+                  'n_e_cal': "Calibrated electron density",
+                  'nu_ei': "Electron-ion collision frequency"}
 
     for key in sorted(list(full_names.keys()), key=len, reverse=True):
         diagnostic = diagnostic.replace(key, full_names[key])

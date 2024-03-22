@@ -46,8 +46,9 @@ def get_diagnostic_keys_units(probe_area=1.*u.mm**2, ion_type="He-4+", bimaxwell
     if bimaxwellian:
         diagnostics = unpack_bimaxwellian(diagnostics)
     keys_units = {key: str(unit_safe(value)) for key, value in diagnostics.items()}
-    keys_units.update({"n_e_cal": str(u.m ** -3)})
-    keys_units.update({"P_e": str(u.Pa)})
+    keys_units.update({"n_e_cal": str(u.m ** -3),
+                       "P_e": str(u.Pa),
+                       "nu_ei": str(u.Hz)})
     return keys_units
 
 

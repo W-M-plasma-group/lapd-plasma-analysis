@@ -80,9 +80,5 @@ if __name__ == "__main__":
                                       tolerance=plot_tolerance)
     """
 
-    for lang_ds in datasets:
-        print(lang_ds.attrs['nu_ei'])
-
 # TODO Not all MATLAB code has been transferred (e.g. neutrals, ExB)
 # QUESTION: can we calibrate both Langmuir probes using an interferometry ratio depending only on one of them?
-# TODO calculate collision freq/collisionality

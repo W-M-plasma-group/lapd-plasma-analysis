@@ -6,7 +6,7 @@ from getIVsweep import get_isweep_vsweep
 from characterization import characterize_sweep_array
 from preview import preview_raw_sweep, preview_characteristics
 from diagnostics import (langmuir_diagnostics, detect_steady_state_ramps, get_pressure,
-                         get_electron_ion_collision_frequency)
+                         get_electron_ion_collision_frequencies)
 from interferometry import interferometry_calibration
 from plots import get_title
 
@@ -33,11 +33,16 @@ def setup_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder, iswee
     for i in range(len(datasets)):
         datasets[i] = datasets[i].assign({"P_e": get_pressure(datasets[i])})
 
-    # NEW: calculate collision frequency
+    # Calculate collision frequency
     for i in range(len(datasets)):
-        datasets[i] = datasets[i].assign_attrs({'nu_ei': get_electron_ion_collision_frequency(
-            datasets[i][{"isweep": 0, "x": 27, "y": 0, "shot": 0, "time": 16}], ion_type="H+")})  # TODO very hardcoded!
-        # TODO make assign() because it will be a dataset!
+        electron_ion_collision_frequencies_da = datasets[i]['n_e'].copy().rename("nu_ei")   # DataArray
+        electron_ion_collision_frequencies = get_electron_ion_collision_frequencies(        # Quantity array
+            datasets[i],
+            ion_type=get_ion(datasets[i].attrs['Run name']))
+        electron_ion_collision_frequencies_da[...] = electron_ion_collision_frequencies
+        electron_ion_collision_frequencies_da = electron_ion_collision_frequencies_da.assign_attrs(
+            {"units": str(electron_ion_collision_frequencies.unit)})
+        datasets[i] = datasets[i].assign({'nu_ei': electron_ion_collision_frequencies_da})
 
     # Save diagnostics datasets to folder
     save_datasets(datasets, netcdf_folder, bimaxwellian)
