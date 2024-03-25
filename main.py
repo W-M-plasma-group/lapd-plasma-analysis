@@ -7,16 +7,15 @@ Comments are added inline. A separate documentation page is not yet complete.
 from helper import *
 from file_access import ask_yes_or_no
 from load_datasets import setup_datasets
-from plots import multiplot_line_diagnostic, plot_line_diagnostic, plot_parallel_diagnostic
-
-import matplotlib
+from plots import multiplot_line_diagnostic, plot_line_diagnostic
+from plots import plot_parallel_diagnostic, scatter_plot_diagnostics, plot_parallel_inverse_scale_length
 
 """ End directory paths with a slash """
 # hdf5_folder = "/Users/leomurphy/lapd-data/April_2018/"
 # hdf5_folder = "/Users/leomurphy/lapd-data/March_2022/"
 # hdf5_folder = "/Users/leomurphy/lapd-data/November_2022/"
-# hdf5_folder = "/Users/leomurphy/lapd-data/January_2024/January_2024_all_working/"
-hdf5_folder = "/Users/leomurphy/lapd-data/all_lang_nc/"
+hdf5_folder = "/Users/leomurphy/lapd-data/January_2024/January_2024_all_working/"
+# hdf5_folder = "/Users/leomurphy/lapd-data/all_lang_nc/"
 
 langmuir_nc_folder = hdf5_folder + ("lang_nc/" if hdf5_folder.endswith("/") else "/lang_nc/")
 
@@ -91,15 +90,15 @@ if __name__ == "__main__":
             datasets_split += [datasets[i]]
             steady_state_plateaus_runs_split += [(27, 33)]
             linestyles_split += ["dotted"]
+    marker_styles_split = ['o' if style == 'solid' else 'x' for style in linestyles_split]
 
-    # isweep_choice_center = [2 if dataset.attrs['Exp name'] == "January_2024" else 0 for dataset in datasets]
     isweep_choice_center_split = [2 if dataset.attrs['Exp name'] == "January_2024" else 0 for dataset in datasets_split]
 
 
     # Plot pressure versus z position for many datasets
     if ask_yes_or_no("Generate parallel pressure plot? (y/n) "):
         plot_parallel_diagnostic(datasets_split, steady_state_plateaus_runs_split, isweep_choice_center_split,
-                                 linestyles_split, diagnostic="P_e")
+                                 linestyles_split, diagnostic="P_e", operation="median")
 
     if ask_yes_or_no("Generate parallel electron temperature plot? (y/n) "):
         plot_parallel_diagnostic(datasets_split, steady_state_plateaus_runs_split, isweep_choice_center_split,
@@ -115,39 +114,25 @@ if __name__ == "__main__":
 
     if ask_yes_or_no("Generate parallel electron-ion collision frequency plot? (y/n) "):
         plot_parallel_diagnostic(datasets_split, steady_state_plateaus_runs_split, isweep_choice_center_split,
-                                 linestyles_split, diagnostic="nu_ei")
+                                 linestyles_split, diagnostic="nu_ei", operation="median")
 
 
     if ask_yes_or_no("Generate scatter plot of first two selected diagnostics? (y/n) "):
-        diagnostics_points = []
-        marker_styles = ['o' if style == 'solid' else 'x' for style in linestyles_split]
-        color_map = matplotlib.colormaps["plasma"](np.linspace(0, 0.9, len(datasets)))
+        scatter_plot_diagnostics(datasets_split, diagnostics_to_plot_list, steady_state_plateaus_runs_split,
+                                 isweep_choice_center_split, marker_styles_split, operation="median")
 
-        plt.rcParams['figure.figsize'] = (5, 3.5)
-        plt.rcParams['figure.dpi'] = 300
 
-        for i in range(len(datasets_split)):
-            diagnostics_point = []
-            for plot_diagnostic in diagnostics_to_plot_list[:2]:
-                diagnostic_mean = core_steady_state(
-                    datasets_split[i][plot_diagnostic], core_radius, steady_state_plateaus_runs_split[i], "mean",
-                    dims_to_keep=("isweep",))
-                diagnostics_point += [diagnostic_mean[{"isweep": isweep_choice_center_split[i]}].item()]
-            diagnostics_points += [diagnostics_point]
+    if ask_yes_or_no("Generate plot of inverse pressure gradient scale length by position? (y/n) "):
+        plot_parallel_inverse_scale_length(datasets_split, steady_state_plateaus_runs_split, "P_e",
+                                           isweep_choice_center_split, marker_styles_split, "median")
 
-        scatter_points = np.array(diagnostics_points)
-        dataset_names = np.unique([dataset.attrs['Run name'] for dataset in datasets])
-        for i in range(len(scatter_points)):
-            plt.scatter(scatter_points[i, 0], scatter_points[i, 1], marker=marker_styles[i],
-                        color=color_map[dataset_names == datasets_split[i].attrs['Run name']])
-            plt.annotate(f"{datasets_split[i].attrs['Exp name'][:3]}, #{datasets_split[i].attrs['Run name'][:2]}",
-                         (scatter_points[i, 0], scatter_points[i, 1]), size="x-small")  # noqa
-        plt.xlabel(diagnostics_to_plot_list[0])
-        plt.ylabel(diagnostics_to_plot_list[1])
-        plt.title("Scatter plot for selected runs at port ~27-29"
-                  "\nJan 2024 runs: x marker = 2nd steady-state")
-        plt.tight_layout()
-        plt.show()
+    if ask_yes_or_no("Generate plot of inverse temperature gradient scale length by position? (y/n) "):
+        plot_parallel_inverse_scale_length(datasets_split, steady_state_plateaus_runs_split, "T_e",
+                                           isweep_choice_center_split, marker_styles_split, "median")
+
+    if ask_yes_or_no("Generate plot of inverse electron density gradient scale length by position? (y/n) "):
+        plot_parallel_inverse_scale_length(datasets_split, steady_state_plateaus_runs_split, "n_e",
+                                           isweep_choice_center_split, marker_styles_split, "median")
 
 
     # (UNFINISHED) Shot plot: multiplot line diagnostics at specific time, with x-axis = x pos and curve color = shot #
