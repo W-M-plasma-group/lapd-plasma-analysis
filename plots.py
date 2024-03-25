@@ -195,6 +195,47 @@ def plot_line_diagnostic(diagnostics_ds_s: list[xr.Dataset], diagnostic, plot_ty
                           f"\n{repr(e)}")
 
 
+def plot_parallel_diagnostic(datasets_split, steady_state_plateaus_runs_split, isweep_choice_center_split,
+                             linestyles_split, diagnostic, operation="mean"):
+    plt.rcParams['figure.figsize'] = (8.5, 5)
+    plt.rcParams['figure.dpi'] = 300
+
+    # Get mean core-steady-state e-i collision frequencies for each dataset and store in list
+    collision_frequencies = []
+    for i in range(len(datasets_split)):
+        collision_frequencies_mean = core_steady_state(datasets_split[i]['nu_ei'], core_radius,
+                                                       steady_state_plateaus_runs_split[i], operation,
+                                                       dims_to_keep=("isweep",))
+        collision_frequencies += [collision_frequencies_mean[{"isweep": isweep_choice_center_split[i]}].mean().item()]
+    collision_frequencies = np.array(collision_frequencies)
+    # create collision frequencies normalized to the range (0, 0.9) for color map
+    collision_frequencies_log = np.log(collision_frequencies)
+    collision_frequencies_normalized = 0.9 * (collision_frequencies_log - collision_frequencies_log.min()
+                                              ) / (collision_frequencies_log.max() - collision_frequencies_log.min())
+
+    color_map = matplotlib.colormaps["plasma"](collision_frequencies_normalized)
+
+    for i in range(len(datasets_split)):
+        isweep_choices = (0, 2) if datasets_split[i].attrs['Exp name'] == "January_2024" else (0, 1)
+        diagnostics = []
+        ports = []
+        diagnostic_means = core_steady_state(datasets_split[i][diagnostic], core_radius,
+                                             steady_state_plateaus_runs_split[i], operation, dims_to_keep=("isweep",))
+
+        for isweep_choice in isweep_choices:
+            diagnostics += [diagnostic_means[{"isweep": isweep_choice}].item()]  # median??
+            ports += [-diagnostic_means[{"isweep": isweep_choice}].coords['z'].item() / 100]  # convert cm to m
+
+        plt.plot(ports, diagnostics, marker="o", color=color_map[i], linestyle=linestyles_split[i],
+                 label=f"{datasets_split[i].attrs['Exp name'][:3]}, #{datasets_split[i].attrs['Run name'][:2]}"
+                       f":  {collision_frequencies[i]:.2E} Hz")
+    plt.title(f"{diagnostic} ({operation}) versus port z-position"
+              f"\nColor map: ln(collision frequency at port ~27)")
+    plt.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left')
+    plt.tight_layout()
+    plt.show()
+
+
 def get_valid_linear_dimension(diagnostics_dataset_sizes):
     if diagnostics_dataset_sizes['y'] == 1:
         linear_dimension = 'x'

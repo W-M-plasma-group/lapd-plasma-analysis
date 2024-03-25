@@ -71,7 +71,8 @@ if __name__ == "__main__":
     #    and plot position on multiplot corresponding to second attribute
     if ask_yes_or_no("Generate line plot of selected diagnostics over radial position? (y/n) "):
         for plot_diagnostic in diagnostics_to_plot_list:
-            multiplot_line_diagnostic(datasets, plot_diagnostic, isweep_choice, steady_state_plateaus_runs,
+            multiplot_line_diagnostic(datasets, plot_diagnostic, isweep_choice, 'x',
+                                      steady_state_by_runs=steady_state_plateaus_runs,
                                       core_rad=core_radius, tolerance=plot_tolerance)
 
     if ask_yes_or_no("Generate parallel pressure plot? (y/n) "):
