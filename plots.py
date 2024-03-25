@@ -5,19 +5,19 @@ from astropy import visualization
 
 from helper import *
 
+
 # matplotlib.use('TkAgg')
 # matplotlib.use('QtAgg')
 
-linestyles = ["solid", "dotted", "dashed", "dashdot"]
 
-
-def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagnostic, isweep_choices,
-                              steady_state_by_runs, core_rad=None, attribute=None, tolerance=np.nan):
+def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagnostic, isweep_choices, x_dim='x',
+                              steady_state_by_runs=None, core_rad=None, attribute=None, tolerance=np.nan):
     r"""
 
     :param diagnostics_datasets: list of xarray Datasets
     :param plot_diagnostic: string identifying label of desired diagnostics
     :param isweep_choices:
+    :param x_dim:
     :param steady_state_by_runs:
     :param core_rad:
     :param attribute:
@@ -25,6 +25,12 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
     :return:
     """
     # TODO generalize steady_state_by_runs, add curve_dimension to control what different colors represent
+
+    linestyles = ("solid", "dotted", "dashed", "dashdot")
+    x_dims = ['x', 'y', 'time']
+    if x_dim not in x_dims:
+        raise ValueError(f"Invalid dimension {repr(x_dim)} against which to plot diagnostic data. "
+                         f"Valid x dimensions are {repr(x_dims)}")
 
     if attribute is None:
         attribute = [attr for attr in diagnostics_datasets[0].attrs if "Nominal" in attr]
@@ -66,37 +72,39 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
 
             ds_s = isweep_selector(datasets[inner_index], isweep_choices)
             for i in range(len(ds_s)):  # isweep index
-                dataset = ds_s[i]
+                ds = ds_s[i]
 
-                inner_val = dataset.attrs[attributes[0]]
+                inner_val = ds.attrs[attributes[0]]
 
-                linear_dimension = get_valid_linear_dimension(dataset.sizes)
-                linear_da = dataset.squeeze()[plot_diagnostic]
+                da = ds[plot_diagnostic]
+                if x_dim in ('x', 'y'):  # only consider steady state
+                    da = steady_state_only(da, steady_state_by_runs[inner_index])
+                elif x_dim == 'time':  # only consider core region
+                    da = da.where(np.logical_and(*in_core([da.x, da.y], core_rad)), drop=True)
 
-                linear_da_steady_state = steady_state_only(linear_da,
-                                                           steady_state_plateaus=steady_state_by_runs[inner_index])
-                linear_da_mean = linear_da_steady_state.mean(['shot', 'time'], keep_attrs=True)
-                linear_da_std = linear_da_steady_state.std(['shot',   'time'], ddof=1, keep_attrs=True)
+                dims_to_average_out = ['shot'] + [dim for dim in x_dims if dim != x_dim]
+                da_mean = da.mean(dims_to_average_out, keep_attrs=True)
+                da_std = da.std(dims_to_average_out, ddof=1, keep_attrs=True)
+                # both of the above should have only one dimension left?
+
                 # 95% (~two standard deviation) confidence interval
-                # TODO fix this. Need to consider number of non-NaN entries only
-                linear_da_error = linear_da_std * 1.96 / np.sqrt(linear_da_steady_state.sizes['shot']
-                                                                 * linear_da_steady_state.sizes['time'])
+                non_nan_element_da = da.copy()
+                non_nan_element_da[...] = ~np.isnan(da)
+                effective_num_non_nan_per_std = non_nan_element_da.sum(dims_to_average_out)
+                linear_da_error = da_std * 1.96 / np.sqrt(effective_num_non_nan_per_std - 1)  # unbiased
 
-                # Filter out certain points due to inconsistent data (likely random noise that skews average higher)
-                if np.isfinite(tolerance):
-                    da_median = linear_da_mean.median(keep_attrs=True)
-                    linear_da_mean = linear_da_mean.where(linear_da_std < tolerance * da_median)  # TODO hardcoded
-
-                if np.isfinite(linear_da_mean).any():
-                    ax.errorbar(linear_da_mean.coords[linear_dimension], linear_da_mean, yerr=linear_da_error,
+                if np.isfinite(da_mean).any():
+                    ax.errorbar(da_mean.coords[x_dim], da_mean, yerr=linear_da_error,
                                 color=color_map[inner_index], linestyle=linestyles[i], label=str(inner_val))
-                ax.set_xlabel(linear_da_mean.coords[linear_dimension].attrs['units'])
-                ax.set_ylabel(linear_da_mean.attrs['units'])
+                ax.set_xlabel(da_mean.coords[x_dim].attrs['units'])
+                ax.set_ylabel(da_mean.attrs['units'])
 
                 # TODO a bit hardcoded
-                y_limits += [np.min([1.1 * linear_da_steady_state.max().item(),
-                                     2 * core_steady_state_mean(linear_da_steady_state, core_rad=core_rad,
-                                                                dims_to_keep=["isweep"]).max().item()])]
+                da_core_steady_state_max = core_steady_state(da, core_rad, steady_state_by_runs[inner_index]
+                                                             ).max().item()
+                y_limits += [np.min([1.1 * da_core_steady_state_max,
+                                     2 * core_steady_state(da, core_rad=core_rad, operation="mean",
+                                                           dims_to_keep=["isweep"]).max().item()])]
         ax.set_ylim(0, np.max(y_limits))
         ax.tick_params(axis="y", left=True, labelleft=True)
         ax.title.set_text(((str(attributes[1]) + ": " + str(outer_val)) if len(attributes) == 2 else '')
@@ -177,6 +185,150 @@ def plot_line_diagnostic(diagnostics_ds_s: list[xr.Dataset], diagnostic, plot_ty
                           f"\n{repr(e)}")
 
 
+def plot_parallel_diagnostic(datasets_split, steady_state_plateaus_runs_split, isweep_choice_center_split,
+                             linestyles_split, diagnostic, operation="mean"):
+    plt.rcParams['figure.figsize'] = (8.5, 5)
+    plt.rcParams['figure.dpi'] = 300
+
+    # Get mean core-steady-state e-i collision frequencies for each dataset and store in list
+    collision_frequencies = []
+    for i in range(len(datasets_split)):
+        collision_frequencies_mean = core_steady_state(datasets_split[i]['nu_ei'], core_radius,
+                                                       steady_state_plateaus_runs_split[i], operation,
+                                                       dims_to_keep=("isweep",))
+        collision_frequencies += [collision_frequencies_mean[{"isweep": isweep_choice_center_split[i]}].mean().item()]
+    collision_frequencies = np.array(collision_frequencies)
+    # create collision frequencies normalized to the range (0, 0.9) for color map
+    collision_frequencies_log = np.log(collision_frequencies)
+    collision_frequencies_normalized = 0.9 * (collision_frequencies_log - collision_frequencies_log.min()
+                                              ) / (collision_frequencies_log.max() - collision_frequencies_log.min())
+    color_map = matplotlib.colormaps["plasma"](collision_frequencies_normalized)
+
+    for i in range(len(datasets_split)):
+        isweep_choices = (0, 2) if datasets_split[i].attrs['Exp name'] == "January_2024" else (0, 1)
+        diagnostic_values = []
+        zs = []
+        diagnostic_means = core_steady_state(datasets_split[i][diagnostic], core_radius,
+                                             steady_state_plateaus_runs_split[i], operation, dims_to_keep=("isweep",))
+
+        for isweep_choice in isweep_choices:
+            diagnostic_values += [diagnostic_means[{"isweep": isweep_choice}].item()]
+            zs += [-diagnostic_means[{"isweep": isweep_choice}].coords['z'].item() / 100]  # converts cm to m
+
+        plt.plot(zs, diagnostic_values, marker="o", color=color_map[i], linestyle=linestyles_split[i],
+                 label=f"{datasets_split[i].attrs['Exp name'][:3]}, #{datasets_split[i].attrs['Run name'][:2]}"
+                       f":  {collision_frequencies[i]:.2E} Hz")
+    plt.title(f"{diagnostic} ({operation}) versus port z-position"
+              f"\nColor map: ln(collision frequency at port ~27)")
+    plt.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left')
+    plt.tight_layout()
+    plt.show()
+
+
+def scatter_plot_diagnostics(datasets_split, diagnostics_to_plot_list, steady_state_plateaus_runs_split,
+                             isweep_choice_center_split, marker_styles_split, operation="mean"):
+    plt.rcParams['figure.figsize'] = (8.5, 5.5)
+    plt.rcParams['figure.dpi'] = 300
+
+    collision_frequencies = []
+    for i in range(len(datasets_split)):
+        collision_frequencies_mean = core_steady_state(datasets_split[i]['nu_ei'], core_radius,
+                                                       steady_state_plateaus_runs_split[i], operation,
+                                                       dims_to_keep=("isweep",))
+        collision_frequencies += [collision_frequencies_mean[{"isweep": isweep_choice_center_split[i]}].mean().item()]
+    collision_frequencies = np.array(collision_frequencies)
+    # create collision frequencies normalized to the range (0, 0.9) for color map
+    collision_frequencies_log = np.log(collision_frequencies)
+    collision_frequencies_normalized = 0.9 * (collision_frequencies_log - collision_frequencies_log.min()
+                                              ) / (collision_frequencies_log.max() - collision_frequencies_log.min())
+    color_map = matplotlib.colormaps["plasma"](collision_frequencies_normalized)
+
+    diagnostics_points = []
+    for i in range(len(datasets_split)):
+        diagnostics_point = []
+        for plot_diagnostic in diagnostics_to_plot_list[:2]:
+            diagnostic_mean = core_steady_state(
+                datasets_split[i][plot_diagnostic], core_radius, steady_state_plateaus_runs_split[i], operation,
+                dims_to_keep=("isweep",))
+            diagnostics_point += [diagnostic_mean[{"isweep": isweep_choice_center_split[i]}].item()]
+        diagnostics_points += [diagnostics_point]
+
+    scatter_points = np.array(diagnostics_points)
+    for i in range(len(scatter_points)):
+        plt.scatter(scatter_points[i, 0], scatter_points[i, 1], marker=marker_styles_split[i], color=color_map[i],
+                    label=f"{datasets_split[i].attrs['Exp name'][:3]}, #{datasets_split[i].attrs['Run name'][:2]}"
+                          f":  {collision_frequencies[i]:.2E} Hz")
+        plt.annotate(f"{datasets_split[i].attrs['Exp name'][:3]}, #{datasets_split[i].attrs['Run name'][:2]}",
+                     (scatter_points[i, 0], scatter_points[i, 1]), size="small")  # noqa
+
+    if ("n_" in diagnostics_to_plot_list[0] or "n_" in diagnostics_to_plot_list[1]) \
+            and ("T_e" in diagnostics_to_plot_list[0] or "T_e" in diagnostics_to_plot_list[1]):
+        x_min, x_max = np.min(scatter_points[:, 0]), np.max(scatter_points[:, 0])
+        y_min, y_max = np.min(scatter_points[:, 1]), np.max(scatter_points[:, 1])
+        pressure_min = np.min(scatter_points[:, 0] * scatter_points[:, 1])
+        pressure_max = np.max(scatter_points[:, 0] * scatter_points[:, 1])
+
+        x_curve = np.linspace(x_min, x_max, 100)
+        pressures = np.linspace(np.sqrt(pressure_min), np.sqrt(pressure_max), 8)[1:-1] ** 2
+        for pressure in pressures:
+            plt.plot(x_curve, pressure / x_curve, color='gray')
+        plt.ylim(0, 1.1 * y_max)  # TODO a bit hardcoded
+
+    plt.xlabel(diagnostics_to_plot_list[0])
+    plt.ylabel(diagnostics_to_plot_list[1])
+    plt.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left')
+    plt.title("Scatter plot for selected runs at port ~27-29"
+              "\nJan 2024 runs: x marker = 2nd steady-state"
+              "\nColor map: ln(collision frequency at port 27/29)")
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_parallel_inverse_scale_length(datasets_split, steady_state_plateaus_runs_split, diagnostic,
+                                       isweep_choice_center_split, marker_styles_split, operation):
+    plt.rcParams['figure.figsize'] = (8.5, 5)
+    plt.rcParams['figure.dpi'] = 300
+
+    # Get mean core-steady-state e-i collision frequencies for each dataset and store in list
+    collision_frequencies = []
+    for i in range(len(datasets_split)):
+        collision_frequencies_mean = core_steady_state(datasets_split[i]['nu_ei'], core_radius,
+                                                       steady_state_plateaus_runs_split[i], operation,
+                                                       dims_to_keep=("isweep",))
+        collision_frequencies += [collision_frequencies_mean[{"isweep": isweep_choice_center_split[i]}].mean().item()]
+    collision_frequencies = np.array(collision_frequencies)
+    # create collision frequencies normalized to the range (0, 0.9) for color map
+    collision_frequencies_log = np.log(collision_frequencies)
+    collision_frequencies_normalized = 0.9 * (collision_frequencies_log - collision_frequencies_log.min()
+                                              ) / (collision_frequencies_log.max() - collision_frequencies_log.min())
+
+    color_map = matplotlib.colormaps["plasma"](collision_frequencies_normalized)
+
+    for i in range(len(datasets_split)):
+        isweep_choices = (0, 2) if datasets_split[i].attrs['Exp name'] == "January_2024" else (0, 1)
+        diagnostic_means = core_steady_state(datasets_split[i][diagnostic], core_radius,
+                                             steady_state_plateaus_runs_split[i], operation, dims_to_keep=("isweep",))
+
+        diagnostic_difference = (diagnostic_means[{"isweep": isweep_choices[1]}].item()
+                                 - diagnostic_means[{"isweep": isweep_choices[0]}].item())
+        diagnostic_mean = 0.5 * (diagnostic_means[{"isweep": isweep_choices[1]}].item()
+                                 + diagnostic_means[{"isweep": isweep_choices[0]}].item())
+        diagnostic_normalized_gradient = diagnostic_difference / diagnostic_mean
+        z1 = -diagnostic_means[{"isweep": isweep_choices[1]}].coords['z'].item() / 100  # converts cm to m
+        z0 = -diagnostic_means[{"isweep": isweep_choices[0]}].coords['z'].item() / 100  # converts cm to m
+        z = 0.5 * (z1 + z0)
+        diagnostic_inverse_scale_length = diagnostic_normalized_gradient / (z1 - z0)
+
+        plt.plot(z, diagnostic_inverse_scale_length, marker=marker_styles_split[i], color=color_map[i],
+                 label=f"{datasets_split[i].attrs['Exp name'][:3]}, #{datasets_split[i].attrs['Run name'][:2]}"
+                       f":  {collision_frequencies[i]:.2E} Hz")
+    plt.title(f"Inverse gradient scale length of {diagnostic} ({operation}) versus z-position"
+              f"\nColor map: ln(collision frequency at port ~27)")
+    plt.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left')
+    plt.tight_layout()
+    plt.show()
+
+
 def get_valid_linear_dimension(diagnostics_dataset_sizes):
     if diagnostics_dataset_sizes['y'] == 1:
         linear_dimension = 'x'
@@ -220,7 +372,6 @@ def check_diagnostic(diagnostic_dataset, choice):
 
 
 def get_title(diagnostic: str) -> str:
-
     full_names = {'V_P': "Plasma potential",
                   'V_F': "Floating potential",
                   'I_es': "Electron saturation current",
