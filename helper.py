@@ -95,18 +95,39 @@ def steady_state_only(diagnostics_dataset, steady_state_plateaus: tuple):
                                                     diagnostics_dataset.plateau <= steady_state_plateaus[1]), drop=True)
 
 
-def core_steady_state_mean(da: xr.DataArray, core_rad=None, steady_state_plateaus=None, dims_to_keep=()) -> xr.DataArray:
+def core_steady_state(da_input: xr.DataArray, core_rad=None, steady_state_plateaus=None, operation=None,
+                      dims_to_keep=(None,)) -> xr.DataArray:
     r"""
-        # TODO use
-    :param da: xarray DataArray with x and y dimensions
-    :param core_rad: astropy Quantity convertible to centimeters giving radius of core
-    :param steady_state_plateaus: tuple or list giving indices of start and end of steady-state period
-    :param dims_to_keep: optional list of dimensions not to calculate mean across
+
+    :param da_input: xarray DataArray with x and y dimensions
+    :param core_rad: (optional) astropy Quantity convertible to centimeters giving radius of core
+    :param steady_state_plateaus: (optional) tuple or list giving indices of start and end of steady-state period
+    :param operation: (optional) Operation to perform on core/steady_state data
+    :param dims_to_keep: (optional) optional list of dimensions not to calculate mean across
     :return: DataArray with dimensions dims_to_keep
     """
-    da_mean = da.copy()
+
+    da = da_input.copy()
     if core_rad is not None:
-        da_mean = da_mean.where(np.logical_and(*in_core([da_mean.x, da_mean.y], core_rad)), drop=True)
+        da = da.where(np.logical_and(*in_core([da.x, da.y], core_rad)), drop=True)
     if steady_state_plateaus is not None:
-        da_mean = steady_state_only(da_mean, steady_state_plateaus=steady_state_plateaus)
-    return da_mean.mean(dim=[dim for dim in da_mean.dims if dim not in dims_to_keep])
+        da = steady_state_only(da, steady_state_plateaus=steady_state_plateaus)
+
+    dims_to_reduce = [dim for dim in da.dims if dim not in dims_to_keep]
+    if operation is None:
+        return da
+    elif operation == "mean":
+        return da.mean(dim=dims_to_reduce)
+    elif operation == "median":
+        return da.median(dim=dims_to_reduce)
+    elif operation == "std":
+        return da.std(dim=dims_to_reduce)
+    elif operation == "std_error":
+        # 95% (~two standard deviation) confidence interval
+        da_std = da.std(dim=dims_to_reduce)
+        non_nan_element_da = da.copy()
+        non_nan_element_da[...] = ~np.isnan(da)
+        effective_num_non_nan_per_std = non_nan_element_da.sum(dims_to_reduce)
+        return da_std * 1.96 / np.sqrt(effective_num_non_nan_per_std)
+    else:
+        raise ValueError(f"Invalid operation {repr(operation)} when acceptable are None, 'mean', 'std', and 'std_err'")
