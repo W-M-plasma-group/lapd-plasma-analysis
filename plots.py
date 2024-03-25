@@ -8,16 +8,15 @@ from helper import *
 # matplotlib.use('TkAgg')
 # matplotlib.use('QtAgg')
 
-linestyles = ["solid", "dotted", "dashed", "dashdot"]
 
-
-def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagnostic, isweep_choices,
-                              steady_state_by_runs, core_rad=None, attribute=None, tolerance=np.nan):
+def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagnostic, isweep_choices, x_dim='x',
+                              steady_state_by_runs=None, core_rad=None, attribute=None, tolerance=np.nan):
     r"""
 
     :param diagnostics_datasets: list of xarray Datasets
     :param plot_diagnostic: string identifying label of desired diagnostics
     :param isweep_choices:
+    :param x_dim:
     :param steady_state_by_runs:
     :param core_rad:
     :param attribute:
@@ -25,6 +24,12 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
     :return:
     """
     # TODO generalize steady_state_by_runs, add curve_dimension to control what different colors represent
+
+    linestyles = ("solid", "dotted", "dashed", "dashdot")
+    x_dims = ['x', 'y', 'time']
+    if x_dim not in x_dims:
+        raise ValueError(f"Invalid dimension {repr(x_dim)} against which to plot diagnostic data. "
+                         f"Valid x dimensions are {repr(x_dims)}")
 
     if attribute is None:
         attribute = [attr for attr in diagnostics_datasets[0].attrs if "Nominal" in attr]
@@ -87,16 +92,22 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
                     da_median = linear_da_mean.median(keep_attrs=True)
                     linear_da_mean = linear_da_mean.where(linear_da_std < tolerance * da_median)  # TODO hardcoded
 
-                if np.isfinite(linear_da_mean).any():
-                    ax.errorbar(linear_da_mean.coords[linear_dimension], linear_da_mean, yerr=linear_da_error,
+                if np.isfinite(da_mean).any():
+                    ax.errorbar(da_mean.coords[x_dim], da_mean, yerr=linear_da_error,
                                 color=color_map[inner_index], linestyle=linestyles[i], label=str(inner_val))
-                ax.set_xlabel(linear_da_mean.coords[linear_dimension].attrs['units'])
-                ax.set_ylabel(linear_da_mean.attrs['units'])
+                ax.set_xlabel(da_mean.coords[x_dim].attrs['units'])
+                ax.set_ylabel(da_mean.attrs['units'])
 
                 # TODO a bit hardcoded
-                y_limits += [np.min([1.1 * linear_da_steady_state.max().item(),
-                                     2 * core_steady_state_mean(linear_da_steady_state, core_rad=core_rad,
-                                                                dims_to_keep=["isweep"]).max().item()])]
+                """da_core_steady_state_max = steady_state_only(
+                    da.where(np.logical_and(*in_core([da.x, da.y], core_rad)), drop=True),
+                    steady_state_by_runs[inner_index]).max().item()
+                """
+                da_core_steady_state_max = core_steady_state(da, core_rad, steady_state_by_runs[inner_index]
+                                                             ).max().item()
+                y_limits += [np.min([1.1 * da_core_steady_state_max,
+                                     2 * core_steady_state(da, core_rad=core_rad, operation="mean",
+                                                           dims_to_keep=["isweep"]).max().item()])]
         ax.set_ylim(0, np.max(y_limits))
         ax.tick_params(axis="y", left=True, labelleft=True)
         ax.title.set_text(((str(attributes[1]) + ": " + str(outer_val)) if len(attributes) == 2 else '')
