@@ -32,7 +32,6 @@ interferometry_folder = False                               # TODO set to False 
 isweep_choice = [[1, 0], [0, 1]]
 # isweep_choice = [0]
 bimaxwellian = False                                        # TODO perform both and store in same NetCDF file?
-plot_tolerance = np.nan   # was 2                           # Optimal values are np.nan (plot all points) or >= 0.5
 core_radius = 26. * u.cm                                    # From MATLAB code
 
 # Diagram of LAPD

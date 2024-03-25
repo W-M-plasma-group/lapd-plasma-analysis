@@ -71,26 +71,33 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
 
             ds_s = isweep_selector(datasets[inner_index], isweep_choices)
             for i in range(len(ds_s)):  # isweep index
-                dataset = ds_s[i]
+                ds = ds_s[i]
 
-                inner_val = dataset.attrs[attributes[0]]
+                inner_val = ds.attrs[attributes[0]]
 
-                linear_dimension = get_valid_linear_dimension(dataset.sizes)
-                linear_da = dataset.squeeze()[plot_diagnostic]
+                da = ds[plot_diagnostic]
+                if x_dim in ('x', 'y'):  # only consider steady state
+                    da = steady_state_only(da, steady_state_by_runs[inner_index])
+                elif x_dim == 'time':    # only consider core region
+                    da = da.where(np.logical_and(*in_core([da.x, da.y], core_rad)), drop=True)
 
-                linear_da_steady_state = steady_state_only(linear_da,
-                                                           steady_state_plateaus=steady_state_by_runs[inner_index])
-                linear_da_mean = linear_da_steady_state.mean(['shot', 'time'], keep_attrs=True)
-                linear_da_std = linear_da_steady_state.std(['shot',   'time'], ddof=1, keep_attrs=True)
+                dims_to_average_out = ['shot'] + [dim for dim in x_dims if dim != x_dim]
+                da_mean = da.mean(dims_to_average_out, keep_attrs=True)
+                da_std = da.std(dims_to_average_out, ddof=1, keep_attrs=True)
+                # both of the above should have only one dimension left?
+
                 # 95% (~two standard deviation) confidence interval
-                # TODO fix this. Need to consider number of non-NaN entries only
-                linear_da_error = linear_da_std * 1.96 / np.sqrt(linear_da_steady_state.sizes['shot']
-                                                                 * linear_da_steady_state.sizes['time'])
+                non_nan_element_da = da.copy()
+                non_nan_element_da[...] = ~np.isnan(da)
+                effective_num_non_nan_per_std = non_nan_element_da.sum(dims_to_average_out)
+                linear_da_error = da_std * 1.96 / np.sqrt(effective_num_non_nan_per_std)
 
+                """
                 # Filter out certain points due to inconsistent data (likely random noise that skews average higher)
                 if np.isfinite(tolerance):
-                    da_median = linear_da_mean.median(keep_attrs=True)
-                    linear_da_mean = linear_da_mean.where(linear_da_std < tolerance * da_median)  # TODO hardcoded
+                    da_mean_median = da_mean.median(keep_attrs=True)
+                    da_mean = da_mean.where(linear_da_std < tolerance * da_median)  # TODO hardcoded
+                """
 
                 if np.isfinite(da_mean).any():
                     ax.errorbar(da_mean.coords[x_dim], da_mean, yerr=linear_da_error,
