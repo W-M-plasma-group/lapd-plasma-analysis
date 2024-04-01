@@ -69,7 +69,7 @@ def preview_characteristics(characteristics_array, positions, ports, ramp_times,
 
 def preview_raw_sweep(bias, currents, positions, ports, exp_params_dict, dt):
     plt.rcParams['figure.dpi'] = 300
-    plt.rcParams['figure.figsize'] = (60, 4)
+    plt.rcParams['figure.figsize'] = (40, 4)
 
     x = np.unique(positions[:, 0])
     y = np.unique(positions[:, 1])

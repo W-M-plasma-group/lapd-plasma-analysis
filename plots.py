@@ -287,7 +287,7 @@ def scatter_plot_diagnostics(datasets_split, diagnostics_to_plot_list, steady_st
 
 def plot_parallel_inverse_scale_length(datasets_split, steady_state_plateaus_runs_split, diagnostic,
                                        isweep_choice_center_split, marker_styles_split, operation):
-    plt.rcParams['figure.figsize'] = (8.5, 5)
+    plt.rcParams['figure.figsize'] = (7, 4.5)   # (8.5, 5.5)
     plt.rcParams['figure.dpi'] = 300
 
     # Get mean core-steady-state e-i collision frequencies for each dataset and store in list
