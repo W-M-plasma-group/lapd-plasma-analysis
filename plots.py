@@ -26,7 +26,7 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
     """
     # TODO generalize steady_state_by_runs, add curve_dimension to control what different colors represent
 
-    linestyles = ("solid", "dotted", "dashed", "dashdot")
+    marker_styles = (".", "+", "x", "^")   # , "1", "2", "3", "4")
     x_dims = ['x', 'y', 'time']
     if x_dim not in x_dims:
         raise ValueError(f"Invalid dimension {repr(x_dim)} against which to plot diagnostic data. "
@@ -94,8 +94,8 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
                 linear_da_error = da_std * 1.96 / np.sqrt(effective_num_non_nan_per_std - 1)  # unbiased
 
                 if np.isfinite(da_mean).any():
-                    ax.errorbar(da_mean.coords[x_dim], da_mean, yerr=linear_da_error,
-                                color=color_map[inner_index], linestyle=linestyles[i], label=str(inner_val))
+                    ax.errorbar(da_mean.coords[x_dim], da_mean, yerr=linear_da_error, linestyle="none",
+                                color=color_map[inner_index], marker=marker_styles[i], label=str(inner_val))
                 ax.set_xlabel(da_mean.coords[x_dim].attrs['units'])
                 ax.set_ylabel(da_mean.attrs['units'])
 
@@ -109,7 +109,7 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
         ax.tick_params(axis="y", left=True, labelleft=True)
         ax.title.set_text(((str(attributes[1]) + ": " + str(outer_val)) if len(attributes) == 2 else '')
                           + f"\nColor: {attributes[0]}"
-                          + f"\nIsweep styles: {linestyles}")
+                          + f"\nIsweep styles: {marker_styles}")
         ax.legend()
     plt.tight_layout()
     plt.show()
@@ -186,8 +186,8 @@ def plot_line_diagnostic(diagnostics_ds_s: list[xr.Dataset], diagnostic, plot_ty
 
 
 def plot_parallel_diagnostic(datasets_split, steady_state_plateaus_runs_split, isweep_choice_center_split,
-                             linestyles_split, diagnostic, operation="mean"):
-    plt.rcParams['figure.figsize'] = (8.5, 5)
+                             marker_styles_split, diagnostic, operation="mean"):
+    plt.rcParams['figure.figsize'] = (6, 3.5)
     plt.rcParams['figure.dpi'] = 300
 
     # Get mean core-steady-state e-i collision frequencies for each dataset and store in list
@@ -215,7 +215,7 @@ def plot_parallel_diagnostic(datasets_split, steady_state_plateaus_runs_split, i
             diagnostic_values += [diagnostic_means[{"isweep": isweep_choice}].item()]
             zs += [-diagnostic_means[{"isweep": isweep_choice}].coords['z'].item() / 100]  # converts cm to m
 
-        plt.plot(zs, diagnostic_values, marker="o", color=color_map[i], linestyle=linestyles_split[i],
+        plt.plot(zs, diagnostic_values, marker=marker_styles_split[i], color=color_map[i], linestyle='none',
                  label=f"{datasets_split[i].attrs['Exp name'][:3]}, #{datasets_split[i].attrs['Run name'][:2]}"
                        f":  {collision_frequencies[i]:.2E} Hz")
     plt.title(f"{diagnostic} ({operation}) versus port z-position"
