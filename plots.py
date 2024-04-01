@@ -203,9 +203,9 @@ def plot_parallel_diagnostic(datasets_split, steady_state_plateaus_runs_split, i
     collision_frequencies = np.array(collision_frequencies)
     # create collision frequencies normalized to the range (0, 0.9) for color map
     collision_frequencies_log = np.log(collision_frequencies)
-    collision_frequencies_normalized = 0.9 * (collision_frequencies_log - collision_frequencies_log.min()
-                                              ) / (collision_frequencies_log.max() - collision_frequencies_log.min())
-    color_map = matplotlib.colormaps["plasma"](collision_frequencies_normalized)
+    collision_frequencies_log_normalized = 0.9 * (collision_frequencies_log - collision_frequencies_log.min()
+                                                  ) / (collision_frequencies_log.max() - collision_frequencies_log.min())
+    color_map = matplotlib.colormaps["plasma"](collision_frequencies_log_normalized)
 
     diagnostic_units = ""
     for i in range(len(datasets_split)):
@@ -224,9 +224,14 @@ def plot_parallel_diagnostic(datasets_split, steady_state_plateaus_runs_split, i
         plt.plot(zs, diagnostic_values, marker=marker_styles_split[i], color=color_map[i], linestyle='none',
                  label=f"{datasets_split[i].attrs['Exp name'][:3]}, #{datasets_split[i].attrs['Run name'][:2]}"
                        f":  {collision_frequencies[i]:.2E} Hz")
-    plt.title(f"{diagnostic} ({operation}) versus port z-position"
-              f"\nColor map: ln(collision frequency at port ~27)")
-    plt.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left')
+    plt.title(f"{get_title(diagnostic)} versus z-position")  # ({operation})
+    plt.xlabel("z position [m]")
+    plt.ylabel(f"{get_title(diagnostic)} [{diagnostic_units}]")
+    normalizer = matplotlib.colors.LogNorm(vmin=np.min(collision_frequencies),
+                                           vmax=np.max(collision_frequencies))
+    color_bar = plt.colorbar(matplotlib.cm.ScalarMappable(norm=normalizer, cmap='plasma'), ax=plt.gca())
+    color_bar.set_label("Midplane electron-ion \ncollision frequency [Hz]", rotation=90, labelpad=10)
+    # plt.legend(bbox_to_anchor=(1.20, 1.0), loc='upper left', fontsize='small')
     plt.tight_layout()
     plt.show()
 
