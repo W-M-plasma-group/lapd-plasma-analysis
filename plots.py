@@ -103,8 +103,8 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
                 da_core_steady_state_max = core_steady_state(da, core_rad, steady_state_by_runs[inner_index]
                                                              ).max().item()
                 y_limits += [np.min([1.1 * da_core_steady_state_max,
-                                     2 * core_steady_state(da, core_rad=core_rad, operation="mean",
-                                                           dims_to_keep=["isweep"]).max().item()])]
+                                     2 * core_steady_state(da, core_rad, steady_state_by_runs[inner_index],
+                                                           operation="median", dims_to_keep=["isweep"]).max().item()])]
         ax.set_ylim(0, np.max(y_limits))
         ax.tick_params(axis="y", left=True, labelleft=True)
         ax.title.set_text(((str(attributes[1]) + ": " + str(outer_val)) if len(attributes) == 2 else '')
@@ -284,6 +284,8 @@ def scatter_plot_diagnostics(datasets_split, diagnostics_to_plot_list, steady_st
         for pressure in pressures:
             plt.plot(x_curve, pressure / x_curve, color='gray')
         plt.ylim(0, 1.1 * y_max)  # TODO a bit hardcoded
+        if "n_" in diagnostics_to_plot_list[0] and "T_e" in diagnostics_to_plot_list[1]:
+            pass
 
     plt.xlabel(diagnostics_to_plot_list[0])
     plt.ylabel(diagnostics_to_plot_list[1])
@@ -328,12 +330,13 @@ def plot_parallel_inverse_scale_length(datasets_split, steady_state_plateaus_run
         z1 = -diagnostic_means[{"isweep": isweep_choices[1]}].coords['z'].item() / 100  # converts cm to m
         z0 = -diagnostic_means[{"isweep": isweep_choices[0]}].coords['z'].item() / 100  # converts cm to m
         z = 0.5 * (z1 + z0)
-        diagnostic_inverse_scale_length = diagnostic_normalized_gradient / (z1 - z0)
+        diagnostic_scale_length = (z1 - z0) / diagnostic_normalized_gradient
+        diagnostic_inverse_scale_length = 1 / diagnostic_scale_length
 
-        plt.plot(z, diagnostic_inverse_scale_length, marker=marker_styles_split[i], color=color_map[i],
+        plt.plot(z, diagnostic_scale_length, marker=marker_styles_split[i], color=color_map[i],
                  label=f"{datasets_split[i].attrs['Exp name'][:3]}, #{datasets_split[i].attrs['Run name'][:2]}"
                        f":  {collision_frequencies[i]:.2E} Hz")
-    plt.title(f"Inverse gradient scale length of {diagnostic} ({operation}) versus z-position"
+    plt.title(f"Parallel gradient scale length (m) of {diagnostic} versus z"  # ({operation})
               f"\nColor map: ln(collision frequency at port ~27)")
     plt.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left')
     plt.tight_layout()
