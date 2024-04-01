@@ -26,7 +26,7 @@ interferometry_folder = False                               # TODO set to False 
 
 """ User parameters """
 # TODO isweep_choice is user choice for probe or linear combination to use; see isweep_selector in helper.py for more
-isweep_choice = [[1, 0, 0, 0], [0, 0, 1, 0]]
+isweep_choice = [[1, 0, 0, 0]]  # , [0, 0, 1, 0]]
 # isweep_choice = [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]
 # isweep_choice = [[1, 0], [0, 1]]
 # isweep_choice = [0]
@@ -94,33 +94,20 @@ if __name__ == "__main__":
 
     isweep_choice_center_split = [2 if dataset.attrs['Exp name'] == "January_2024" else 0 for dataset in datasets_split]
 
-
     # Plot pressure versus z position for many datasets
-    if ask_yes_or_no("Generate parallel pressure plot? (y/n) "):
-        plot_parallel_diagnostic(datasets_split, steady_state_plateaus_runs_split, isweep_choice_center_split,
-                                 linestyles_split, diagnostic="P_e", operation="median")
-
-    if ask_yes_or_no("Generate parallel electron temperature plot? (y/n) "):
-        plot_parallel_diagnostic(datasets_split, steady_state_plateaus_runs_split, isweep_choice_center_split,
-                                 linestyles_split, diagnostic="T_e", operation="median")
-
-    if ask_yes_or_no("Generate parallel electron density plot? (y/n) "):
-        plot_parallel_diagnostic(datasets_split, steady_state_plateaus_runs_split, isweep_choice_center_split,
-                                 linestyles_split, diagnostic="n_e")
-
-    if ask_yes_or_no("Generate parallel ion density plot? (y/n) "):
-        plot_parallel_diagnostic(datasets_split, steady_state_plateaus_runs_split, isweep_choice_center_split,
-                                 linestyles_split, diagnostic="n_i_OML")
-
-    if ask_yes_or_no("Generate parallel electron-ion collision frequency plot? (y/n) "):
-        plot_parallel_diagnostic(datasets_split, steady_state_plateaus_runs_split, isweep_choice_center_split,
-                                 linestyles_split, diagnostic="nu_ei", operation="median")
-
+    parallel_diagnostics = {"P_e": "pressure",
+                            "T_e": "electron temperature",  # median ..
+                            "n_e": "electron density",      # mean?
+                            "n_i_OML": "ion density",       # mean?
+                            "nu_ei": "electron-ion collision frequency"}
+    for key in parallel_diagnostics:
+        if ask_yes_or_no(f"Generate parallel plot of {parallel_diagnostics[key]}? (y/n) "):
+            plot_parallel_diagnostic(datasets_split, steady_state_plateaus_runs_split, isweep_choice_center_split,
+                                     marker_styles_split, diagnostic=key, operation="median")
 
     if ask_yes_or_no("Generate scatter plot of first two selected diagnostics? (y/n) "):
         scatter_plot_diagnostics(datasets_split, diagnostics_to_plot_list, steady_state_plateaus_runs_split,
                                  isweep_choice_center_split, marker_styles_split, operation="median")
-
 
     if ask_yes_or_no("Generate plot of inverse pressure gradient scale length by position? (y/n) "):
         plot_parallel_inverse_scale_length(datasets_split, steady_state_plateaus_runs_split, "P_e",
