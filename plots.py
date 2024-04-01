@@ -134,8 +134,9 @@ def plot_line_diagnostic(diagnostics_ds_s: list[xr.Dataset], diagnostic, plot_ty
         elif shot_mode == "all":
             raise NotImplementedError("Shot handling mode 'all' not yet supported for plotting")
         else:
-            raise NotImplementedError(f"Shot handling mode {repr(shot_mode)} not currently implemented for plotting")
+            raise ValueError(f"Shot handling mode {repr(shot_mode)} not supported for plotting")
 
+        # This is still here for contour plots!
         # Filter out certain points due to inconsistent data (likely random noise that skews average higher)
         if np.isfinite(tolerance):  # note: an insidious error was made here with (tolerance != np.nan)
             da_mean = linear_ds.mean()
