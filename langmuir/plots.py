@@ -233,6 +233,8 @@ def plot_parallel_diagnostic(datasets_split, steady_state_plateaus_runs_split, i
     color_bar.set_label("Midplane electron-ion \ncollision frequency [Hz]", rotation=90, labelpad=10)
     # plt.legend(bbox_to_anchor=(1.20, 1.0), loc='upper left', fontsize='small')
     plt.tight_layout()
+    plt.savefig("/Users/leomurphy/Desktop/Research images spring 2024/research graphs late march 2024/PDF plots/"
+                "parallel_plot.pdf")
     plt.show()
 
 

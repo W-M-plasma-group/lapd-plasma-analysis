@@ -4,25 +4,27 @@ written in MATLAB by Conor Perks (MIT) and using the PlasmaPy and bapsflib libra
 Comments are added inline. A separate documentation page is not yet complete.
 """
 
-from helper import *
-from file_access import ask_yes_or_no
-from load_datasets import setup_datasets
-from plots import multiplot_line_diagnostic, plot_line_diagnostic
-from plots import plot_parallel_diagnostic, scatter_plot_diagnostics, plot_parallel_inverse_scale_length
+from langmuir.helper import *
+from langmuir.file_access import ask_yes_or_no
+from langmuir.load_datasets import setup_datasets
+from langmuir.plots import multiplot_line_diagnostic, plot_line_diagnostic
+from langmuir.plots import plot_parallel_diagnostic, scatter_plot_diagnostics, plot_parallel_inverse_scale_length
 
 """ End directory paths with a slash """
 # hdf5_folder = "/Users/leomurphy/lapd-data/April_2018/"
 # hdf5_folder = "/Users/leomurphy/lapd-data/March_2022/"
 # hdf5_folder = "/Users/leomurphy/lapd-data/November_2022/"
-hdf5_folder = "/Users/leomurphy/lapd-data/January_2024/January_2024_all_working/"
-# hdf5_folder = "/Users/leomurphy/lapd-data/all_lang_nc/"
+# hdf5_folder = "/Users/leomurphy/lapd-data/January_2024/January_2024_all_working/"
+hdf5_folder = "/Users/leomurphy/lapd-data/all_lang_nc/"
 
 langmuir_nc_folder = hdf5_folder + ("lang_nc/" if hdf5_folder.endswith("/") else "/lang_nc/")
 
 """ Set to False or equivalent if interferometry calibration is not desired """
-interferometry_folder = False                               # TODO set to False to avoid interferometry calibration
-# interferometry_folder = hdf5_folder
+# interferometry_folder = False                               # TODO set to False to avoid interferometry calibration
+interferometry_folder = "/Users/leomurphy/lapd-data/November_2022/uwave_288_GHz_waveforms/" \
+    if "November_2022" in hdf5_folder else hdf5_folder
 # interferometry_folder = "/Users/leomurphy/lapd-data/November_2022/uwave_288_GHz_waveforms/"
+# interferometry_folder = hdf5_folder
 
 """ User parameters """
 # TODO isweep_choice is user choice for probe or linear combination to use; see isweep_selector in helper.py for more
@@ -42,8 +44,8 @@ core_radius = 26. * u.cm                                    # From MATLAB code
   |____|______________________'______|       V
       (a)                    (b)    (c)
         +z direction (+ports) ==>
-                  plasma flow ==>
-            magnetic field B0 ==>
+                  plasma flow ==> ???
+            magnetic field B0 <==
 
 a) LaB6 electron beam cathode
 b) downstream mesh anode
