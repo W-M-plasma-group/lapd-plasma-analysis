@@ -4,7 +4,7 @@ import matplotlib
 from astropy import visualization
 
 from helper import *
-
+from bapsflib.lapd.tools import portnum_to_z
 
 # matplotlib.use('TkAgg')
 # matplotlib.use('QtAgg')
@@ -191,6 +191,8 @@ def plot_parallel_diagnostic(datasets_split, steady_state_plateaus_runs_split, i
     plt.rcParams['figure.figsize'] = (6, 3.5)
     plt.rcParams['figure.dpi'] = 300
 
+    anode_z = portnum_to_z(0).to(u.m)
+
     # Get mean core-steady-state e-i collision frequencies for each dataset and store in list
     collision_frequencies = []
     for i in range(len(datasets_split)):
@@ -205,6 +207,7 @@ def plot_parallel_diagnostic(datasets_split, steady_state_plateaus_runs_split, i
                                               ) / (collision_frequencies_log.max() - collision_frequencies_log.min())
     color_map = matplotlib.colormaps["plasma"](collision_frequencies_normalized)
 
+    diagnostic_units = ""
     for i in range(len(datasets_split)):
         isweep_choices = (0, 2) if datasets_split[i].attrs['Exp name'] == "January_2024" else (0, 1)
         diagnostic_values = []
@@ -214,7 +217,9 @@ def plot_parallel_diagnostic(datasets_split, steady_state_plateaus_runs_split, i
 
         for isweep_choice in isweep_choices:
             diagnostic_values += [diagnostic_means[{"isweep": isweep_choice}].item()]
-            zs += [-diagnostic_means[{"isweep": isweep_choice}].coords['z'].item() / 100]  # converts cm to m
+            zs += [diagnostic_means[{"isweep": isweep_choice}].coords['z'].item()]
+        zs = anode_z - (zs * u.Unit(diagnostic_means.coords['z'].attrs['units'])).to(u.m)  # convert to meters
+        diagnostic_units = datasets_split[i][diagnostic].attrs['units']
 
         plt.plot(zs, diagnostic_values, marker=marker_styles_split[i], color=color_map[i], linestyle='none',
                  label=f"{datasets_split[i].attrs['Exp name'][:3]}, #{datasets_split[i].attrs['Run name'][:2]}"
