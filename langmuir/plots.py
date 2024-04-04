@@ -195,18 +195,9 @@ def plot_parallel_diagnostic(datasets_split, steady_state_plateaus_runs_split, i
 
     anode_z = portnum_to_z(0).to(u.m)
 
-    # Get mean core-steady-state e-i collision frequencies for each dataset and store in list
-    collision_frequencies = []
-    for i in range(len(datasets_split)):
-        collision_frequencies_mean = core_steady_state(datasets_split[i]['nu_ei'], core_radius,
-                                                       steady_state_plateaus_runs_split[i], operation,
-                                                       dims_to_keep=("isweep",))
-        collision_frequencies += [collision_frequencies_mean[{"isweep": isweep_choice_center_split[i]}].mean().item()]
-    collision_frequencies = np.array(collision_frequencies)
-    # create collision frequencies normalized to the range (0, 0.9) for color map
-    collision_frequencies_log = np.log(collision_frequencies)
-    collision_frequencies_log_normalized = 0.9 * (collision_frequencies_log - collision_frequencies_log.min()
-                                                  ) / (collision_frequencies_log.max() - collision_frequencies_log.min())
+    collision_frequencies = get_collision_frequencies(datasets_split, core_radius, steady_state_plateaus_runs_split,
+                                                      isweep_choice_center_split, operation)
+    collision_frequencies_log_normalized = normalize(collision_frequencies, 0, 0.9)
     color_map = matplotlib.colormaps["plasma"](collision_frequencies_log_normalized)
 
     diagnostic_units = ""
@@ -307,19 +298,10 @@ def plot_parallel_inverse_scale_length(datasets_split, steady_state_plateaus_run
     plt.rcParams['figure.dpi'] = 300
 
     # Get mean core-steady-state e-i collision frequencies for each dataset and store in list
-    collision_frequencies = []
-    for i in range(len(datasets_split)):
-        collision_frequencies_mean = core_steady_state(datasets_split[i]['nu_ei'], core_radius,
-                                                       steady_state_plateaus_runs_split[i], operation,
-                                                       dims_to_keep=("isweep",))
-        collision_frequencies += [collision_frequencies_mean[{"isweep": isweep_choice_center_split[i]}].mean().item()]
-    collision_frequencies = np.array(collision_frequencies)
-    # create collision frequencies normalized to the range (0, 0.9) for color map
-    collision_frequencies_log = np.log(collision_frequencies)
-    collision_frequencies_normalized = 0.9 * (collision_frequencies_log - collision_frequencies_log.min()
-                                              ) / (collision_frequencies_log.max() - collision_frequencies_log.min())
-
-    color_map = matplotlib.colormaps["plasma"](collision_frequencies_normalized)
+    collision_frequencies = get_collision_frequencies(datasets_split, core_radius, steady_state_plateaus_runs_split,
+                                                      isweep_choice_center_split, operation)
+    collision_frequencies_log_normalized = normalize(collision_frequencies, 0, 0.9)
+    color_map = matplotlib.colormaps["plasma"](collision_frequencies_log_normalized)
 
     for i in range(len(datasets_split)):
         isweep_choices = (0, 2) if datasets_split[i].attrs['Exp name'] == "January_2024" else (0, 1)
@@ -410,3 +392,31 @@ def get_title(diagnostic: str) -> str:
         diagnostic = diagnostic.replace(key, full_names[key])
 
     return diagnostic
+
+
+def get_collision_frequencies(datasets, core_radius, steady_state_plateaus_runs, isweep_choice_center, operation):
+    r"""
+    Finds typical core-steady-state electron-ion collision frequencies for each dataset.
+    :param datasets:
+    :param core_radius:
+    :param steady_state_plateaus_runs:
+    :param isweep_choice_center:
+    :param operation:
+    :return: tuple of (collision frequencies DataArray, log(collision frequencies) DataArray normalized to [0, 0.9])
+    """
+
+    collision_frequencies = []
+    for i in range(len(datasets)):
+        collision_frequencies_mean = core_steady_state(datasets[i]['nu_ei'], core_radius,
+                                                       steady_state_plateaus_runs[i], operation,
+                                                       dims_to_keep=("isweep",))
+        collision_frequencies += [collision_frequencies_mean[{"isweep": isweep_choice_center[i]}].mean().item()]
+    collision_frequencies = np.array(collision_frequencies)
+
+    return collision_frequencies
+
+
+def normalize(ndarray, lower=0., upper=1.):
+    return lower + (upper - lower) * (ndarray - ndarray.min()) / (ndarray.max() - ndarray.min())
+
+
