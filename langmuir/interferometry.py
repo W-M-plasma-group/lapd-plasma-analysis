@@ -182,7 +182,7 @@ def itfm_file_search_hdf5(run_str: str, folder_path: str):
     hdf5_paths = search_folder(folder_path, "hdf5")
 
     # find hdf5 path corresponding to hdf5 file
-    return [path for path in hdf5_paths if os.path.split(path)[1].startswith(run_str)][0]
+    return [path for path in hdf5_paths if lapd.File(path).info['run name'].startswith(run_str)][0]
 
 
 def itfm_density_288ghz(reference_filename: str, signal_filename: str) -> xr.DataArray:
