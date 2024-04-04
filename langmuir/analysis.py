@@ -17,6 +17,9 @@ def get_langmuir_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder
     print("\n===== Langmuir probe analysis =====")
     netcdf_folder = ensure_directory(langmuir_nc_folder)  # Create folder to save NetCDF files if not yet existing
 
+    # Display user file parameters
+    print_file_choices(hdf5_folder, langmuir_nc_folder, interferometry_folder, interferometry_mode, isweep_choice)
+
     # Ask user to choose either NetCDF files or HDF5 files, then create datasets from them
     datasets = load_datasets(hdf5_folder, netcdf_folder, bimaxwellian)
 
@@ -76,6 +79,9 @@ def print_file_choices(hdf5_folder, lang_nc_folder, interferometry_folder, inter
           "\nLinear combinations of isat sources:   \t", repr(isweep_choice),
           "\nThese can be changed in main.py.")
     input("Enter any key to continue: ")
+
+
+def load_datasets(hdf5_folder, lang_nc_folder, bimaxwellian):
 
     print("\nThe following NetCDF files were found in the NetCDF folder (specified in main.py): ")
     nc_paths = sorted(search_folder(lang_nc_folder, 'nc', limit=52))
