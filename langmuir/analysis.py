@@ -27,7 +27,7 @@ def get_langmuir_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder
         datasets = interferometry_calibrate_datasets(datasets, density_diagnostic, interferometry_folder,
                                                      interferometry_mode, core_radius, steady_state_plateaus_runs)
 
-    # Calculate pressure
+    # Calculate pressures
     for i in range(len(datasets)):
         # TODO check behavior with advisor: use avg or cold T_e for bimaxwellian plasmas?
         electron_temperature = datasets[i]['T_e_avg'] if 'T_e_avg' in datasets[i] else datasets[i]['T_e']
@@ -63,11 +63,12 @@ def get_langmuir_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder
     return datasets, steady_state_plateaus_runs, diagnostic_name_dict, diagnostics_to_plot_list
 
 
-def load_datasets(hdf5_folder, lang_nc_folder, interferometry_folder, isweep_choice, bimaxwellian):
-
-    if not bool(interferometry_folder):
-        print("\nInterferometry calibration is OFF. "
-              "Interferometry-calibrated electron density ('n_e_cal') is not available.")
+def print_file_choices(hdf5_folder, lang_nc_folder, interferometry_folder, interferometry_mode, isweep_choice):
+    interferometry_mode_actions = ({"skip": "skipped",
+                                    "append": "added to uncalibrated datasets only",
+                                    "overwrite": "recalculated for all datasets"})
+    print(f"Interferometry mode is {repr(interferometry_mode)}. "
+          f"Calibrated density data will be {interferometry_mode_actions[interferometry_mode]}.")
 
     print("Current HDF5 directory path:           \t", repr(hdf5_folder),
           "\nCurrent NetCDF directory path:         \t", repr(lang_nc_folder),

@@ -101,7 +101,8 @@ if __name__ == "__main__":
                             "T_e": "electron temperature",  # median ..
                             "n_e": "electron density",      # mean?
                             "n_i_OML": "ion density",       # mean?
-                            "nu_ei": "electron-ion collision frequency"}
+                            "nu_ei": "electron-ion collision frequency",
+                            "P_e_cal": "calibrated electron pressure"}
     for key in parallel_diagnostics:
         try:
             if ask_yes_or_no(f"Generate parallel plot of {parallel_diagnostics[key]}? (y/n) "):
