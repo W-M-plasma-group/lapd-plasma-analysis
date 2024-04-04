@@ -32,7 +32,8 @@ def interferometry_calibration(density_da: xr.DataArray,
     run_str = exp_attrs['Run name'][:2]
 
     # Use only probe listed first for generating scale factors
-    core_density = density_da.isel(port=0)
+    isweep_coord = density_da['isweep']
+    core_density = density_da.isel(isweep=0)
 
     # Select core region in x and y and interpolate nan values to allow integration; 10 cm (arbitrary) max gap
     # TODO describe averaging across shots! Preserve structure in that direction, since only time varies in itfm data?
@@ -43,8 +44,8 @@ def interferometry_calibration(density_da: xr.DataArray,
 
     if itfm_id == 0:  # April 2018
         itfm_file = lapd.File(itfm_file_search_hdf5(run_str, itfm_folder))
-        itfm_raw = np.array(itfm_file.read_msi("Interferometer array")['signal'][:, 0, :])
-        density_scale_factor = itfm_calib_56ghz(core_density, itfm_raw, spatial_dims).expand_dims("port")
+        itfm = itfm_file.read_msi("Interferometer array")
+        density_scale_factor = itfm_calib_56ghz(core_density, itfm, spatial_dims).expand_dims({"isweep": isweep_coord})
         itfm_file.close()
 
     elif itfm_id == 1:  # March 2022
@@ -62,8 +63,9 @@ def interferometry_calibration(density_da: xr.DataArray,
         # TODO complete
         raise ValueError
         itfm_file = lapd.File(itfm_file_search_hdf5(run_str, itfm_folder))
-        itfm_raw = np.array(itfm_file.read_msi("Interferometer array")['signal'][:, 0, :])
-        density_scale_factor = itfm_calib_56ghz(core_density, itfm_raw, spatial_dims).expand_dims("port")
+        itfm = itfm_file.read_msi("Interferometer array")
+        density_scale_factor = itfm_calib_jan_2024(core_density, itfm, spatial_dims
+                                                   ).expand_dims({"isweep": isweep_coord})
         itfm_file.close()
 
     else:
