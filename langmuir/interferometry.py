@@ -81,14 +81,14 @@ def interferometry_calibration(density_da: xr.DataArray,
     return density_da
 
 
-def itfm_calib_56ghz(langmuir_da, itfm_nd, spatial_dimensions) -> xr.DataArray:
+def itfm_calib_56ghz(langmuir_da, itfm, spatial_dimensions) -> xr.DataArray:
     r"""
     Calibrates density data from sweep probe to measurements from interferometry probe.
 
     Parameters
     ----------
     :param langmuir_da: DataArray of n_e in cm^-3, core region only
-    :param itfm_nd: ndarray of raw interferometry data from HDF5 file
+    :param itfm: structured array of interferometry data and metadata from HDF5 file
     :param spatial_dimensions: list of spatial dimensions of density data, e.g. ('x', 'y')
 
     :return: DataArray of dimensionless scale factors for density data
