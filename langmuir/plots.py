@@ -211,17 +211,15 @@ def plot_parallel_diagnostic(datasets_split, steady_state_plateaus_runs_split, i
         zs = anode_z - (zs * u.Unit(diagnostic_means.coords['z'].attrs['units'])).to(u.m)  # convert to meters
         diagnostic_units = datasets_split[i][diagnostic].attrs['units']
 
-        plt.plot(zs, diagnostic_values, marker=marker_styles_split[i], color=color_map[i], linestyle='none',
-                 label=f"{datasets_split[i].attrs['Exp name'][:3]}, #{datasets_split[i].attrs['Run name'][:2]}"
-                       f":  {collision_frequencies[i]:.2E} Hz")
-    plt.title(f"{get_title(diagnostic)} versus z-position")  # ({operation})
+        plt.plot(zs, diagnostic_values, marker=marker_styles_split[i], color=color_map[i], linestyle='none')
+    plt.title(get_title(diagnostic) + " ", y=0.9, loc='right')  # ({operation})
     plt.xlabel("z position [m]")
-    plt.ylabel(f"{get_title(diagnostic)} [{diagnostic_units}]")
+    plt.ylabel(f"[{diagnostic_units}]", rotation=0, labelpad=10)   # {get_title(diagnostic)}
     normalizer = matplotlib.colors.LogNorm(vmin=np.min(collision_frequencies),
                                            vmax=np.max(collision_frequencies))
     color_bar = plt.colorbar(matplotlib.cm.ScalarMappable(norm=normalizer, cmap='plasma'), ax=plt.gca())
-    color_bar.set_label("Midplane electron-ion \ncollision frequency [Hz]", rotation=90, labelpad=10)
-    # plt.legend(bbox_to_anchor=(1.20, 1.0), loc='upper left', fontsize='small')
+    color_bar.set_label("nu_ei [Hz]\n(midplane)", rotation=0, labelpad=30)
+    # color_bar.set_label("Midplane electron-ion \ncollision frequency [Hz]", rotation=90, labelpad=10)
     plt.tight_layout()
     plt.savefig("/Users/leomurphy/Desktop/Research images spring 2024/research graphs late march 2024/PDF plots/"
                 "parallel_plot.pdf")
