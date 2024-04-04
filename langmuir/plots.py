@@ -376,7 +376,10 @@ def get_title(diagnostic: str) -> str:
                   'T_e_hot': "Hot electron temperature",
                   'T_e_avg': "Average bimaxwellian electron temperature",
                   'P_e': "Electron pressure",
+                  'P_e_cal': "Calibrated electron pressure",
                   'n_e_cal': "Calibrated electron density",
+                  'n_i_cal': "Calibrated ion density",
+                  'n_i_OML_cal': "Calibrated ion density (OML)",
                   'nu_ei': "Electron-ion collision frequency"}
 
     for key in sorted(list(full_names.keys()), key=len, reverse=True):

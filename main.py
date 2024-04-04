@@ -99,6 +99,7 @@ if __name__ == "__main__":
     # Plot pressure versus z position for many datasets
     parallel_diagnostics = {"P_e": "pressure",
                             "T_e": "electron temperature",  # median ..
+                            "n_e_cal": "calibrated electron density",
                             "n_e": "electron density",      # mean?
                             "n_i_OML": "ion density",       # mean?
                             "nu_ei": "electron-ion collision frequency",

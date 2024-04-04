@@ -177,6 +177,7 @@ def interferometry_calibrate_datasets(datasets, density_diagnostic, interferomet
 
 def save_datasets(datasets: list[xr.Dataset], lang_nc_folder, bimaxwellian):
     for i in range(len(datasets)):
-        ds_save_path = make_path(lang_nc_folder, datasets[i].attrs['Run name'] + ("_bimax" if bimaxwellian else "")
-                                 + "_lang", "nc")
+        ds_save_name = (datasets[i].attrs['Exp name'][:3] + datasets[i].attrs['Exp name'][-2:] + "_"
+                        + datasets[i].attrs['Run name'] + ("_bimax" if bimaxwellian else "") + "_lang")
+        ds_save_path = make_path(lang_nc_folder, ds_save_name, "nc")
         write_netcdf(datasets[i], ds_save_path)
