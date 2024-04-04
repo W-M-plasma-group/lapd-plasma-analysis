@@ -103,17 +103,21 @@ if __name__ == "__main__":
                             "n_i_OML": "ion density",       # mean?
                             "nu_ei": "electron-ion collision frequency"}
     for key in parallel_diagnostics:
-        if ask_yes_or_no(f"Generate parallel plot of {parallel_diagnostics[key]}? (y/n) "):
-            plot_parallel_diagnostic(datasets_split, steady_state_plateaus_runs_split, isweep_choice_center_split,
-                                     marker_styles_split, diagnostic=key, operation="median")
+        try:
+            if ask_yes_or_no(f"Generate parallel plot of {parallel_diagnostics[key]}? (y/n) "):
+                plot_parallel_diagnostic(datasets_split, steady_state_plateaus_runs_split, isweep_choice_center_split,
+                                         marker_styles_split, diagnostic=key, operation="median", core_radius=core_radius)
+        except KeyError as e:
+            print(e)
 
     if ask_yes_or_no("Generate scatter plot of first two selected diagnostics? (y/n) "):
         scatter_plot_diagnostics(datasets_split, diagnostics_to_plot_list, steady_state_plateaus_runs_split,
-                                 isweep_choice_center_split, marker_styles_split, operation="median")
+                                 isweep_choice_center_split, marker_styles_split, operation="median",
+                                 core_radius=core_radius)
 
     if ask_yes_or_no("Generate plot of inverse pressure gradient scale length by position? (y/n) "):
         plot_parallel_inverse_scale_length(datasets_split, steady_state_plateaus_runs_split, "P_e",
-                                           isweep_choice_center_split, marker_styles_split, "median")
+                                           isweep_choice_center_split, marker_styles_split, "median", core_radius)
 
     if ask_yes_or_no("Generate plot of inverse temperature gradient scale length by position? (y/n) "):
         plot_parallel_inverse_scale_length(datasets_split, steady_state_plateaus_runs_split, "T_e",

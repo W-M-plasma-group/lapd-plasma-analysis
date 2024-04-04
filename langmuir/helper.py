@@ -5,7 +5,6 @@ import astropy.units as u
 from plasmapy.diagnostics.langmuir import swept_probe_analysis, reduce_bimaxwellian_temperature, Characteristic
 
 plt.rcParams["figure.dpi"] = 160
-core_radius = 26. * u.cm
 
 
 def value_safe(quantity_or_scalar):  # Get value of quantity or scalar, depending on type

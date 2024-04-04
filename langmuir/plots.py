@@ -187,7 +187,7 @@ def plot_line_diagnostic(diagnostics_ds_s: list[xr.Dataset], diagnostic, plot_ty
 
 
 def plot_parallel_diagnostic(datasets_split, steady_state_plateaus_runs_split, isweep_choice_center_split,
-                             marker_styles_split, diagnostic, operation="mean"):
+                             marker_styles_split, diagnostic, operation="mean", core_radius=26 * u.cm):
     plt.rcParams['figure.figsize'] = (6, 3.5)
     plt.rcParams['figure.dpi'] = 300
 
@@ -230,7 +230,7 @@ def plot_parallel_diagnostic(datasets_split, steady_state_plateaus_runs_split, i
 
 
 def scatter_plot_diagnostics(datasets_split, diagnostics_to_plot_list, steady_state_plateaus_runs_split,
-                             isweep_choice_center_split, marker_styles_split, operation="mean"):
+                             isweep_choice_center_split, marker_styles_split, operation="mean", core_radius=26 * u.cm):
     plt.rcParams['figure.figsize'] = (8.5, 5.5)
     plt.rcParams['figure.dpi'] = 300
 
@@ -284,7 +284,7 @@ def scatter_plot_diagnostics(datasets_split, diagnostics_to_plot_list, steady_st
 
 
 def plot_parallel_inverse_scale_length(datasets_split, steady_state_plateaus_runs_split, diagnostic,
-                                       isweep_choice_center_split, marker_styles_split, operation):
+                                       isweep_choice_center_split, marker_styles_split, operation, core_radius):
     plt.rcParams['figure.figsize'] = (7, 4.5)   # (8.5, 5.5)
     plt.rcParams['figure.dpi'] = 300
 
