@@ -9,8 +9,8 @@ import astropy.units as u
 from astropy import constants as const
 from bapsflib import lapd
 
-from file_access import search_folder
-from configurations import get_config_id
+from langmuir.file_access import search_folder
+from langmuir.configurations import get_config_id
 
 
 # "interferometry" is abbreviated as "itfm" throughout

@@ -8,7 +8,7 @@ from bapsflib.lapd.tools import portnum_to_z
 from plasmapy.formulary.collisions import Coulomb_logarithm
 from plasmapy.formulary.collisions.frequencies import MaxwellianCollisionFrequencies
 
-from helper import *
+from langmuir.helper import *
 
 
 def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, ports, probe_area, ion_type, bimaxwellian=False):

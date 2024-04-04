@@ -1,4 +1,4 @@
-from helper import *
+from langmuir.helper import *
 
 import warnings
 import bottleneck as bn

@@ -1,14 +1,14 @@
-from file_access import *
-from helper import *
-from configurations import *
-from experimental import get_exp_params
-from getIVsweep import get_isweep_vsweep
-from characterization import characterize_sweep_array
-from preview import preview_raw_sweep, preview_characteristics
-from diagnostics import (langmuir_diagnostics, detect_steady_state_ramps, get_pressure,
-                         get_electron_ion_collision_frequencies)
-from interferometry import interferometry_calibration
-from plots import get_title
+from langmuir.file_access import *
+from langmuir.helper import *
+from langmuir.configurations import *
+from langmuir.experimental import get_exp_params
+from langmuir.getIVsweep import get_isweep_vsweep
+from langmuir.characterization import characterize_sweep_array
+from langmuir.preview import preview_raw_sweep, preview_characteristics
+from langmuir.diagnostics import (langmuir_diagnostics, detect_steady_state_ramps, get_pressure,
+                                  get_electron_ion_collision_frequencies)
+from langmuir.interferometry import interferometry_calibration
+from langmuir.plots import get_title
 
 
 def setup_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder, isweep_choice, bimaxwellian) -> (

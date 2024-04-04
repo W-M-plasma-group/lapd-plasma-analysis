@@ -5,6 +5,9 @@ from astropy import visualization
 
 from helper import *
 from bapsflib.lapd.tools import portnum_to_z
+from langmuir.helper import *
+
+matplotlib.rcParams.update(matplotlib.rcParamsDefault)
 
 # matplotlib.use('TkAgg')
 # matplotlib.use('QtAgg')

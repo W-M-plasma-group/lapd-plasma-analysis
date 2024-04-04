@@ -6,7 +6,7 @@ Comments are added inline. A separate documentation page is not yet complete.
 
 from langmuir.helper import *
 from langmuir.file_access import ask_yes_or_no
-from langmuir.load_datasets import setup_datasets
+from langmuir.analysis import get_langmuir_datasets
 from langmuir.plots import multiplot_line_diagnostic, plot_line_diagnostic
 from langmuir.plots import plot_parallel_diagnostic, scatter_plot_diagnostics, plot_parallel_inverse_scale_length
 
