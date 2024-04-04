@@ -11,8 +11,10 @@ from langmuir.interferometry import interferometry_calibration
 from langmuir.plots import get_title
 
 
-def setup_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder, isweep_choice, bimaxwellian) -> (
-        list[xr.Dataset], list[tuple], dict, list[np.ndarray]):
+def get_langmuir_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder, interferometry_mode, isweep_choice,
+                          core_radius, bimaxwellian) -> (list[xr.Dataset], list[tuple], dict, list[np.ndarray]):
+
+    print("\n===== Langmuir probe analysis =====")
     netcdf_folder = ensure_directory(langmuir_nc_folder)  # Create folder to save NetCDF files if not yet existing
 
     # Ask user to choose either NetCDF files or HDF5 files, then create datasets from them
@@ -143,21 +145,28 @@ def load_datasets(hdf5_folder, lang_nc_folder, interferometry_folder, isweep_cho
     return datasets, calibrate_new_interferometry
 
 
-def interferometry_calibrate_datasets(datasets, interferometry_folder, steady_state_ramps):
+def interferometry_calibrate_datasets(datasets, density_diagnostic, interferometry_folder, interferometry_mode,
+                                      core_radius, steady_state_ramps):
+    # datasets[i].attrs = exp params
+    calibrated_density_diagnostic = density_diagnostic + '_cal'
+    print(f"{get_title(density_diagnostic)} mean steady-state interferometry calibration factors")
 
     for i in range(len(datasets)):
-        calibrated_electron_density = interferometry_calibration(datasets[i]['n_e'].copy(),
-                                                                 datasets[i].attrs,          # exp params
-                                                                 interferometry_folder,
-                                                                 steady_state_ramps[i],
-                                                                 # datasets[i].attrs['Steady state plateau indices']
-                                                                 core_radius=core_radius)
-        datasets[i] = datasets[i].assign({"n_e_cal": calibrated_electron_density})
-        """
-        except (IndexError, ValueError, TypeError, AttributeError, KeyError) as e:
-            print(f"Error in calibrating electron density: \n{str(e)}")
-            calibrated_electron_density = datasets[i]['n_e'].copy()
-        """
+        if interferometry_mode == "overwrite" or (interferometry_mode == "append"
+                                                  and np.isnan(datasets[i][calibrated_density_diagnostic]).all()):
+            print("\t", end="")  # indent interferometry scale factor
+            calibrated_electron_density = interferometry_calibration(datasets[i][density_diagnostic].copy(),
+                                                                     datasets[i].attrs,
+                                                                     interferometry_folder,
+                                                                     steady_state_ramps[i],
+                                                                     core_radius)
+            datasets[i] = datasets[i].assign({calibrated_density_diagnostic: calibrated_electron_density})
+
+            """
+            except (IndexError, ValueError, TypeError, AttributeError, KeyError) as e:
+                print(f"Error in calibrating electron density: \n{str(e)}")
+                calibrated_electron_density = datasets[i]['n_e'].copy()
+            """
 
         datasets[i] = datasets[i].assign_attrs({"Interferometry calibrated": True})
 

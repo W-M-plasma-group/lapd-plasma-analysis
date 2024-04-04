@@ -20,8 +20,8 @@ hdf5_folder = "/Users/leomurphy/lapd-data/January_2024/January_2024_all_working/
 assert hdf5_folder.endswith("/")
 langmuir_nc_folder = hdf5_folder + "lang_nc/"
 
-""" Set to False or equivalent if interferometry calibration is not desired """
-# interferometry_folder = False                               # TODO set to False to avoid interferometry calibration
+""" Path to directory containing interferometry files """
+interferometry_mode = "overwrite"                                # "skip", "append", "overwrite"; recommended: "append"
 interferometry_folder = "/Users/leomurphy/lapd-data/November_2022/uwave_288_GHz_waveforms/" \
     if "November_2022" in hdf5_folder else hdf5_folder
 
@@ -56,8 +56,9 @@ if __name__ == "__main__":
     # TODO list of hardcoded parameters
     #    (16, 24) for January_2024 steady state period (detect_steady_state_period in diagnostics.py)
 
-    datasets, steady_state_plateaus_runs, diagnostic_name_dict, diagnostics_to_plot_list = setup_datasets(
-        langmuir_nc_folder, hdf5_folder, interferometry_folder, isweep_choice, bimaxwellian)
+    datasets, steady_state_plateaus_runs, diagnostic_name_dict, diagnostics_to_plot_list = get_langmuir_datasets(
+        langmuir_nc_folder, hdf5_folder, interferometry_folder, interferometry_mode,
+        isweep_choice, core_radius, bimaxwellian)
     print("Diagnostics selected:", diagnostics_to_plot_list)
 
     # Plot chosen diagnostics for each individual dataset
