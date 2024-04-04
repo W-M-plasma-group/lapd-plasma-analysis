@@ -37,7 +37,11 @@ def get_langmuir_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder
 
     # Calculate pressure
     for i in range(len(datasets)):
-        datasets[i] = datasets[i].assign({"P_e": get_pressure(datasets[i])})
+        # TODO check behavior with advisor: use avg or cold T_e for bimaxwellian plasmas?
+        electron_temperature = datasets[i]['T_e_avg'] if 'T_e_avg' in datasets[i] else datasets[i]['T_e']
+        datasets[i] = datasets[i].assign({"P_e": get_pressure(datasets[i]['n_e'], electron_temperature)})
+        if not np.isnan(datasets[i]['n_e_cal']).all():
+            datasets[i] = datasets[i].assign({"P_e_cal": get_pressure(datasets[i]['n_e_cal'], electron_temperature)})
 
     # Calculate collision frequency
     for i in range(len(datasets)):

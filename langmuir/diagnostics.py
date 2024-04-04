@@ -119,12 +119,10 @@ def filter_characteristic(characteristic) -> bool:
     return True
 
 
-def get_pressure(lang_ds):
+def get_pressure(electron_density, electron_temperature):
     r"""Calculate electron pressure from temperature and calibrated density"""
     pressure_unit = u.Pa
-    calibrated_electron_density = lang_ds['n_e'] if np.isnan(lang_ds['n_e_cal']).all() else lang_ds['n_e_cal']
-    electron_temperature = lang_ds['T_e_avg'] if 'T_e_avg' in lang_ds else lang_ds['T_e']  # TODO check w Dr.: avg/cold?
-    pressure = (3 / 2) * electron_temperature * calibrated_electron_density * (1. * u.eV * u.m ** -3).to(pressure_unit)
+    pressure = (3 / 2) * electron_temperature * electron_density * (1. * u.eV * u.m ** -3).to(pressure_unit)
     return pressure.assign_attrs({'units': str(pressure_unit)})
 
 
