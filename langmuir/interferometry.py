@@ -70,9 +70,10 @@ def interferometry_calibration(density_da: xr.DataArray,
         raise NotImplementedError("Unsupported interferometry id " + repr(itfm_id))
 
     # Select steady state region only (given by plateau indices)
-    density_scale_factor = density_scale_factor.where(np.logical_and(density_da.plateau >= steady_state[0],
-                                                                     density_da.plateau <= steady_state[1]))
-    print(f"Mean steady-state interferometry calibration factor: {np.nanmean(np.asarray(density_scale_factor)):.2f}")
+    steady_state_density_scale_factor = density_scale_factor.where(np.logical_and(
+        density_da.plateau >= steady_state[0], density_da.plateau <= steady_state[1]))
+    print(f"Run {exp_attrs['Run name'][:2]}: \t"
+          f"{np.nanmean(np.asarray(steady_state_density_scale_factor)):.2f}")
 
     density_da *= density_scale_factor.expand_dims({dim: density_da.sizes[dim] for dim in spatial_dims + ["shot"]})
     density_da *= (1 / u.cm ** 3).to(1 / u.m ** 3).value  # density in 1/m^3
