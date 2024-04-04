@@ -26,7 +26,7 @@ def interferometry_calibration(density_da: xr.DataArray,
     density_da *= (1 / u.m ** 3).to(1 / u.cm ** 3).value  # density in 1/cm^3
 
     # Detect spatial dimensions (1D or 2D)
-    spatial_dims = [dim for dim in ['x', 'y'] if density_da.sizes[dim] > 1]
+    spatial_dims = [dim for dim in ('x', 'y') if density_da.sizes[dim] > 1]
     # Assume all spatial dimensions are labeled in centimeters
 
     run_str = exp_attrs['Run name'][:2]
@@ -226,12 +226,12 @@ def itfm_density_288ghz(reference_filename: str, signal_filename: str) -> xr.Dat
     dphi = (pref - psig)
     dphi -= dphi[0]
 
-    density = (dphi * calibration / diameter).to(u.cm ** -3).value  # returns array of *average* density over core
-    density_da = xr.DataArray(density,
-                              dims=["time"],
-                              coords={"time": time_ms.value})
+    itfm_density = (dphi * calibration / diameter).to(u.cm ** -3).value  # returns array of *average* density over core
+    itfm_density_da = xr.DataArray(itfm_density,
+                                   dims=["time"],
+                                   coords={"time": time_ms.value})
 
-    return density_da
+    return itfm_density_da
 
 
 def itfm_calib_288ghz(density_da: xr.DataArray,
@@ -239,7 +239,7 @@ def itfm_calib_288ghz(density_da: xr.DataArray,
 
     dt = (itfm_da.time[-1] - itfm_da.time[0]) / len(itfm_da.time)   # time step for density time coord. in ms
 
-    mean_density_da = density_da
+    mean_density_da = density_da.copy()
     for dim in spatial_dimensions:
         mean_density_da = (mean_density_da.integrate(dim) / (2 * core_radius.to(u.cm).value)
                            ).assign_attrs(mean_density_da.attrs)
@@ -345,7 +345,7 @@ def crunch_data(source_da: xr.DataArray,
     Parameters
     ----------
     :param source_da: DataArray containing data to bin and average
-    :param source_coord_name: string, dimension in data_array
+    :param source_coord_name: string, dimension in data_array; used to bin data
     :param destination_coord_da: xarray DataArray, used as coordinate
     :param step:
     :return:
