@@ -97,11 +97,15 @@ def itfm_calib_56ghz(langmuir_da, itfm, spatial_dimensions) -> xr.DataArray:
     # INTERFEROMETRY DATA #
     # ___________________ #
 
+    itfm_nd = np.array(itfm['signal'][:, 0, :])
+    itfm_raw_to_line_integrated_density = itfm.info['n_bar_L'][0] / u.cm ** 2
+    itfm_dt = itfm.info['dt'][0] * u.s
+    # itfm_t0 = itfm.info['t0'][0] * u.s  # unused because we align times manually here
+
     itfm_nd = np.mean(itfm_nd, axis=0)  # average out unnecessary length-2 dimension
 
-    # TODO scan from HDF5 MSI data (in 'meta' field?)
-    itfm_nd *= 8e13 / (u.cm ** 2)  # from MATLAB code
-    itfm_times = np.arange(len(itfm_nd)) * (4.88e-5 * u.s).to(u.ms)   # from MATLAB code; HDF5 header data says 4.0e-5 s
+    itfm_nd = itfm_nd * itfm_raw_to_line_integrated_density  # previously: itfm_nd *= real_density_scale
+    itfm_times = np.arange(len(itfm_nd)) * itfm_dt.to(u.ms)
 
     # Create interferometry DataArray with interferometry time as coordinates
     itfm_da = xr.DataArray(itfm_nd, coords=(('time', itfm_times, {'units': str(u.ms)}),))
