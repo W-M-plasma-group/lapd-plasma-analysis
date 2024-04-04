@@ -55,8 +55,9 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
 
     visualization.quantity_support()
     plt.rcParams['figure.dpi'] = 300
-    plt.rcParams['figure.figsize'] = (3 + 3 * len(outer_indexes), 4)
+    plt.rcParams['figure.figsize'] = (3 + 3 * len(outer_indexes), 4.5)
     fig, axes = plt.subplots(1, len(outer_indexes), sharey="row")
+    fig.suptitle(f"{get_title(plot_diagnostic)}\nColor: {attributes[0]}\nIsweep styles: {marker_styles}", size=18)
 
     for outer_index in range(len(outer_unique)):    # gas puff voltage index
         outer_val = outer_unique[outer_index]
@@ -107,9 +108,7 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
                                                            operation="median", dims_to_keep=["isweep"]).max().item()])]
         ax.set_ylim(0, np.max(y_limits))
         ax.tick_params(axis="y", left=True, labelleft=True)
-        ax.title.set_text(((str(attributes[1]) + ": " + str(outer_val)) if len(attributes) == 2 else '')
-                          + f"\nColor: {attributes[0]}"
-                          + f"\nIsweep styles: {marker_styles}")
+        ax.title.set_text((str(attributes[1]) + ": " + str(outer_val)) if len(attributes) == 2 else '')
         ax.legend()
     plt.tight_layout()
     plt.show()
