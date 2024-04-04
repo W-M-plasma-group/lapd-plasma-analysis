@@ -39,7 +39,6 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
     attributes = np.atleast_1d(attribute)
     if len(attributes) > 2:
         # TODO detect/fix
-        # raise ValueError("Cannot currently categorize line plots that differ in more than two attributes")
         warn(f"Can currently only categorize line plots by two attributes. Selecting last two: {attributes[-2:]}")
         attributes = attributes[-2:]
 
@@ -59,8 +58,7 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
     plt.rcParams['figure.figsize'] = (3 + 3 * len(outer_indexes), 4)
     fig, axes = plt.subplots(1, len(outer_indexes), sharey="row")
 
-    fig.suptitle(get_title(plot_diagnostic), size=18)
-    for outer_index in range(len(outer_unique)):
+    for outer_index in range(len(outer_unique)):    # gas puff voltage index
         outer_val = outer_unique[outer_index]
         ax = np.atleast_1d(axes)[outer_index]
 
@@ -69,11 +67,11 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
 
         color_map = matplotlib.colormaps["plasma"](np.linspace(0, 0.9, num_datasets))
 
-        y_limits = []
-        for inner_index in range(num_datasets):
+        y_limits = [0]
+        for inner_index in range(num_datasets):     # discharge current index
 
             ds_s = isweep_selector(datasets[inner_index], isweep_choices)
-            for i in range(len(ds_s)):  # isweep index
+            for i in range(len(ds_s)):              # isweep index
                 ds = ds_s[i]
 
                 inner_val = ds.attrs[attributes[0]]
@@ -237,17 +235,10 @@ def scatter_plot_diagnostics(datasets_split, diagnostics_to_plot_list, steady_st
     plt.rcParams['figure.dpi'] = 300
 
     collision_frequencies = []
-    for i in range(len(datasets_split)):
-        collision_frequencies_mean = core_steady_state(datasets_split[i]['nu_ei'], core_radius,
-                                                       steady_state_plateaus_runs_split[i], operation,
-                                                       dims_to_keep=("isweep",))
-        collision_frequencies += [collision_frequencies_mean[{"isweep": isweep_choice_center_split[i]}].mean().item()]
-    collision_frequencies = np.array(collision_frequencies)
-    # create collision frequencies normalized to the range (0, 0.9) for color map
-    collision_frequencies_log = np.log(collision_frequencies)
-    collision_frequencies_normalized = 0.9 * (collision_frequencies_log - collision_frequencies_log.min()
-                                              ) / (collision_frequencies_log.max() - collision_frequencies_log.min())
-    color_map = matplotlib.colormaps["plasma"](collision_frequencies_normalized)
+    collision_frequencies = get_collision_frequencies(datasets_split, core_radius, steady_state_plateaus_runs_split,
+                                                      isweep_choice_center_split, operation)
+    collision_frequencies_log_normalized = normalize(collision_frequencies, 0, 0.9)
+    color_map = matplotlib.colormaps["plasma"](collision_frequencies_log_normalized)
 
     diagnostics_points = []
     for i in range(len(datasets_split)):

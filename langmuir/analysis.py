@@ -18,22 +18,14 @@ def get_langmuir_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder
     netcdf_folder = ensure_directory(langmuir_nc_folder)  # Create folder to save NetCDF files if not yet existing
 
     # Ask user to choose either NetCDF files or HDF5 files, then create datasets from them
-    datasets, generate_new_itfm = load_datasets(hdf5_folder, netcdf_folder, interferometry_folder, isweep_choice,
-                                                bimaxwellian)
-
-    # Get ramp indices for beginning and end of steady state period in plasma; TODO hardcoded
-    """
-    for dataset in datasets:
-        steady_state_plateau_indices = (16, 24) if "january" in hdf5_folder.lower(
-            ) else detect_steady_state_ramps(dataset['n_e'], core_radius)
-        dataset = dataset.assign_attrs({"Steady state plateaus indices": steady_state_plateau_indices})
-    """
+    datasets = load_datasets(hdf5_folder, netcdf_folder, bimaxwellian)
 
     steady_state_plateaus_runs = [detect_steady_state_ramps(dataset, core_radius) for dataset in datasets]
 
-    # Calibrate electron densities using interferometry data only if diagnostics were newly generated from HDF5 files
-    if generate_new_itfm:
-        datasets = interferometry_calibrate_datasets(datasets, interferometry_folder, steady_state_plateaus_runs)
+    # Calibrate electron densities using interferometry data, depending on interferometry mode
+    for density_diagnostic in ('n_e', 'n_i', 'n_i_OML'):
+        datasets = interferometry_calibrate_datasets(datasets, density_diagnostic, interferometry_folder,
+                                                     interferometry_mode, core_radius, steady_state_plateaus_runs)
 
     # Calculate pressure
     for i in range(len(datasets)):
@@ -145,8 +137,7 @@ def load_datasets(hdf5_folder, lang_nc_folder, interferometry_folder, isweep_cho
             save_datasets([diagnostics_dataset], lang_nc_folder, bimaxwellian)
             datasets.append(diagnostics_dataset)
 
-    calibrate_new_interferometry = len(nc_paths_to_open_ints) == 0 and interferometry_folder
-    return datasets, calibrate_new_interferometry
+    return datasets
 
 
 def interferometry_calibrate_datasets(datasets, density_diagnostic, interferometry_folder, interferometry_mode,
@@ -172,7 +163,7 @@ def interferometry_calibrate_datasets(datasets, density_diagnostic, interferomet
                 calibrated_electron_density = datasets[i]['n_e'].copy()
             """
 
-        datasets[i] = datasets[i].assign_attrs({"Interferometry calibrated": True})
+            # datasets[i] = datasets[i].assign_attrs({"Interferometry calibrated": True})  # TODO necessary?/improve
 
     return datasets
 

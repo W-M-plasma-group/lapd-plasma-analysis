@@ -20,7 +20,6 @@ def interferometry_calibration(density_da: xr.DataArray,
                                core_radius: u.Quantity = 26. * u.cm,
                                ) -> xr.DataArray:
 
-    # itfm_id = ["April_2018", "March_2022", "November_2022"].index(exp_attrs['Exp name'])
     itfm_id = get_config_id(exp_attrs['Exp name'])
 
     # All calculations are in cm, as coordinates are labeled in cm
@@ -90,6 +89,7 @@ def itfm_calib_56ghz(langmuir_da, itfm_nd, spatial_dimensions) -> xr.DataArray:
     :param langmuir_da: DataArray of n_e in cm^-3, core region only
     :param itfm_nd: ndarray of raw interferometry data from HDF5 file
     :param spatial_dimensions: list of spatial dimensions of density data, e.g. ('x', 'y')
+
     :return: DataArray of dimensionless scale factors for density data
     """
 

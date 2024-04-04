@@ -31,7 +31,7 @@ isweep_choice = [[1, 0, 0, 0]]  # , [0, 0, 1, 0]]
 # isweep_choice = [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]
 # isweep_choice = [[1, 0], [0, 1]]
 # isweep_choice = [0]
-bimaxwellian = False                                        # TODO perform both and store in same NetCDF file?
+bimaxwellian = False                                        # note to self: perform both and store in same NetCDF file?
 core_radius = 26. * u.cm                                    # From MATLAB code
 
 # Diagram of LAPD
@@ -122,7 +122,6 @@ if __name__ == "__main__":
     if ask_yes_or_no("Generate plot of inverse electron density gradient scale length by position? (y/n) "):
         plot_parallel_inverse_scale_length(datasets_split, steady_state_plateaus_runs_split, "n_e",
                                            isweep_choice_center_split, marker_styles_split, "median")
-
 
     # (UNFINISHED) Shot plot: multiplot line diagnostics at specific time, with x-axis = x pos and curve color = shot #
     """if ask_yes_or_no("Generate line shot plot of selected diagnostics over radial position? (y/n) "):
