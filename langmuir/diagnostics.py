@@ -1,5 +1,3 @@
-import xarray as xr
-
 import sys
 import warnings
 from tqdm import tqdm

@@ -3,7 +3,6 @@ from warnings import warn
 import matplotlib
 from astropy import visualization
 
-from helper import *
 from bapsflib.lapd.tools import portnum_to_z
 from langmuir.helper import *
 

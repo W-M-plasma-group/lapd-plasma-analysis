@@ -2,7 +2,6 @@ import numpy as np
 import xarray as xr
 import pandas as pd
 import re
-import os
 
 from scipy.signal import find_peaks, hilbert
 import astropy.units as u
