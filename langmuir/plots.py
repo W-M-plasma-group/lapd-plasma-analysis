@@ -79,7 +79,7 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
 
                 da = ds[plot_diagnostic]
                 if x_dim in ('x', 'y'):  # only consider steady state
-                    da = steady_state_only(da, steady_state_by_runs[inner_index])
+                    da = steady_state_only(da, steady_state_by_runs[inner_index])  # TODO deprecate w core_steady_state?
                 elif x_dim == 'time':  # only consider core region
                     da = da.where(np.logical_and(*in_core([da.x, da.y], core_rad)), drop=True)
 
@@ -100,13 +100,16 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
                 ax.set_xlabel(da_mean.coords[x_dim].attrs['units'])
                 ax.set_ylabel(da_mean.attrs['units'])
 
-                # TODO a bit hardcoded
-                da_core_steady_state_max = core_steady_state(da, core_rad, steady_state_by_runs[inner_index]
+                # TODO a bit hardcoded; TODO document fill_na!
+                da_core_steady_state_max = core_steady_state(da.fillna(0), core_rad, steady_state_by_runs[inner_index]
                                                              ).max().item()
-                y_limits += [np.min([1.1 * da_core_steady_state_max,
-                                     2 * core_steady_state(da, core_rad, steady_state_by_runs[inner_index],
-                                                           operation="median", dims_to_keep=["isweep"]).max().item()])]
-        ax.set_ylim(0, np.max(y_limits))
+                y_limits += [np.nanmin([1.1 * da_core_steady_state_max,
+                                        2 * core_steady_state(da, core_rad, steady_state_by_runs[inner_index],
+                                                              operation="median", dims_to_keep=["isweep"]
+                                                              ).max().item()])]
+        if not np.nanmax(y_limits) > 0:
+            warn("A plot was assigned a NaN upper axis limit")
+        ax.set_ylim(0, np.nanmax(y_limits))
         ax.tick_params(axis="y", left=True, labelleft=True)
         ax.title.set_text((str(attributes[1]) + ": " + str(outer_val)) if len(attributes) == 2 else '')
         ax.legend()
