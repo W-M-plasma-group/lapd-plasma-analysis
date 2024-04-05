@@ -1,4 +1,4 @@
-from helper import *
+from langmuir.helper import *
 
 
 def preview_characteristics(characteristics_array, positions, ports, ramp_times, exp_params_dict, diagnostics=False,

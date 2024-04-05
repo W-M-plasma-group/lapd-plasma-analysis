@@ -3,7 +3,7 @@ import astropy.units as u
 import re
 
 from bapsflib import lapd
-from configurations import get_config_id
+from langmuir.configurations import get_config_id
 
 
 def get_exp_params(hdf5_path):

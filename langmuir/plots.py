@@ -3,8 +3,10 @@ from warnings import warn
 import matplotlib
 from astropy import visualization
 
-from helper import *
 from bapsflib.lapd.tools import portnum_to_z
+from langmuir.helper import *
+
+matplotlib.rcParams.update(matplotlib.rcParamsDefault)
 
 # matplotlib.use('TkAgg')
 # matplotlib.use('QtAgg')
@@ -37,7 +39,6 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
     attributes = np.atleast_1d(attribute)
     if len(attributes) > 2:
         # TODO detect/fix
-        # raise ValueError("Cannot currently categorize line plots that differ in more than two attributes")
         warn(f"Can currently only categorize line plots by two attributes. Selecting last two: {attributes[-2:]}")
         attributes = attributes[-2:]
 
@@ -54,11 +55,11 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
 
     visualization.quantity_support()
     plt.rcParams['figure.dpi'] = 300
-    plt.rcParams['figure.figsize'] = (3 + 3 * len(outer_indexes), 4)
+    plt.rcParams['figure.figsize'] = (3 + 3 * len(outer_indexes), 4.5)
     fig, axes = plt.subplots(1, len(outer_indexes), sharey="row")
+    fig.suptitle(f"{get_title(plot_diagnostic)}\nColor: {attributes[0]}\nIsweep styles: {marker_styles}", size=18)
 
-    fig.suptitle(get_title(plot_diagnostic), size=18)
-    for outer_index in range(len(outer_unique)):
+    for outer_index in range(len(outer_unique)):    # gas puff voltage index
         outer_val = outer_unique[outer_index]
         ax = np.atleast_1d(axes)[outer_index]
 
@@ -67,18 +68,18 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
 
         color_map = matplotlib.colormaps["plasma"](np.linspace(0, 0.9, num_datasets))
 
-        y_limits = []
-        for inner_index in range(num_datasets):
+        y_limits = [0]
+        for inner_index in range(num_datasets):     # discharge current index
 
             ds_s = isweep_selector(datasets[inner_index], isweep_choices)
-            for i in range(len(ds_s)):  # isweep index
+            for i in range(len(ds_s)):              # isweep index
                 ds = ds_s[i]
 
                 inner_val = ds.attrs[attributes[0]]
 
                 da = ds[plot_diagnostic]
                 if x_dim in ('x', 'y'):  # only consider steady state
-                    da = steady_state_only(da, steady_state_by_runs[inner_index])
+                    da = steady_state_only(da, steady_state_by_runs[inner_index])  # TODO deprecate w core_steady_state?
                 elif x_dim == 'time':  # only consider core region
                     da = da.where(np.logical_and(*in_core([da.x, da.y], core_rad)), drop=True)
 
@@ -99,17 +100,18 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
                 ax.set_xlabel(da_mean.coords[x_dim].attrs['units'])
                 ax.set_ylabel(da_mean.attrs['units'])
 
-                # TODO a bit hardcoded
-                da_core_steady_state_max = core_steady_state(da, core_rad, steady_state_by_runs[inner_index]
+                # TODO a bit hardcoded; TODO document fill_na!
+                da_core_steady_state_max = core_steady_state(da.fillna(0), core_rad, steady_state_by_runs[inner_index]
                                                              ).max().item()
-                y_limits += [np.min([1.1 * da_core_steady_state_max,
-                                     2 * core_steady_state(da, core_rad, steady_state_by_runs[inner_index],
-                                                           operation="median", dims_to_keep=["isweep"]).max().item()])]
-        ax.set_ylim(0, np.max(y_limits))
+                y_limits += [np.nanmin([1.1 * da_core_steady_state_max,
+                                        2 * core_steady_state(da, core_rad, steady_state_by_runs[inner_index],
+                                                              operation="median", dims_to_keep=["isweep"]
+                                                              ).max().item()])]
+        if not np.nanmax(y_limits) > 0:
+            warn("A plot was assigned a NaN upper axis limit")
+        ax.set_ylim(0, np.nanmax(y_limits))
         ax.tick_params(axis="y", left=True, labelleft=True)
-        ax.title.set_text(((str(attributes[1]) + ": " + str(outer_val)) if len(attributes) == 2 else '')
-                          + f"\nColor: {attributes[0]}"
-                          + f"\nIsweep styles: {marker_styles}")
+        ax.title.set_text((str(attributes[1]) + ": " + str(outer_val)) if len(attributes) == 2 else '')
         ax.legend()
     plt.tight_layout()
     plt.show()
@@ -187,24 +189,15 @@ def plot_line_diagnostic(diagnostics_ds_s: list[xr.Dataset], diagnostic, plot_ty
 
 
 def plot_parallel_diagnostic(datasets_split, steady_state_plateaus_runs_split, isweep_choice_center_split,
-                             marker_styles_split, diagnostic, operation="mean"):
+                             marker_styles_split, diagnostic, operation="mean", core_radius=26 * u.cm):
     plt.rcParams['figure.figsize'] = (6, 3.5)
     plt.rcParams['figure.dpi'] = 300
 
     anode_z = portnum_to_z(0).to(u.m)
 
-    # Get mean core-steady-state e-i collision frequencies for each dataset and store in list
-    collision_frequencies = []
-    for i in range(len(datasets_split)):
-        collision_frequencies_mean = core_steady_state(datasets_split[i]['nu_ei'], core_radius,
-                                                       steady_state_plateaus_runs_split[i], operation,
-                                                       dims_to_keep=("isweep",))
-        collision_frequencies += [collision_frequencies_mean[{"isweep": isweep_choice_center_split[i]}].mean().item()]
-    collision_frequencies = np.array(collision_frequencies)
-    # create collision frequencies normalized to the range (0, 0.9) for color map
-    collision_frequencies_log = np.log(collision_frequencies)
-    collision_frequencies_log_normalized = 0.9 * (collision_frequencies_log - collision_frequencies_log.min()
-                                                  ) / (collision_frequencies_log.max() - collision_frequencies_log.min())
+    collision_frequencies = get_collision_frequencies(datasets_split, core_radius, steady_state_plateaus_runs_split,
+                                                      isweep_choice_center_split, operation)
+    collision_frequencies_log_normalized = normalize(collision_frequencies, 0, 0.9)
     color_map = matplotlib.colormaps["plasma"](collision_frequencies_log_normalized)
 
     diagnostic_units = ""
@@ -221,38 +214,31 @@ def plot_parallel_diagnostic(datasets_split, steady_state_plateaus_runs_split, i
         zs = anode_z - (zs * u.Unit(diagnostic_means.coords['z'].attrs['units'])).to(u.m)  # convert to meters
         diagnostic_units = datasets_split[i][diagnostic].attrs['units']
 
-        plt.plot(zs, diagnostic_values, marker=marker_styles_split[i], color=color_map[i], linestyle='none',
-                 label=f"{datasets_split[i].attrs['Exp name'][:3]}, #{datasets_split[i].attrs['Run name'][:2]}"
-                       f":  {collision_frequencies[i]:.2E} Hz")
-    plt.title(f"{get_title(diagnostic)} versus z-position")  # ({operation})
+        plt.plot(zs, diagnostic_values, marker=marker_styles_split[i], color=color_map[i], linestyle='none')
+    plt.title(get_title(diagnostic) + " ", y=0.9, loc='right')  # ({operation})
     plt.xlabel("z position [m]")
-    plt.ylabel(f"{get_title(diagnostic)} [{diagnostic_units}]")
+    plt.ylabel(f"[{diagnostic_units}]", rotation=0, labelpad=10)   # {get_title(diagnostic)}
     normalizer = matplotlib.colors.LogNorm(vmin=np.min(collision_frequencies),
                                            vmax=np.max(collision_frequencies))
     color_bar = plt.colorbar(matplotlib.cm.ScalarMappable(norm=normalizer, cmap='plasma'), ax=plt.gca())
-    color_bar.set_label("Midplane electron-ion \ncollision frequency [Hz]", rotation=90, labelpad=10)
-    # plt.legend(bbox_to_anchor=(1.20, 1.0), loc='upper left', fontsize='small')
+    color_bar.set_label("nu_ei [Hz]\n(midplane)", rotation=0, labelpad=30)
+    # color_bar.set_label("Midplane electron-ion \ncollision frequency [Hz]", rotation=90, labelpad=10)
     plt.tight_layout()
+    plt.savefig("/Users/leomurphy/Desktop/Research images spring 2024/research graphs late march 2024/PDF plots/"
+                "parallel_plot.pdf")
     plt.show()
 
 
 def scatter_plot_diagnostics(datasets_split, diagnostics_to_plot_list, steady_state_plateaus_runs_split,
-                             isweep_choice_center_split, marker_styles_split, operation="mean"):
+                             isweep_choice_center_split, marker_styles_split, operation="mean", core_radius=26 * u.cm):
     plt.rcParams['figure.figsize'] = (8.5, 5.5)
     plt.rcParams['figure.dpi'] = 300
 
     collision_frequencies = []
-    for i in range(len(datasets_split)):
-        collision_frequencies_mean = core_steady_state(datasets_split[i]['nu_ei'], core_radius,
-                                                       steady_state_plateaus_runs_split[i], operation,
-                                                       dims_to_keep=("isweep",))
-        collision_frequencies += [collision_frequencies_mean[{"isweep": isweep_choice_center_split[i]}].mean().item()]
-    collision_frequencies = np.array(collision_frequencies)
-    # create collision frequencies normalized to the range (0, 0.9) for color map
-    collision_frequencies_log = np.log(collision_frequencies)
-    collision_frequencies_normalized = 0.9 * (collision_frequencies_log - collision_frequencies_log.min()
-                                              ) / (collision_frequencies_log.max() - collision_frequencies_log.min())
-    color_map = matplotlib.colormaps["plasma"](collision_frequencies_normalized)
+    collision_frequencies = get_collision_frequencies(datasets_split, core_radius, steady_state_plateaus_runs_split,
+                                                      isweep_choice_center_split, operation)
+    collision_frequencies_log_normalized = normalize(collision_frequencies, 0, 0.9)
+    color_map = matplotlib.colormaps["plasma"](collision_frequencies_log_normalized)
 
     diagnostics_points = []
     for i in range(len(datasets_split)):
@@ -298,24 +284,15 @@ def scatter_plot_diagnostics(datasets_split, diagnostics_to_plot_list, steady_st
 
 
 def plot_parallel_inverse_scale_length(datasets_split, steady_state_plateaus_runs_split, diagnostic,
-                                       isweep_choice_center_split, marker_styles_split, operation):
+                                       isweep_choice_center_split, marker_styles_split, operation, core_radius):
     plt.rcParams['figure.figsize'] = (7, 4.5)   # (8.5, 5.5)
     plt.rcParams['figure.dpi'] = 300
 
     # Get mean core-steady-state e-i collision frequencies for each dataset and store in list
-    collision_frequencies = []
-    for i in range(len(datasets_split)):
-        collision_frequencies_mean = core_steady_state(datasets_split[i]['nu_ei'], core_radius,
-                                                       steady_state_plateaus_runs_split[i], operation,
-                                                       dims_to_keep=("isweep",))
-        collision_frequencies += [collision_frequencies_mean[{"isweep": isweep_choice_center_split[i]}].mean().item()]
-    collision_frequencies = np.array(collision_frequencies)
-    # create collision frequencies normalized to the range (0, 0.9) for color map
-    collision_frequencies_log = np.log(collision_frequencies)
-    collision_frequencies_normalized = 0.9 * (collision_frequencies_log - collision_frequencies_log.min()
-                                              ) / (collision_frequencies_log.max() - collision_frequencies_log.min())
-
-    color_map = matplotlib.colormaps["plasma"](collision_frequencies_normalized)
+    collision_frequencies = get_collision_frequencies(datasets_split, core_radius, steady_state_plateaus_runs_split,
+                                                      isweep_choice_center_split, operation)
+    collision_frequencies_log_normalized = normalize(collision_frequencies, 0, 0.9)
+    color_map = matplotlib.colormaps["plasma"](collision_frequencies_log_normalized)
 
     for i in range(len(datasets_split)):
         isweep_choices = (0, 2) if datasets_split[i].attrs['Exp name'] == "January_2024" else (0, 1)
@@ -399,10 +376,41 @@ def get_title(diagnostic: str) -> str:
                   'T_e_hot': "Hot electron temperature",
                   'T_e_avg': "Average bimaxwellian electron temperature",
                   'P_e': "Electron pressure",
+                  'P_e_cal': "Calibrated electron pressure",
                   'n_e_cal': "Calibrated electron density",
+                  'n_i_cal': "Calibrated ion density",
+                  'n_i_OML_cal': "Calibrated ion density (OML)",
                   'nu_ei': "Electron-ion collision frequency"}
 
     for key in sorted(list(full_names.keys()), key=len, reverse=True):
         diagnostic = diagnostic.replace(key, full_names[key])
 
     return diagnostic
+
+
+def get_collision_frequencies(datasets, core_radius, steady_state_plateaus_runs, isweep_choice_center, operation):
+    r"""
+    Finds typical core-steady-state electron-ion collision frequencies for each dataset.
+    :param datasets:
+    :param core_radius:
+    :param steady_state_plateaus_runs:
+    :param isweep_choice_center:
+    :param operation:
+    :return: tuple of (collision frequencies DataArray, log(collision frequencies) DataArray normalized to [0, 0.9])
+    """
+
+    collision_frequencies = []
+    for i in range(len(datasets)):
+        collision_frequencies_mean = core_steady_state(datasets[i]['nu_ei'], core_radius,
+                                                       steady_state_plateaus_runs[i], operation,
+                                                       dims_to_keep=("isweep",))
+        collision_frequencies += [collision_frequencies_mean[{"isweep": isweep_choice_center[i]}].mean().item()]
+    collision_frequencies = np.array(collision_frequencies)
+
+    return collision_frequencies
+
+
+def normalize(ndarray, lower=0., upper=1.):
+    return lower + (upper - lower) * (ndarray - ndarray.min()) / (ndarray.max() - ndarray.min())
+
+

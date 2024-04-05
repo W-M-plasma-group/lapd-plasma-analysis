@@ -2,15 +2,14 @@ import numpy as np
 import xarray as xr
 import pandas as pd
 import re
-import os
 
 from scipy.signal import find_peaks, hilbert
 import astropy.units as u
 from astropy import constants as const
 from bapsflib import lapd
 
-from file_access import search_folder
-from configurations import get_config_id
+from langmuir.file_access import search_folder
+from langmuir.configurations import get_config_id
 
 
 # "interferometry" is abbreviated as "itfm" throughout
@@ -21,20 +20,20 @@ def interferometry_calibration(density_da: xr.DataArray,
                                core_radius: u.Quantity = 26. * u.cm,
                                ) -> xr.DataArray:
 
-    # itfm_id = ["April_2018", "March_2022", "November_2022"].index(exp_attrs['Exp name'])
     itfm_id = get_config_id(exp_attrs['Exp name'])
 
     # All calculations are in cm, as coordinates are labeled in cm
     density_da *= (1 / u.m ** 3).to(1 / u.cm ** 3).value  # density in 1/cm^3
 
     # Detect spatial dimensions (1D or 2D)
-    spatial_dims = [dim for dim in ['x', 'y'] if density_da.sizes[dim] > 1]
+    spatial_dims = [dim for dim in ('x', 'y') if density_da.sizes[dim] > 1]
     # Assume all spatial dimensions are labeled in centimeters
 
     run_str = exp_attrs['Run name'][:2]
 
     # Use only probe listed first for generating scale factors
-    core_density = density_da.isel(port=0)
+    isweep_coord = density_da['isweep']
+    core_density = density_da.isel(isweep=0)
 
     # Select core region in x and y and interpolate nan values to allow integration; 10 cm (arbitrary) max gap
     # TODO describe averaging across shots! Preserve structure in that direction, since only time varies in itfm data?
@@ -45,8 +44,8 @@ def interferometry_calibration(density_da: xr.DataArray,
 
     if itfm_id == 0:  # April 2018
         itfm_file = lapd.File(itfm_file_search_hdf5(run_str, itfm_folder))
-        itfm_raw = np.array(itfm_file.read_msi("Interferometer array")['signal'][:, 0, :])
-        density_scale_factor = itfm_calib_56ghz(core_density, itfm_raw, spatial_dims).expand_dims("port")
+        itfm = itfm_file.read_msi("Interferometer array")
+        density_scale_factor = itfm_calib_56ghz(core_density, itfm, spatial_dims).expand_dims({"isweep": isweep_coord})
         itfm_file.close()
 
     elif itfm_id == 1:  # March 2022
@@ -61,20 +60,20 @@ def interferometry_calibration(density_da: xr.DataArray,
         density_scale_factor = itfm_calib_288ghz(core_density, itfm_density_da, spatial_dims, core_radius)
 
     elif itfm_id == 3:  # January 2024
-        # TODO complete
-        raise ValueError
         itfm_file = lapd.File(itfm_file_search_hdf5(run_str, itfm_folder))
-        itfm_raw = np.array(itfm_file.read_msi("Interferometer array")['signal'][:, 0, :])
-        density_scale_factor = itfm_calib_56ghz(core_density, itfm_raw, spatial_dims).expand_dims("port")
+        itfm = itfm_file.read_msi("Interferometer array")
+        density_scale_factor = itfm_calib_jan_2024(core_density, itfm, spatial_dims
+                                                   ).expand_dims({"isweep": isweep_coord})
         itfm_file.close()
 
     else:
         raise NotImplementedError("Unsupported interferometry id " + repr(itfm_id))
 
     # Select steady state region only (given by plateau indices)
-    density_scale_factor = density_scale_factor.where(np.logical_and(density_da.plateau >= steady_state[0],
-                                                                     density_da.plateau <= steady_state[1]))
-    print(f"Mean steady-state interferometry calibration factor: {np.nanmean(np.asarray(density_scale_factor)):.2f}")
+    steady_state_density_scale_factor = density_scale_factor.where(np.logical_and(
+        density_da.plateau >= steady_state[0], density_da.plateau <= steady_state[1]))
+    print(f"Run {exp_attrs['Run name'][:2]}: \t"
+          f"{np.nanmean(np.asarray(steady_state_density_scale_factor)):.2f}")
 
     density_da *= density_scale_factor.expand_dims({dim: density_da.sizes[dim] for dim in spatial_dims + ["shot"]})
     density_da *= (1 / u.cm ** 3).to(1 / u.m ** 3).value  # density in 1/m^3
@@ -82,26 +81,31 @@ def interferometry_calibration(density_da: xr.DataArray,
     return density_da
 
 
-def itfm_calib_56ghz(langmuir_da, itfm_nd, spatial_dimensions) -> xr.DataArray:
+def itfm_calib_56ghz(langmuir_da, itfm, spatial_dimensions) -> xr.DataArray:
     r"""
     Calibrates density data from sweep probe to measurements from interferometry probe.
 
     Parameters
     ----------
     :param langmuir_da: DataArray of n_e in cm^-3, core region only
-    :param itfm_nd: ndarray of raw interferometry data from HDF5 file
+    :param itfm: structured array of interferometry data and metadata from HDF5 file
     :param spatial_dimensions: list of spatial dimensions of density data, e.g. ('x', 'y')
+
     :return: DataArray of dimensionless scale factors for density data
     """
 
     # INTERFEROMETRY DATA #
     # ___________________ #
 
+    itfm_nd = np.array(itfm['signal'][:, 0, :])
+    itfm_raw_to_line_integrated_density = itfm.info['n_bar_L'][0] / u.cm ** 2
+    itfm_dt = itfm.info['dt'][0] * u.s
+    # itfm_t0 = itfm.info['t0'][0] * u.s  # unused because we align times manually here
+
     itfm_nd = np.mean(itfm_nd, axis=0)  # average out unnecessary length-2 dimension
 
-    # TODO scan from HDF5 MSI data (in 'meta' field?)
-    itfm_nd *= 8e13 / (u.cm ** 2)  # from MATLAB code
-    itfm_times = np.arange(len(itfm_nd)) * (4.88e-5 * u.s).to(u.ms)   # from MATLAB code; HDF5 header data says 4.0e-5 s
+    itfm_nd = itfm_nd * itfm_raw_to_line_integrated_density  # previously: itfm_nd *= real_density_scale
+    itfm_times = np.arange(len(itfm_nd)) * itfm_dt.to(u.ms)
 
     # Create interferometry DataArray with interferometry time as coordinates
     itfm_da = xr.DataArray(itfm_nd, coords=(('time', itfm_times, {'units': str(u.ms)}),))
@@ -178,7 +182,7 @@ def itfm_file_search_hdf5(run_str: str, folder_path: str):
     hdf5_paths = search_folder(folder_path, "hdf5")
 
     # find hdf5 path corresponding to hdf5 file
-    return [path for path in hdf5_paths if os.path.split(path)[1].startswith(run_str)][0]
+    return [path for path in hdf5_paths if lapd.File(path).info['run name'].startswith(run_str)][0]
 
 
 def itfm_density_288ghz(reference_filename: str, signal_filename: str) -> xr.DataArray:
@@ -226,12 +230,12 @@ def itfm_density_288ghz(reference_filename: str, signal_filename: str) -> xr.Dat
     dphi = (pref - psig)
     dphi -= dphi[0]
 
-    density = (dphi * calibration / diameter).to(u.cm ** -3).value  # returns array of *average* density over core
-    density_da = xr.DataArray(density,
-                              dims=["time"],
-                              coords={"time": time_ms.value})
+    itfm_density = (dphi * calibration / diameter).to(u.cm ** -3).value  # returns array of *average* density over core
+    itfm_density_da = xr.DataArray(itfm_density,
+                                   dims=["time"],
+                                   coords={"time": time_ms.value})
 
-    return density_da
+    return itfm_density_da
 
 
 def itfm_calib_288ghz(density_da: xr.DataArray,
@@ -239,7 +243,7 @@ def itfm_calib_288ghz(density_da: xr.DataArray,
 
     dt = (itfm_da.time[-1] - itfm_da.time[0]) / len(itfm_da.time)   # time step for density time coord. in ms
 
-    mean_density_da = density_da
+    mean_density_da = density_da.copy()
     for dim in spatial_dimensions:
         mean_density_da = (mean_density_da.integrate(dim) / (2 * core_radius.to(u.cm).value)
                            ).assign_attrs(mean_density_da.attrs)
@@ -263,6 +267,72 @@ def itfm_file_search_288ghz(run_str: str, folder_path: str):
     return c1_match, c2_match
 
 
+def itfm_calib_jan_2024(lang_da, itfm, spatial_dimensions) -> xr.DataArray:
+    r"""
+    Calibrates density data from sweep probe to measurements from interferometry probe.
+
+    Parameters
+    ----------
+    :param lang_da: DataArray of n_e in cm^-3, core region only
+    :param itfm: structured array of interferometry data and metadata from HDF5 file
+    :param spatial_dimensions: list of spatial dimensions of density data, e.g. ('x', 'y')
+
+    :return: DataArray of dimensionless scale factors for density data
+    """
+
+    # INTERFEROMETRY DATA #
+    # ___________________ #
+
+    itfm_signal = np.array(itfm['signal'][:, 1, :])  # Port 20 interferometer
+    itfm_signal = itfm_signal.mean(axis=0)  # average out unnecessary length-2 dimension "shot"; check similarity?
+    itfm_signal = np.clip(itfm_signal, a_min=0, a_max=None)  # TODO document this clipping
+
+    # Convert interferometry signal from arbitrary dimensionless values to real units
+    itfm_raw_to_line_integrated_density = itfm.info['n_bar_L'][1] / u.cm ** 2
+    itfm_signal = itfm_signal * itfm_raw_to_line_integrated_density
+
+    # Calculate time coordinates for interferometry data
+    itfm_t0 = itfm.info['t0'][0] * u.s
+    itfm_dt = itfm.info['dt'][0] * u.s
+    itfm_time_ms = itfm_t0.to(u.ms) + itfm_dt.to(u.ms) * np.arange(len(itfm_signal))
+
+    # Create interferometry DataArray with interferometry time as coordinates
+    itfm_da = xr.DataArray(itfm_signal, coords=(('time', itfm_time_ms, {'units': str(u.ms)}),))
+
+    # TODO correct interferometry issues for bimaxwellian diagnostics (?)
+
+    # Find average step in density (n_e) time coordinate by dividing total time elapsed by number of time measurements
+    lang_time_ms = lang_da.coords['time']
+    lang_dt = (lang_time_ms[-1] - lang_time_ms[0]) / len(lang_time_ms)  # time step for density time coord.
+
+    # DENSITY LINE INTEGRALS #
+    # ______________________ #
+
+    # Average all interferometry measurements into data point with the closest corresponding density time coordinate
+    itfm_crunched = crunch_data(source_da=itfm_da, source_coord_name='time',
+                                destination_coord_da=lang_da.coords['time'], step=lang_dt)
+
+    """
+    Note: Maybe just extend each dimension that was integrated out back to its original size?
+    
+    density_scales = dict()  # create empty dictionary to hold x and y scaling factors where necessary
+    for dim in spatial_dimensions:
+        # Line integral along dimension
+        integral = lang_da.integrate(dim)
+        density_scales[dim] = itfm_time_avg / integral
+    
+    # Average together x and y scale factors, if they exist, to get scale factor array in right number of dimensions
+    return np.sum(*[density_scales[dim] for dim in spatial_dimensions]) / len(spatial_dimensions)  # 1D xarray?
+    """
+
+    if len(spatial_dimensions) > 1:
+        raise NotImplementedError("2D areal data detected, which is not supported for January 2024.")
+    integral = lang_da.fillna(0).integrate(spatial_dimensions[0])
+    density_scales = itfm_crunched / integral
+
+    return density_scales
+
+
 def crunch_data(source_da: xr.DataArray,
                 source_coord_name: str,
                 destination_coord_da: xr.DataArray,
@@ -279,7 +349,7 @@ def crunch_data(source_da: xr.DataArray,
     Parameters
     ----------
     :param source_da: DataArray containing data to bin and average
-    :param source_coord_name: string, dimension in data_array
+    :param source_coord_name: string, dimension in data_array; used to bin data
     :param destination_coord_da: xarray DataArray, used as coordinate
     :param step:
     :return:
