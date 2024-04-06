@@ -90,6 +90,7 @@ def in_core(pos_list, core_rad):
     return [np.abs(pos) < core_rad.to(u.cm).value for pos in pos_list]
 
 
+# Make time based and not plateau based to improve compatibility with mach probe analysis?
 def steady_state_only(diagnostics_dataset, steady_state_plateaus: tuple):
 
     # return diagnostics_dataset[{'time': slice(*steady_state_plateaus)}]

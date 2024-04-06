@@ -96,7 +96,8 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
 
                 if np.isfinite(da_mean).any():
                     ax.errorbar(da_mean.coords[x_dim], da_mean, yerr=linear_da_error, linestyle="none",
-                                color=color_map[inner_index], marker=marker_styles[i], label=str(inner_val))
+                                color=color_map[inner_index], marker=marker_styles[i],
+                                label=str(inner_val) + (f" ({isweep_choices[i]})" if len(isweep_choices) > 1 else ""))
                 ax.set_xlabel(da_mean.coords[x_dim].attrs['units'])
                 ax.set_ylabel(da_mean.attrs['units'])
 
@@ -104,9 +105,9 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
                 da_core_steady_state_max = core_steady_state(da.fillna(0), core_rad, steady_state_by_runs[inner_index]
                                                              ).max().item()
                 y_limits += [np.nanmin([1.1 * da_core_steady_state_max,
-                                        2 * core_steady_state(da, core_rad, steady_state_by_runs[inner_index],
-                                                              operation="median", dims_to_keep=["isweep"]
-                                                              ).max().item()])]
+                                        2.5 * core_steady_state(da, core_rad, steady_state_by_runs[inner_index],
+                                                                operation="median", dims_to_keep=["isweep"]
+                                                                ).max().item()])]
         if not np.nanmax(y_limits) > 0:
             warn("A plot was assigned a NaN upper axis limit")
         ax.set_ylim(0, np.nanmax(y_limits))
