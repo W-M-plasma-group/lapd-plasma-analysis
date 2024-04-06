@@ -101,38 +101,22 @@ if __name__ == "__main__":
 
     isweep_choice_center_split = [2 if dataset.attrs['Exp name'] == "January_2024" else 0 for dataset in datasets_split]
 
-    # Plot pressure versus z position for many datasets
-    parallel_diagnostics = {"P_e": "pressure",
-                            "T_e": "electron temperature",  # median ..
-                            "n_e_cal": "calibrated electron density",
-                            "n_e": "electron density",      # mean?
-                            "n_i_OML": "ion density",       # mean?
-                            "nu_ei": "electron-ion collision frequency",
-                            "P_e_cal": "calibrated electron pressure"}
-    for key in parallel_diagnostics:
-        try:
-            if ask_yes_or_no(f"Generate parallel plot of {parallel_diagnostics[key]}? (y/n) "):
-                plot_parallel_diagnostic(datasets_split, steady_state_plateaus_runs_split, isweep_choice_center_split,
-                                         marker_styles_split, diagnostic=key, operation="median", core_radius=core_radius)
-        except KeyError as e:
-            print(e)
+    if ask_yes_or_no(f"Generate parallel plot of selected diagnostics? (y/n) "):  # plot of {parallel_diagnostics[key]}
+        for plot_diagnostic in diagnostics_to_plot_list:  # for key in parallel_diagnostics:
+            plot_parallel_diagnostic(datasets_split, steady_state_plateaus_runs_split, isweep_choice_center_split,
+                                     marker_styles_split, diagnostic=plot_diagnostic,
+                                     operation="median", core_radius=core_radius,
+                                     save_directory=plot_save_directory_path)
 
     if ask_yes_or_no("Generate scatter plot of first two selected diagnostics? (y/n) "):
         scatter_plot_diagnostics(datasets_split, diagnostics_to_plot_list, steady_state_plateaus_runs_split,
                                  isweep_choice_center_split, marker_styles_split, operation="median",
                                  core_radius=core_radius)
 
-    if ask_yes_or_no("Generate plot of inverse pressure gradient scale length by position? (y/n) "):
-        plot_parallel_inverse_scale_length(datasets_split, steady_state_plateaus_runs_split, "P_e",
-                                           isweep_choice_center_split, marker_styles_split, "median", core_radius)
-
-    if ask_yes_or_no("Generate plot of inverse temperature gradient scale length by position? (y/n) "):
-        plot_parallel_inverse_scale_length(datasets_split, steady_state_plateaus_runs_split, "T_e",
-                                           isweep_choice_center_split, marker_styles_split, "median")
-
-    if ask_yes_or_no("Generate plot of inverse electron density gradient scale length by position? (y/n) "):
-        plot_parallel_inverse_scale_length(datasets_split, steady_state_plateaus_runs_split, "n_e",
-                                           isweep_choice_center_split, marker_styles_split, "median")
+    if ask_yes_or_no("Generate plot of inverse gradient scale length by position for selected diagnostics? (y/n) "):
+        for plot_diagnostic in diagnostics_to_plot_list:
+            plot_parallel_inverse_scale_length(datasets_split, steady_state_plateaus_runs_split, plot_diagnostic,
+                                               isweep_choice_center_split, marker_styles_split, "median", core_radius)
 
     # (UNFINISHED) Shot plot: multiplot line diagnostics at specific time, with x-axis = x pos and curve color = shot #
     """if ask_yes_or_no("Generate line shot plot of selected diagnostics over radial position? (y/n) "):
