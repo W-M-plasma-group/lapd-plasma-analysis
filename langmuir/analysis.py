@@ -158,8 +158,9 @@ def interferometry_calibrate_datasets(datasets, density_diagnostic, interferomet
 
     for i in range(len(datasets)):
         if interferometry_mode == "overwrite" or (interferometry_mode == "append"
-                                                  and np.isnan(datasets[i][calibrated_density_diagnostic]).all()):
-            print("\t", end="")  # indent interferometry scale factor
+                                                  and (calibrated_density_diagnostic not in datasets[i]
+                                                       or np.isnan(datasets[i][calibrated_density_diagnostic]).all())):
+            print("\t", end="")  # indent
             calibrated_electron_density = interferometry_calibration(datasets[i][density_diagnostic].copy(),
                                                                      datasets[i].attrs,
                                                                      interferometry_folder,
