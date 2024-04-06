@@ -58,7 +58,6 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
     plt.rcParams['figure.dpi'] = 300
     plt.rcParams['figure.figsize'] = (3 + 3 * len(outer_indexes), 4.5)
     fig, axes = plt.subplots(1, len(outer_indexes), sharey="row")
-    fig.suptitle(f"{get_title(plot_diagnostic)}\nColor: {attributes[0]}\nIsweep styles: {marker_styles}", size=18)
 
     for outer_index in range(len(outer_unique)):    # gas puff voltage index
         outer_val = outer_unique[outer_index]
@@ -113,7 +112,8 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
         ax.set_ylim(0, np.nanmax(y_limits))
         ax.tick_params(axis="y", left=True, labelleft=True)
         ax.title.set_text((str(attributes[1]) + ": " + str(outer_val)) if len(attributes) == 2 else '')
-        ax.legend()
+        ax.legend(title=str(attributes[0]) + (f"\n    (sweep choice)" if len(isweep_choices) > 1 else ""))
+    fig.suptitle(get_title(plot_diagnostic), size=18)
     plt.tight_layout()
     if save_directory:
         plt.savefig(save_directory + "multiplot_line_" + plot_diagnostic + ".pdf")
@@ -192,8 +192,9 @@ def plot_line_diagnostic(diagnostics_ds_s: list[xr.Dataset], diagnostic, plot_ty
 
 
 def plot_parallel_diagnostic(datasets_split, steady_state_plateaus_runs_split, isweep_choice_center_split,
-                             marker_styles_split, diagnostic, operation="mean", core_radius=26 * u.cm):
-    plt.rcParams['figure.figsize'] = (6, 3.5)
+                             marker_styles_split, diagnostic, operation="mean", core_radius=26 * u.cm,
+                             save_directory=""):
+    plt.rcParams['figure.figsize'] = (6.5, 3.5)
     plt.rcParams['figure.dpi'] = 300
 
     anode_z = portnum_to_z(0).to(u.m)
@@ -220,7 +221,7 @@ def plot_parallel_diagnostic(datasets_split, steady_state_plateaus_runs_split, i
         plt.plot(zs, diagnostic_values, marker=marker_styles_split[i], color=color_map[i], linestyle='none')
     plt.title(get_title(diagnostic) + " ", y=0.9, loc='right')  # ({operation})
     plt.xlabel("z position [m]")
-    plt.ylabel(f"[{diagnostic_units}]", rotation=0, labelpad=10)   # {get_title(diagnostic)}
+    plt.ylabel(f"[{diagnostic_units}]", rotation=0, labelpad=25)   # {get_title(diagnostic)}
     normalizer = matplotlib.colors.LogNorm(vmin=np.min(collision_frequencies),
                                            vmax=np.max(collision_frequencies))
     color_bar = plt.colorbar(matplotlib.cm.ScalarMappable(norm=normalizer, cmap='plasma'), ax=plt.gca())
@@ -272,7 +273,7 @@ def scatter_plot_diagnostics(datasets_split, diagnostics_to_plot_list, steady_st
         pressures = np.linspace(np.sqrt(pressure_min), np.sqrt(pressure_max), 8)[1:-1] ** 2
         for pressure in pressures:
             plt.plot(x_curve, pressure / x_curve, color='gray')
-        plt.ylim(0, 1.1 * y_max)  # TODO a bit hardcoded
+        plt.ylim(0, 1.1 * y_max)
         if "n_" in diagnostics_to_plot_list[0] and "T_e" in diagnostics_to_plot_list[1]:
             pass
 

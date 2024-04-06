@@ -35,6 +35,8 @@ def get_langmuir_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder
         # TODO check behavior with advisor: use avg or cold T_e for bimaxwellian plasmas?
         electron_temperature = datasets[i]['T_e_avg'] if 'T_e_avg' in datasets[i] else datasets[i]['T_e']
         datasets[i] = datasets[i].assign({"P_e": get_pressure(datasets[i]['n_e'], electron_temperature)})
+        datasets[i] = datasets[i].assign({'P_e_from_n_i_OML':
+                                          get_pressure(datasets[i]['n_i_OML'], electron_temperature)})
         if not np.isnan(datasets[i]['n_e_cal']).all():
             datasets[i] = datasets[i].assign({"P_e_cal": get_pressure(datasets[i]['n_e_cal'], electron_temperature)})
 
@@ -57,7 +59,7 @@ def get_langmuir_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder
 
     # Ask users for list of diagnostics to plot
     print("The following diagnostics are available to plot: ")
-    diagnostics_sort_indices = np.argsort(list(diagnostic_name_dict.keys()))
+    diagnostics_sort_indices = np.argsort(list(diagnostic_name_dict.values()))
     diagnostics_to_plot_ints = choose_multiple_list(
         np.array(list(diagnostic_name_dict.values()))[diagnostics_sort_indices],
         "diagnostic", null_action="skip")
