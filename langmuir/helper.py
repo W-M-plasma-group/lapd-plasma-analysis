@@ -51,7 +51,7 @@ def get_diagnostic_keys_units(probe_area=1.*u.mm**2, ion_type="He-4+", bimaxwell
     return keys_units
 
 
-def isweep_selector(ds, vectors):  # TODO should separate diagnostics_main and plot_main anyway!
+def isweep_selector(ds, vectors):
     r"""
     Select an isweep signal, linear combination of isweep signals, or multiple such linear combinations from a
     diagnostic dataset. For example, on a dataset with two isweep signals (e.g. from 2 different probes or probe faces),

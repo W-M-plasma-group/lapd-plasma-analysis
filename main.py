@@ -10,26 +10,26 @@ from langmuir.analysis import get_langmuir_datasets
 from langmuir.plots import multiplot_line_diagnostic, plot_line_diagnostic
 from langmuir.plots import plot_parallel_diagnostic, scatter_plot_diagnostics, plot_parallel_inverse_scale_length
 
-""" HDF5 file (or NetCDF home) directory; end paths with a slash """
+""" HDF5 file directory; end path with a slash """              # TODO user adjust
 # hdf5_folder = "/Users/leomurphy/lapd-data/April_2018/"
 # hdf5_folder = "/Users/leomurphy/lapd-data/March_2022/"
 # hdf5_folder = "/Users/leomurphy/lapd-data/November_2022/"
 hdf5_folder = "/Users/leomurphy/lapd-data/January_2024/January_2024_all_working/"
 # hdf5_folder = "/Users/leomurphy/lapd-data/combined_lang_nc/"
 
+""" Langmuir NetCDF directory; end path with a slash """        # TODO user adjust
 assert hdf5_folder.endswith("/")
 langmuir_nc_folder = hdf5_folder + "lang_nc/"
 
-""" Path to directory containing interferometry files """
-interferometry_mode = "overwrite"                                # "skip", "append", "overwrite"; recommended: "append"
+""" Interferometry file directory; end path with a slash """    # TODO user adjust
+interferometry_mode = "append"                                  # "skip", "append", "overwrite"; recommended: "append"
 interferometry_folder = "/Users/leomurphy/lapd-data/November_2022/uwave_288_GHz_waveforms/" \
     if "November_2022" in hdf5_folder else hdf5_folder
 
-""" User parameters """
-# TODO isweep_choice is user choice for probe or linear combination to use; see isweep_selector in helper.py for more
-isweep_choice = [[1, 0, 0, 0]]  # , [0, 0, 1, 0]]
-# isweep_choice = [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]
-# isweep_choice = [[1, 0], [0, 1]]
+""" User parameters """                                         # TODO user adjust
+# isweep_choice is user choice for probe or linear combination to plot; see isweep_selector in helper.py for more
+isweep_choice = [[1, 0, 0, 0], [0, 0, 1, 0]]
+# isweep_choice = [[1, 0]]  # , [0, 1]]
 # isweep_choice = [0]
 bimaxwellian = False                                        # note to self: perform both and store in same NetCDF file?
 core_radius = 26. * u.cm                                    # From MATLAB code
@@ -56,6 +56,7 @@ if __name__ == "__main__":
     # TODO list of hardcoded parameters
     #    (16, 24) for January_2024 steady state period (detect_steady_state_period in diagnostics.py)
 
+    print("\n===== Langmuir probe analysis =====")
     datasets, steady_state_plateaus_runs, diagnostic_name_dict, diagnostics_to_plot_list = get_langmuir_datasets(
         langmuir_nc_folder, hdf5_folder, interferometry_folder, interferometry_mode,
         isweep_choice, core_radius, bimaxwellian)
@@ -137,4 +138,4 @@ if __name__ == "__main__":
     """
 
 # TODO Not all MATLAB code has been transferred (e.g. neutrals, ExB)
-# QUESTION: can we calibrate both Langmuir probes using an interferometry ratio depending only on one of them?
+# QUESTION: can we calibrate both Langmuir probes using an interferometry ratio depending only on one of them? (NO)

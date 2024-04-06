@@ -14,8 +14,8 @@ from langmuir.plots import get_title
 def get_langmuir_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder, interferometry_mode, isweep_choice,
                           core_radius, bimaxwellian) -> (list[xr.Dataset], list[tuple], dict, list[np.ndarray]):
 
-    print("\n===== Langmuir probe analysis =====")
-    netcdf_folder = ensure_directory(langmuir_nc_folder)  # Create folder to save NetCDF files if not yet existing
+    # Create folder to save NetCDF files if not yet existing
+    netcdf_folder = ensure_directory(langmuir_nc_folder)
 
     # Display user file parameters
     print_file_choices(hdf5_folder, langmuir_nc_folder, interferometry_folder, interferometry_mode, isweep_choice)
@@ -54,6 +54,7 @@ def get_langmuir_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder
 
     # Get possible diagnostics and their full names, e.g. "n_e" and "Electron density"
     diagnostic_name_dict = {key: get_title(key) for key in set.intersection(*[set(dataset) for dataset in datasets])}
+
     # Ask users for list of diagnostics to plot
     print("The following diagnostics are available to plot: ")
     diagnostics_sort_indices = np.argsort(list(diagnostic_name_dict.keys()))
