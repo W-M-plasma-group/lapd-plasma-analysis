@@ -23,8 +23,8 @@ langmuir_nc_folder = hdf5_folder + "lang_nc/"
 
 """ Interferometry file directory; end path with a slash """    # TODO user adjust
 interferometry_mode = "append"                                  # "skip", "append", "overwrite"; recommended: "append"
-interferometry_folder = "/Users/leomurphy/lapd-data/November_2022/uwave_288_GHz_waveforms/" \
-    if "November_2022" in hdf5_folder else hdf5_folder
+interferometry_folder = ("/Users/leomurphy/lapd-data/November_2022/uwave_288_GHz_waveforms/"
+                         if "November_2022" in hdf5_folder else hdf5_folder)
 
 """ User parameters """                                         # TODO user adjust
 # isweep_choice is user choice for probe or linear combination to plot; see isweep_selector in helper.py for more
@@ -34,9 +34,9 @@ isweep_choice = [[1, 0, 0, 0], [0, 0, 1, 0]]
 bimaxwellian = False                                        # note to self: perform both and store in same NetCDF file?
 core_radius = 26. * u.cm                                    # From MATLAB code
 
-"""Optional directory for saving some figures; end path with a slash"""
-plot_save_directory_path = ("/Users/leomurphy/Desktop/Research images spring 2024/"
-                            "new research plots mar-apr 2024/saved plots/")
+""" Optional directory to save plots; end path with a slash"""  # TODO user adjust
+plot_save_folder = ("/Users/leomurphy/Desktop/Research images spring 2024/"
+                    "new research plots mar-apr 2024/saved plots/")
 
 # Diagram of LAPD
 """
@@ -79,13 +79,13 @@ if __name__ == "__main__":
         for plot_diagnostic in diagnostics_to_plot_list:
             multiplot_line_diagnostic(datasets, plot_diagnostic, isweep_choice, 'x',
                                       steady_state_by_runs=steady_state_plateaus_runs,
-                                      core_rad=core_radius, save_directory=plot_save_directory_path)
+                                      core_rad=core_radius, save_directory=plot_save_folder)
 
     if ask_yes_or_no("Generate line plot of selected diagnostics over time? (y/n) "):
         for plot_diagnostic in diagnostics_to_plot_list:
             multiplot_line_diagnostic(datasets, plot_diagnostic, isweep_choice, 'time',
                                       steady_state_by_runs=steady_state_plateaus_runs,
-                                      core_rad=core_radius, save_directory=plot_save_directory_path)
+                                      core_rad=core_radius, save_directory=plot_save_folder)
 
     datasets = sorted(datasets, key=lambda ds: ds.attrs['Exp name'])
     # Split two steady state periods for jan_2024 data: (16, 24) and (27, 33) and plot with dotted
@@ -106,7 +106,7 @@ if __name__ == "__main__":
             plot_parallel_diagnostic(datasets_split, steady_state_plateaus_runs_split, isweep_choice_center_split,
                                      marker_styles_split, diagnostic=plot_diagnostic,
                                      operation="median", core_radius=core_radius,
-                                     save_directory=plot_save_directory_path)
+                                     save_directory=plot_save_folder)
 
     if ask_yes_or_no("Generate scatter plot of first two selected diagnostics? (y/n) "):
         scatter_plot_diagnostics(datasets_split, diagnostics_to_plot_list, steady_state_plateaus_runs_split,
