@@ -210,6 +210,9 @@ def plot_parallel_diagnostic(datasets_split, steady_state_plateaus_runs_split, i
         isweep_choices = (0, 2) if datasets_split[i].attrs['Exp name'] == "January_2024" else (0, 1)
         diagnostic_values = []
         zs = []
+
+        if diagnostic not in datasets_split[i]:  # TODO needs testing
+            continue
         diagnostic_means = core_steady_state(datasets_split[i][diagnostic], core_radius,
                                              steady_state_plateaus_runs_split[i], operation, dims_to_keep=("isweep",))
 
