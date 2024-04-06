@@ -380,6 +380,8 @@ def get_title(diagnostic: str) -> str:
                   'T_e_avg': "Average bimaxwellian electron temperature",
                   'P_e': "Electron pressure",
                   'P_e_cal': "Calibrated electron pressure",
+                  'P_e_from_n_i': "Electron pressure (from ion density)",  # not added yet
+                  'P_e_from_n_i_OML': "Electron pressure (from ion density (OML))",
                   'n_e_cal': "Calibrated electron density",
                   'n_i_cal': "Calibrated ion density",
                   'n_i_OML_cal': "Calibrated ion density (OML)",
