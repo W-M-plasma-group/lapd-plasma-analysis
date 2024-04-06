@@ -200,9 +200,9 @@ def plot_parallel_diagnostic(datasets_split, steady_state_plateaus_runs_split, i
 
     anode_z = portnum_to_z(0).to(u.m)
 
-    collision_frequencies = get_collision_frequencies(datasets_split, core_radius, steady_state_plateaus_runs_split,
-                                                      isweep_choice_center_split, operation)
-    collision_frequencies_log_normalized = normalize(collision_frequencies, 0, 0.9)
+    collision_frequencies = extract_collision_frequencies(datasets_split, core_radius, steady_state_plateaus_runs_split,
+                                                          isweep_choice_center_split, operation)
+    collision_frequencies_log_normalized = normalize(np.log(collision_frequencies), 0, 0.9)
     color_map = matplotlib.colormaps["plasma"](collision_frequencies_log_normalized)
 
     diagnostic_units = ""
@@ -239,10 +239,9 @@ def scatter_plot_diagnostics(datasets_split, diagnostics_to_plot_list, steady_st
     plt.rcParams['figure.figsize'] = (8.5, 5.5)
     plt.rcParams['figure.dpi'] = 300
 
-    collision_frequencies = []
-    collision_frequencies = get_collision_frequencies(datasets_split, core_radius, steady_state_plateaus_runs_split,
-                                                      isweep_choice_center_split, operation)
-    collision_frequencies_log_normalized = normalize(collision_frequencies, 0, 0.9)
+    collision_frequencies = extract_collision_frequencies(datasets_split, core_radius, steady_state_plateaus_runs_split,
+                                                          isweep_choice_center_split, operation)
+    collision_frequencies_log_normalized = normalize(np.log(collision_frequencies), 0, 0.9)
     color_map = matplotlib.colormaps["plasma"](collision_frequencies_log_normalized)
 
     diagnostics_points = []
@@ -282,7 +281,7 @@ def scatter_plot_diagnostics(datasets_split, diagnostics_to_plot_list, steady_st
     plt.ylabel(diagnostics_to_plot_list[1])
     plt.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left')
     plt.title("Scatter plot for selected runs at port ~27-29"
-              "\nJan 2024 runs: x marker = 2nd steady-state"
+              "\nJan 2024 runs: x marker = post-gas puff"
               "\nColor map: ln(collision frequency at port 27/29)")
     plt.tight_layout()
     plt.show()
@@ -294,9 +293,9 @@ def plot_parallel_inverse_scale_length(datasets_split, steady_state_plateaus_run
     plt.rcParams['figure.dpi'] = 300
 
     # Get mean core-steady-state e-i collision frequencies for each dataset and store in list
-    collision_frequencies = get_collision_frequencies(datasets_split, core_radius, steady_state_plateaus_runs_split,
-                                                      isweep_choice_center_split, operation)
-    collision_frequencies_log_normalized = normalize(collision_frequencies, 0, 0.9)
+    collision_frequencies = extract_collision_frequencies(datasets_split, core_radius, steady_state_plateaus_runs_split,
+                                                          isweep_choice_center_split, operation)
+    collision_frequencies_log_normalized = normalize(np.log(collision_frequencies), 0, 0.9)
     color_map = matplotlib.colormaps["plasma"](collision_frequencies_log_normalized)
 
     for i in range(len(datasets_split)):
@@ -395,7 +394,7 @@ def get_title(diagnostic: str) -> str:
     return diagnostic
 
 
-def get_collision_frequencies(datasets, core_radius, steady_state_plateaus_runs, isweep_choice_center, operation):
+def extract_collision_frequencies(datasets, core_radius, steady_state_plateaus_runs, isweep_choice_center, operation):
     r"""
     Finds typical core-steady-state electron-ion collision frequencies for each dataset.
     :param datasets:
