@@ -14,8 +14,8 @@ from langmuir.plots import plot_parallel_diagnostic, scatter_plot_diagnostics, p
 # hdf5_folder = "/Users/leomurphy/lapd-data/April_2018/"
 # hdf5_folder = "/Users/leomurphy/lapd-data/March_2022/"
 # hdf5_folder = "/Users/leomurphy/lapd-data/November_2022/"
-hdf5_folder = "/Users/leomurphy/lapd-data/January_2024/January_2024_all_working/"
-# hdf5_folder = "/Users/leomurphy/lapd-data/combined_lang_nc/"
+# hdf5_folder = "/Users/leomurphy/lapd-data/January_2024/January_2024_all_working/"
+hdf5_folder = "/Users/leomurphy/lapd-data/combined_lang_nc/"
 
 """ Langmuir NetCDF directory; end path with a slash """        # TODO user adjust
 assert hdf5_folder.endswith("/")
@@ -33,6 +33,10 @@ isweep_choice = [[1, 0, 0, 0], [0, 0, 1, 0]]
 # isweep_choice = [0]
 bimaxwellian = False                                        # note to self: perform both and store in same NetCDF file?
 core_radius = 26. * u.cm                                    # From MATLAB code
+
+"""Optional directory for saving some figures; end path with a slash"""
+plot_save_directory_path = ("/Users/leomurphy/Desktop/Research images spring 2024/"
+                            "new research plots mar-apr 2024/saved plots/")
 
 # Diagram of LAPD
 """
@@ -75,13 +79,13 @@ if __name__ == "__main__":
         for plot_diagnostic in diagnostics_to_plot_list:
             multiplot_line_diagnostic(datasets, plot_diagnostic, isweep_choice, 'x',
                                       steady_state_by_runs=steady_state_plateaus_runs,
-                                      core_rad=core_radius)
+                                      core_rad=core_radius, save_directory=plot_save_directory_path)
 
     if ask_yes_or_no("Generate line plot of selected diagnostics over time? (y/n) "):
         for plot_diagnostic in diagnostics_to_plot_list:
             multiplot_line_diagnostic(datasets, plot_diagnostic, isweep_choice, 'time',
                                       steady_state_by_runs=steady_state_plateaus_runs,
-                                      core_rad=core_radius)
+                                      core_rad=core_radius, save_directory=plot_save_directory_path)
 
     datasets = sorted(datasets, key=lambda ds: ds.attrs['Exp name'])
     # Split two steady state periods for jan_2024 data: (16, 24) and (27, 33) and plot with dotted

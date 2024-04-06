@@ -13,7 +13,8 @@ matplotlib.rcParams.update(matplotlib.rcParamsDefault)
 
 
 def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagnostic, isweep_choices, x_dim='x',
-                              steady_state_by_runs=None, core_rad=None, attribute=None, tolerance=np.nan):
+                              steady_state_by_runs=None, core_rad=None, attribute=None, tolerance=np.nan,
+                              save_directory=""):
     r"""
 
     :param diagnostics_datasets: list of xarray Datasets
@@ -114,6 +115,8 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
         ax.title.set_text((str(attributes[1]) + ": " + str(outer_val)) if len(attributes) == 2 else '')
         ax.legend()
     plt.tight_layout()
+    if save_directory:
+        plt.savefig(save_directory + "multiplot_line_" + plot_diagnostic + ".pdf")
     plt.show()
 
 
@@ -224,8 +227,8 @@ def plot_parallel_diagnostic(datasets_split, steady_state_plateaus_runs_split, i
     color_bar.set_label("nu_ei [Hz]\n(midplane)", rotation=0, labelpad=30)
     # color_bar.set_label("Midplane electron-ion \ncollision frequency [Hz]", rotation=90, labelpad=10)
     plt.tight_layout()
-    plt.savefig("/Users/leomurphy/Desktop/Research images spring 2024/research graphs late march 2024/PDF plots/"
-                "parallel_plot.pdf")
+    if save_directory:
+        plt.savefig(f"{save_directory}parallel_plot_{diagnostic}.pdf")
     plt.show()
 
 
