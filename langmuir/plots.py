@@ -554,3 +554,14 @@ def normalize(ndarray, lower=0., upper=1.):
     return lower + (upper - lower) * (ndarray - ndarray.min()) / (ndarray.max() - ndarray.min())
 
 
+def probe_face_choice_to_eq_string(probe_face_choice, ports, faces):
+    eq_string = ""
+    for p in range(len(probe_face_choice)):
+        for f in range(len(probe_face_choice[p])):
+            if probe_face_choice[p][f] != 0:
+                port_face_string = str(ports[p]) + str(faces[f])   # (faces[f] if faces[f] else "")
+                eq_string += (((probe_face_choice[p][f] + "*") if probe_face_choice[p][f] != 1 else '')
+                              + str(port_face_string) + " + ")
+    return eq_string[:-3]
+
+
