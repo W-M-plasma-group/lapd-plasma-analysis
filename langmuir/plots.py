@@ -121,7 +121,8 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
         ax.set_ylim(0, np.nanmax(y_limits))
         ax.tick_params(axis="y", left=True, labelleft=True)
         ax.title.set_text((str(attributes[1]) + ": " + str(outer_val)) if len(attributes) == 2 else '')
-        ax.legend(title=str(attributes[0]) + (f"\n    (sweep choice)" if len(isweep_choices) > 1 else ""))
+        ax.legend(title=f"\n{attributes[0]} (probe face)", loc="upper center", bbox_to_anchor=(0.5, -0.15), ncol=2)
+
     fig.suptitle(get_title(plot_diagnostic), size=18)
     plt.tight_layout()
     if save_directory:
@@ -266,10 +267,12 @@ def scatter_plot_diagnostics(datasets, diagnostics_to_plot_list, steady_state_pl
 
     scatter_points = np.array(diagnostics_points)
     for i in range(len(scatter_points)):
-        plt.scatter(scatter_points[i, 0], scatter_points[i, 1], marker=marker_styles_split[i], color=color_map[i],
-                    label=f"{datasets_split[i].attrs['Exp name'][:3]}, #{datasets_split[i].attrs['Run name'][:2]}"
+        plt.scatter(scatter_points[i, 0], scatter_points[i, 1], marker=marker_styles[i], color=color_map[i])
+        """
+                    label=f"{datasets[i].attrs['Exp name'][:3]}, #{datasets[i].attrs['Run name'][:2]}"
                           f":  {collision_frequencies[i]:.2E} Hz")
-        plt.annotate(f"{datasets_split[i].attrs['Exp name'][:3]}, #{datasets_split[i].attrs['Run name'][:2]}",
+        """
+        plt.annotate(f"{datasets[i].attrs['Exp name'][:3]} {datasets[i].attrs['Run name'][:2]}",
                      (scatter_points[i, 0], scatter_points[i, 1]), size="small")  # noqa
 
     if ("n_" in diagnostics_to_plot_list[0] or "n_" in diagnostics_to_plot_list[1]) \
