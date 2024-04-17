@@ -1,10 +1,9 @@
 from langmuir.helper import *
 
 
-def preview_characteristics(characteristics_array, positions, ports, ramp_times, exp_params_dict, diagnostics=False,
-                            areas=None, ion=None, bimaxwellian=False):
+def preview_characteristics(characteristics_array, positions, ports_faces, ramp_times, exp_params_dict, diagnostics=False,
+                            areas=None, ion=None, bimaxwellian=False, plot_save_directory=""):
 
-    plt.rcParams['figure.dpi'] = 300
     plt.rcParams['figure.figsize'] = (6, 4)
 
     x = np.unique(positions[:, 0])
@@ -130,4 +129,6 @@ def preview_raw_sweep(bias, currents, positions, ports_faces, exp_params_dict, d
                   f"x: {loc_x}, y: {loc_y}, shot: {isweep_x_y_shot_to_plot[3]}")
         plt.legend()
         plt.tight_layout()
+
         plt.show()
+        plt.rcParams['figure.dpi'] = 300

@@ -1,12 +1,9 @@
 from warnings import warn
 
-import matplotlib
 from astropy import visualization
 
 from bapsflib.lapd.tools import portnum_to_z
 from langmuir.helper import *
-
-matplotlib.rcParams.update(matplotlib.rcParamsDefault)
 
 # matplotlib.use('TkAgg')
 # matplotlib.use('QtAgg')
@@ -55,9 +52,9 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
     outer_bounds = np.append(outer_indexes, len(outer_values))
 
     visualization.quantity_support()
-    plt.rcParams['figure.dpi'] = 300
-    plt.rcParams['figure.figsize'] = (3 + 3 * len(outer_indexes), 4.5)
-    fig, axes = plt.subplots(1, len(outer_indexes), sharey="row")
+    # plt.rcParams['figure.dpi'] = 300
+    plt.rcParams['figure.figsize'] = (3 + 3 * len(outer_indexes), 4.5 + 0.1 * len(diagnostics_datasets))  # TODO hardcoded
+    fig, axes = plt.subplots(1, len(outer_indexes), sharey="row", sharex="col", layout="constrained")
 
     for outer_index in range(len(outer_unique)):    # gas puff voltage index
         outer_val = outer_unique[outer_index]
@@ -198,7 +195,6 @@ def plot_parallel_diagnostic(datasets, steady_state_plateaus_runs, probes_faces_
                              marker_styles, diagnostic, operation="mean", core_radius=26 * u.cm,
                              save_directory=""):
     plt.rcParams['figure.figsize'] = (6.5, 3.5)
-    plt.rcParams['figure.dpi'] = 300
 
     anode_z = portnum_to_z(0).to(u.m)
 
@@ -246,7 +242,6 @@ def scatter_plot_diagnostics(datasets, diagnostics_to_plot_list, steady_state_pl
                              probes_faces_midplane, marker_styles, operation="mean", core_radius=26 * u.cm,
                              save_directory=""):
     plt.rcParams['figure.figsize'] = (6, 4)
-    # plt.rcParams['figure.dpi'] = 300
 
     collision_frequencies = extract_collision_frequencies(datasets, core_radius, steady_state_plateaus_runs,
                                                           probes_faces_midplane, operation)
@@ -300,7 +295,6 @@ def scatter_plot_diagnostics(datasets, diagnostics_to_plot_list, steady_state_pl
 def plot_parallel_inverse_scale_length(datasets, steady_state_plateaus_runs, diagnostic, probes_faces_midplane,
                                        probes_faces_parallel, marker_styles, operation, core_radius, save_directory):
     plt.rcParams['figure.figsize'] = 6, 4  # (7, 4.5)   # (8.5, 5.5)
-    # plt.rcParams['figure.dpi'] = 300
 
     anode_z = portnum_to_z(0).to(u.m).value
 
@@ -415,7 +409,7 @@ def get_title(diagnostic: str) -> str:
     return diagnostic
 
 
-def extract_collision_frequencies(datasets, core_radius, steady_state_plateaus_runs, isweep_choice_center, operation):
+def extract_collision_frequencies(datasets, core_radius, steady_state_plateaus_runs, probe_face_midplane, operation):
     r"""
     Finds typical core-steady-state electron-ion collision frequencies for each dataset.
     :param datasets:

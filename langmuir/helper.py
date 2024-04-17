@@ -1,10 +1,14 @@
 import numpy as np
 import xarray as xr
-import matplotlib.pyplot as plt
 import astropy.units as u
 from plasmapy.diagnostics.langmuir import swept_probe_analysis, reduce_bimaxwellian_temperature, Characteristic
 
-plt.rcParams["figure.dpi"] = 160
+import matplotlib
+from matplotlib import pyplot as plt
+matplotlib.rcParams['figure.dpi'] = 300
+plt.rcParams['figure.dpi'] = 300
+
+anode_z = portnum_to_z(0).to(u.m)
 
 
 def value_safe(quantity_or_scalar):  # Get value of quantity or scalar, depending on type

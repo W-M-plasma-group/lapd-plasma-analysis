@@ -4,7 +4,6 @@ written in MATLAB by Conor Perks (MIT) and using the PlasmaPy and bapsflib libra
 Comments are added inline. A separate documentation page is not yet complete.
 """
 
-from langmuir.helper import *
 from langmuir.file_access import ask_yes_or_no
 from langmuir.analysis import get_langmuir_datasets
 from langmuir.plots import multiplot_line_diagnostic, plot_line_diagnostic
