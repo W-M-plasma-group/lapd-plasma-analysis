@@ -55,12 +55,12 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, langmuir_
                                                                     'port': ('probe', ports),
                                                                     'z':    ('probe', port_zs, {"units": str(u.cm)})}
                                                                    ).assign_attrs({"units": keys_units[key]})
-                                 for key in keys_units.keys()}).assign_attrs({"Interferometry calibrated": False})
+                                 for key in keys_units.keys()})
 
     num_characteristics = (diagnostics_ds.sizes['probe'] * diagnostics_ds.sizes['face'] * diagnostics_ds.sizes['x']
                            * diagnostics_ds.sizes['y'] * diagnostics_ds.sizes['shot'] * diagnostics_ds.sizes['time'])
 
-    # """
+    """
     error_types = []
     error_chart = np.zeros(shape=(num_probe, num_face, num_x, num_y, num_shots, num_plateaus))
     # """
@@ -73,14 +73,17 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, langmuir_
                 for s in range(characteristic_arrays.shape[2]):  # shot
                     for r in range(characteristic_arrays.shape[3]):  # ramp
                         characteristic = characteristic_arrays[i, l, s, r]
-                        diagnostics = diagnose_char(characteristic, probe_areas[i], ion_type, bimaxwellian=bimaxwellian)
+                        diagnostics = diagnose_char(characteristic, probe_areas[i], ion_type,
+                                                    bimaxwellian=bimaxwellian)
                         pbar.update(1)
                         if isinstance(diagnostics, str):  # error with diagnostics
+                            """
                             if diagnostics not in error_types:
                                 error_types.append(diagnostics)
                             error_chart[i,
                                         np.where(x == positions[l, 0])[0][0],
                                         np.where(y == positions[l, 1])[0][0], s, r] = error_types.index(diagnostics) + 1
+                            """
                             continue
                         if bimaxwellian:
                             diagnostics = unpack_bimaxwellian(diagnostics)
@@ -95,6 +98,7 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, langmuir_
 
     warnings.simplefilter(action='default')  # Restore warnings to default handling
 
+    """
     # Leo debug below: display plots showing types of errors
     show_error_plot = False
     if show_error_plot:
@@ -110,6 +114,7 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, langmuir_
             plt.title(f"Error types (s = {s})")
             plt.tight_layout()
             plt.show()
+    # """
 
     return diagnostics_ds
 
