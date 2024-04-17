@@ -37,7 +37,7 @@ bimaxwellian = False                                        # note to self: perf
 core_radius = 26. * u.cm                                    # From MATLAB code
 
 """ Optional directory to save plots; end path with a slash"""  # TODO user adjust
-plot_save_folder = ("/Users/leomurphy/Desktop/Research images spring 2024/"
+plot_save_folder = ("/Users/leomurphy/Desktop/wm/Plasma research/Research images/Research images spring 2024/"
                     "new research plots mar-apr 2024/saved plots/")
 
 # Diagram of LAPD
@@ -147,6 +147,13 @@ if __name__ == "__main__":
             multiplot_line_diagnostic(datasets, plot_diagnostic, isweep_choice, steady_state_plateaus_runs,
                                       tolerance=plot_tolerance)
     """
+
+
+
+
+    print("\n===== Mach probe analysis =====")
+
+
 
 # TODO Not all MATLAB code has been transferred (e.g. neutrals, ExB)
 # QUESTION: can we calibrate both Langmuir probes using an interferometry ratio depending only on one of them? (NO)
