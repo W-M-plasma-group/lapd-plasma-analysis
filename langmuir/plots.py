@@ -22,6 +22,7 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
     :param core_rad:
     :param attribute:
     :param tolerance:
+    :param save_directory:
     :return:
     """
     # TODO generalize steady_state_by_runs, add curve_dimension to control what different colors represent
@@ -77,10 +78,13 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
                 inner_val = ds.attrs[attributes[0]]
 
                 da = ds[plot_diagnostic]
-                if x_dim in ('x', 'y'):  # only consider steady state
-                    da = steady_state_only(da, steady_state_by_runs[inner_index])  # TODO deprecate w core_steady_state?
-                elif x_dim == 'time':  # only consider core region
-                    da = da.where(np.logical_and(*in_core([da.x, da.y], core_rad)), drop=True)
+
+                core_steady_state_params = []
+                # below: only consider steady state
+                core_steady_state_params += [core_rad] if x_dim == 'time' else [None]
+                core_steady_state_params += [steady_state_by_runs[inner_index]] if x_dim in ('x', 'y') else [None]
+                # above: only consider core region
+                da = core_steady_state(da, *core_steady_state_params)
 
                 dims_to_average_out = ['shot'] + [dim for dim in x_dims if dim != x_dim]
                 da_mean = da.mean(dims_to_average_out, keep_attrs=True)
@@ -161,11 +165,10 @@ def plot_line_diagnostic(diagnostics_ds_s: list[xr.Dataset], diagnostic, plot_ty
         plot_type = 'contour'
     # 1D plot type
     if plot_type in plot_types_1d:
-        linear_ds_s_1d = [steady_state_only(linear_ds, steady_state_plateaus=steady_state).mean('time')
-                          for linear_ds in linear_ds_s]
         for key in diagnostic_list:
-            for d in range(len(linear_ds_s_1d)):
-                linear_ds_1d = linear_ds_s_1d[d]
+            for d in range(len(linear_ds_s)):
+                linear_ds_1d = core_steady_state(linear_ds_s[d], steady_state_plateaus=steady_state, operation="mean",
+                                                 dims_to_keep=linear_dimensions[d])
                 linear_plot_1d(linear_ds_1d[key], linear_dimensions[d])
             plot_title = f"{run_names[0]}\n{get_title(key)} {plot_type} plot"
             if hasattr(linear_ds_s_1d[0], "facevector"):

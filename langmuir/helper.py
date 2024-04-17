@@ -79,12 +79,13 @@ def probe_face_selector(ds, vectors):
                          f"but got dimension {len(np.array(vectors).shape)}")
     ds_s = []
     for vector in vectors:
-        ds_isweep_selected = 0 * ds.isel(isweep=0).copy()
-        for i in range(ds.sizes['isweep']):
-            ds_isweep_selected += vector[i] * ds.isel(isweep=i)
-        for key in ds:
-            ds_isweep_selected[key] = ds_isweep_selected[key].assign_attrs(manual_sub_attrs[key])
-        ds_s += [ds_isweep_selected.assign_attrs(manual_attrs | {"facevector": str(vector)})]
+        ds_isweep_selected = 0 * ds.isel(probe=0, face=0).copy()
+        for p in range(ds.sizes['probe']):
+            for f in range(ds.sizes['face']):
+                ds_isweep_selected += vector[p][f] * ds.isel(probe=p, face=f)
+            for key in ds:
+                ds_isweep_selected[key] = ds_isweep_selected[key].assign_attrs(manual_sub_attrs[key])
+        ds_s += [ds_isweep_selected.assign_attrs(manual_attrs | {"probe_face_vector": str(vector)})]
     return ds_s
 
 
@@ -94,14 +95,6 @@ def array_lookup(array, value):
 
 def in_core(pos_list, core_rad):
     return [np.abs(pos) < core_rad.to(u.cm).value for pos in pos_list]
-
-
-# Make time based and not plateau based to improve compatibility with mach probe analysis?
-def steady_state_only(diagnostics_dataset, steady_state_plateaus: tuple):
-
-    # return diagnostics_dataset[{'time': slice(*steady_state_plateaus)}]
-    return diagnostics_dataset.where(np.logical_and(diagnostics_dataset.plateau >= steady_state_plateaus[0],
-                                                    diagnostics_dataset.plateau <= steady_state_plateaus[1]), drop=True)
 
 
 def core_steady_state(da_input: xr.DataArray, core_rad=None, steady_state_plateaus=None, operation=None,
@@ -120,7 +113,9 @@ def core_steady_state(da_input: xr.DataArray, core_rad=None, steady_state_platea
     if core_rad is not None:
         da = da.where(np.logical_and(*in_core([da.x, da.y], core_rad)), drop=True)
     if steady_state_plateaus is not None:
-        da = steady_state_only(da, steady_state_plateaus=steady_state_plateaus)
+        # dataset[{'time': slice(*steady_state_plateaus)}]  # TODO bring back?
+        da = da.where(np.logical_and(da.plateau >= steady_state_plateaus[0],
+                                     da.plateau <= steady_state_plateaus[1]), drop=True)
 
     dims_to_reduce = [dim for dim in da.dims if dim not in dims_to_keep]
     if operation is None:
