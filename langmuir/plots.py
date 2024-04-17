@@ -117,7 +117,7 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
     fig.suptitle(get_title(plot_diagnostic), size=18)
     plt.tight_layout()
     if save_directory:
-        plt.savefig(save_directory + "multiplot_line_" + plot_diagnostic + ".pdf")
+        plt.savefig(save_directory + "multiplot_line_" + plot_diagnostic + ".pdf", bbox_inches="tight")
     plt.show()
 
 
@@ -292,6 +292,8 @@ def scatter_plot_diagnostics(datasets, diagnostics_to_plot_list, steady_state_pl
     # plt.title("Midplane scatter plot")
     # "\nJan 2024 runs: x marker = post-gas puff")
     plt.tight_layout()
+    if save_directory:
+        plt.savefig(f"{save_directory}scatter_plot_{diagnostics_to_plot_list[0]}_{diagnostics_to_plot_list[1]}.pdf")
     plt.show()
 
 

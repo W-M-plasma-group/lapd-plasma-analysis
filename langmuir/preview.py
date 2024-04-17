@@ -72,6 +72,9 @@ def preview_characteristics(characteristics_array, positions, ports_faces, ramp_
 
             plt.title(plot_title)
             plt.tight_layout()
+
+            if plot_save_directory:
+                plt.savefig(f"{plot_save_directory}langmuir_sweep.pdf")
             plt.show()
 
 
