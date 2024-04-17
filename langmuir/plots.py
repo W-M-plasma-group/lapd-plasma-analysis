@@ -351,7 +351,110 @@ def plot_parallel_inverse_scale_length(datasets, steady_state_plateaus_runs, dia
 
     # plt.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left')
     plt.tight_layout()
+    plt.ylim(bottom=0) # TODO hardcoded
+
+    if save_directory:
+        plt.savefig(f"{save_directory}parallel_gradient_scale_length_plot_{diagnostic}.pdf")
     plt.show()
+
+    plt.show()
+
+
+def plot_vertical_stack(datasets, diagnostics_to_plot_list, steady_state_plateaus_runs,
+                        probes_faces_midplane, probes_faces_parallel, operation, core_radius, plot_save_folder):
+    # Split into top plot row and bottom plot row
+    tolerance = 0.5
+    port_marker_styles = {20: 'x', 27: '.', 29: '.', 35: '^', 43: '^'}
+    save_directory = plot_save_folder
+    x_dims = ['x', 'y', 'time']
+    for plot_diagnostic in diagnostics_to_plot_list:
+        """ plot_ab(datasets_split, steady_state_plateaus_runs_split, plot_diagnostic, probes_faces_midplane_split,
+                probes_faces_parallel_split, port_marker_styles, "median", core_radius)
+            def plot_ab(datasets, steady_state_plateaus_runs, plot_diagnostic,
+                    probes_faces_midplane, probes_faces_parallel,
+                    port_marker_styles, operation, core_radius): """
+
+        plt.rcParams['figure.figsize'] = (6.5, 6.5)  # TODO hardcoded
+        fig, axes = plt.subplots(2, 1, sharex='all', sharey='row', layout="constrained")  # sharey=all
+        axes_1d = np.atleast_1d(axes)
+
+        collision_frequencies = extract_collision_frequencies(datasets, core_radius, steady_state_plateaus_runs,
+                                                              probes_faces_midplane, operation)
+        collision_frequencies_log_normalized = normalize(np.log(collision_frequencies), 0, 0.9)
+        color_map = matplotlib.colormaps["plasma"](collision_frequencies_log_normalized)
+
+        indices = np.arange(2 * (len(datasets) // 2)).reshape(2, -1)  # e.g. 1 2 3; 4 5 6
+        for row in range(2):  # row of the plot grid
+            max_val = 0
+            for run in range(len(indices[row])):  # column of the plot grid
+                index = indices[row][run]
+
+                ax = axes_1d[row]
+                dataset = datasets[index]
+                ports = dataset.coords['port'].data
+                faces = dataset.coords['face'].data
+                # """
+                ds_s = [dataset[{"probe": probe_face[0],
+                                 "face": probe_face[1]}]
+                        for probe_face in probes_faces_parallel[index]]  # todo [0:1]  !
+                """
+                probe_face = probes_faces_midplane_split[unsort_indices[index]]
+                ds_s = [dataset[{"probe": probe_face[0],
+                                 "face": probe_face[1]}]]
+                # """
+                for ds in ds_s:  # ds for upstream (cathode) and downstream (anti-cathode)
+                    da = ds[plot_diagnostic]
+
+                    # below: only consider steady state
+                    da = core_steady_state(da,
+                                           steady_state_plateaus=steady_state_plateaus_runs[index])
+
+                    dims_to_average_out = ['shot'] + [dim for dim in x_dims if dim != "x"]  # hardcoded
+                    da_mean = da.mean(dims_to_average_out, keep_attrs=True)
+                    da_median = da.median()
+                    da_std = da.std(dims_to_average_out, ddof=1, keep_attrs=True)
+                    # both of the above should have only one dimension left?
+
+                    # 95% (~two standard deviation) confidence interval
+                    non_nan_element_da = da.copy()
+                    non_nan_element_da[...] = ~np.isnan(da)
+                    effective_num_non_nan_per_std = non_nan_element_da.sum(dims_to_average_out)
+                    linear_da_error = da_std * np.nan
+                    linear_da_error[effective_num_non_nan_per_std > 1
+                                    ] = (da_std * 1.96 / np.sqrt(effective_num_non_nan_per_std - 1)
+                                         )[effective_num_non_nan_per_std > 1]  # unbiased
+
+                    if np.isfinite(da_mean).any():
+                        # probe_face_eq_str = probe_face_choice_to_eq_string(probe_face_choices[i], ports, faces)
+                        port = ds.coords['port'].item()
+                        z_real = anode_z.to(u.m).value - ds.coords['z'].item() / 100
+                        marker_style = port_marker_styles[port]
+                        da_mean[~(linear_da_error < tolerance * da_median)] = np.nan  # TODO hardcoded! document!
+                        ax.errorbar(da_mean.coords["x"], da_mean, yerr=linear_da_error, linestyle="none",
+                                    color=color_map[index], marker=marker_style,
+                                    label=f"{z_real:.1f}")  # str(port)
+                        max_val = np.nanmax([max_val, np.nanmax(da_mean)])
+                    ax.set_xlabel(da_mean.coords["x"].attrs['units'])
+                    ax.set_ylabel(da_mean.attrs['units'])
+
+                # ax.set_ylim(0, [30, 20][index])  # TODO extremely hardcoded
+                ax.set_ylim(bottom=0)
+                """ax.title.set_text(dataset.attrs['Exp name'][:3] + " " + dataset.attrs['Exp name'][-2:]
+                                  + ", run " + dataset.attrs['Run name'][:2])"""
+
+                # ax.legend(title=f"\n{attributes[0]} (probe face)", loc="upper center", bbox_to_anchor=(0.5, -0.15), ncol=1)
+                ax.legend(title="z [m]")
+            ax.set_ylim(top=1.05 * max_val)
+        normalizer = matplotlib.colors.LogNorm(vmin=np.min(collision_frequencies),
+                                               vmax=np.max(collision_frequencies))
+        color_bar = fig.colorbar(matplotlib.cm.ScalarMappable(norm=normalizer, cmap='plasma'),
+                                 ax=axes_1d.ravel().tolist())
+        color_bar.set_label(r"$\nu_{ei}$" " [Hz]\n(midplane)", rotation=0, labelpad=32)
+
+        fig.suptitle(get_title(plot_diagnostic), size=18)
+        if save_directory:
+            plt.savefig(save_directory + "vertical_line_" + plot_diagnostic + ".pdf", bbox_inches="tight")
+        plt.show()
 
 
 def get_valid_linear_dimension(diagnostics_dataset_sizes):
