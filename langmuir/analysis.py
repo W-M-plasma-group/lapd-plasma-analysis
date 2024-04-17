@@ -18,7 +18,7 @@ def get_langmuir_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder
     netcdf_folder = ensure_directory(langmuir_nc_folder)
 
     # Display user file parameters
-    print_file_choices(hdf5_folder, langmuir_nc_folder, interferometry_folder, interferometry_mode, isweep_choice)
+    print_file_choices(hdf5_folder, langmuir_nc_folder, interferometry_folder, interferometry_mode, isweep_choices)
 
     # Ask user to choose either NetCDF files or HDF5 files, then create datasets from them
     datasets = load_datasets(hdf5_folder, netcdf_folder, bimaxwellian, plot_save_directory)
@@ -69,7 +69,7 @@ def get_langmuir_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder
     return datasets, steady_state_plateaus_runs, diagnostic_name_dict, diagnostics_to_plot_list
 
 
-def print_file_choices(hdf5_folder, lang_nc_folder, interferometry_folder, interferometry_mode, isweep_choice):
+def print_file_choices(hdf5_folder, lang_nc_folder, interferometry_folder, interferometry_mode, isweep_choices):
     interferometry_mode_actions = ({"skip": "skipped",
                                     "append": "added to uncalibrated datasets only",
                                     "overwrite": "recalculated for all datasets"})
@@ -79,7 +79,7 @@ def print_file_choices(hdf5_folder, lang_nc_folder, interferometry_folder, inter
     print("Current HDF5 directory path:           \t", repr(hdf5_folder),
           "\nCurrent NetCDF directory path:         \t", repr(lang_nc_folder),
           "\nCurrent interferometry directory path: \t", repr(interferometry_folder),
-          "\nLinear combinations of isat sources:   \t", repr(isweep_choice),
+          "\nLinear combinations of isweep sources:   \t", repr(isweep_choices),
           "\nThese can be changed in main.py.")
     input("Enter any key to continue: ")
 
@@ -117,8 +117,8 @@ def load_datasets(hdf5_folder, lang_nc_folder, bimaxwellian, plot_save_directory
             orientation = get_orientation(config_id)
 
             # get current and bias data from Langmuir probe
-            bias, currents, positions, dt, ports = get_isweep_vsweep(hdf5_path, vsweep_board_channel,
-                                                                     langmuir_probes, voltage_gain, orientation)
+            bias, currents, positions, dt = get_isweep_vsweep(hdf5_path, vsweep_board_channel,
+                                                              langmuir_configs, voltage_gain, orientation)
 
             if sweep_view_mode:
                 preview_raw_sweep(bias, currents, positions, langmuir_configs[['port', 'face']], exp_params_dict, dt)
@@ -130,15 +130,15 @@ def load_datasets(hdf5_folder, lang_nc_folder, bimaxwellian, plot_save_directory
             del bias, currents
 
             if chara_view_mode:
-                preview_characteristics(characteristics, positions, langmuir_configs[['port', 'face']], ramp_times,
-                                        exp_params_dict,
-                                        diagnostics=True, areas=langmuir_configs['area'], ion=ion_type,
+                preview_characteristics(characteristics, positions, ramp_times,
+                                        langmuir_configs, exp_params_dict,
+                                        diagnostics=True, ion=ion_type,
                                         bimaxwellian=bimaxwellian,
                                         plot_save_directory=plot_save_directory)
 
             # perform langmuir diagnostics on each dataset
-            diagnostics_dataset = langmuir_diagnostics(characteristics, positions, ramp_times, ports,
-                                                       langmuir_probes['area'], ion_type, bimaxwellian=bimaxwellian)
+            diagnostics_dataset = langmuir_diagnostics(characteristics, positions, ramp_times,
+                                                       langmuir_configs, ion_type, bimaxwellian=bimaxwellian)
 
             # cleanup 2
             del characteristics, positions
