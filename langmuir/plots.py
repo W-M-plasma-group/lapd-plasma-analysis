@@ -95,7 +95,10 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
                 non_nan_element_da = da.copy()
                 non_nan_element_da[...] = ~np.isnan(da)
                 effective_num_non_nan_per_std = non_nan_element_da.sum(dims_to_average_out)
-                linear_da_error = da_std * 1.96 / np.sqrt(effective_num_non_nan_per_std - 1)  # unbiased
+                linear_da_error = da_std * np.nan
+                linear_da_error[effective_num_non_nan_per_std > 1
+                                ] = (da_std * 1.96 / np.sqrt(effective_num_non_nan_per_std - 1)
+                                     )[effective_num_non_nan_per_std > 1]  # unbiased
 
                 if np.isfinite(da_mean).any():
                     probe_face_eq_str = probe_face_choice_to_eq_string(probe_face_choices[i], ports, faces)
@@ -105,12 +108,13 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
                 ax.set_xlabel(da_mean.coords[x_dim].attrs['units'])
                 ax.set_ylabel(da_mean.attrs['units'])
 
-                # TODO a bit hardcoded; TODO document fill_na!
-                da_core_steady_state_max = core_steady_state(da.fillna(0), core_rad, steady_state_by_runs[inner_index]
-                                                             ).max().item()
-                y_limits += [np.nanmin([1.1 * da_core_steady_state_max,
-                                        2.5 * core_steady_state(da, core_rad, steady_state_by_runs[inner_index],
-                                                                operation="median", dims_to_keep=["isweep"]
+                # TODO very hardcoded; TODO document fill_na!
+                da_small_core_steady_state_max = core_steady_state(da.fillna(0), core_rad / 2,
+                                                                   steady_state_by_runs[inner_index]
+                                                                   ).max().item()
+                y_limits += [np.nanmin([1.1 * da_small_core_steady_state_max,
+                                        2.2 * core_steady_state(da, core_rad, steady_state_by_runs[inner_index],
+                                                                operation="median", dims_to_keep=["probe", "face"]
                                                                 ).max().item()])]
         if not np.nanmax(y_limits) > 0:
             warn("A plot was assigned a NaN upper axis limit")
