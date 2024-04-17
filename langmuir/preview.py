@@ -59,9 +59,11 @@ def preview_characteristics(characteristics_array, positions, ports_faces, ramp_
                 plot_title += f"\nTemperature: {electron_temperature:.3f}"
                 chara_to_plot.plot()
                 plt.plot(diagnostics['V_F'],
-                         chara_to_plot.current[array_lookup(chara_to_plot.bias, diagnostics['V_F'])], 'go', label="V_F")
+                         chara_to_plot.current[array_lookup(chara_to_plot.bias, diagnostics['V_F'])], 'go',
+                         label=r"$V_F$")
                 plt.plot(diagnostics['V_P'],
-                         chara_to_plot.current[array_lookup(chara_to_plot.bias, diagnostics['V_P'])], 'ro', label="V_P")
+                         chara_to_plot.current[array_lookup(chara_to_plot.bias, diagnostics['V_P'])], 'ro',
+                         label=r"$V_P$")
                 plt.legend()
 
             except (ValueError, RuntimeError, TypeError) as e:

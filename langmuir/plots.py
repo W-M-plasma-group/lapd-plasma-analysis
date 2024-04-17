@@ -94,9 +94,10 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
                 linear_da_error = da_std * 1.96 / np.sqrt(effective_num_non_nan_per_std - 1)  # unbiased
 
                 if np.isfinite(da_mean).any():
+                    probe_face_eq_str = probe_face_choice_to_eq_string(probe_face_choices[i], ports, faces)
                     ax.errorbar(da_mean.coords[x_dim], da_mean, yerr=linear_da_error, linestyle="none",
                                 color=color_map[inner_index], marker=marker_styles[i],
-                                label=str(inner_val) + (f" ({isweep_choices[i]})" if len(isweep_choices) > 1 else ""))
+                                label=str(inner_val) + f" ({probe_face_eq_str})")
                 ax.set_xlabel(da_mean.coords[x_dim].attrs['units'])
                 ax.set_ylabel(da_mean.attrs['units'])
 
@@ -196,8 +197,6 @@ def plot_parallel_diagnostic(datasets, steady_state_plateaus_runs, probes_faces_
                              save_directory=""):
     plt.rcParams['figure.figsize'] = (6.5, 3.5)
 
-    anode_z = portnum_to_z(0).to(u.m)
-
     collision_frequencies = extract_collision_frequencies(datasets, core_radius, steady_state_plateaus_runs,
                                                           probes_faces_midplane, operation)
     collision_frequencies_log_normalized = normalize(np.log(collision_frequencies), 0, 0.9)
@@ -230,7 +229,7 @@ def plot_parallel_diagnostic(datasets, steady_state_plateaus_runs, probes_faces_
     normalizer = matplotlib.colors.LogNorm(vmin=np.min(collision_frequencies),
                                            vmax=np.max(collision_frequencies))
     color_bar = plt.colorbar(matplotlib.cm.ScalarMappable(norm=normalizer, cmap='plasma'), ax=plt.gca())
-    color_bar.set_label("nu_ei [Hz]\n(midplane)", rotation=0, labelpad=30)
+    color_bar.set_label(r"$\nu_{ei}$" " [Hz]\n(midplane)", rotation=0, labelpad=30)
     # color_bar.set_label("Midplane electron-ion \ncollision frequency [Hz]", rotation=90, labelpad=10)
     plt.tight_layout()
     if save_directory:
@@ -282,12 +281,16 @@ def scatter_plot_diagnostics(datasets, diagnostics_to_plot_list, steady_state_pl
         if "n_" in diagnostics_to_plot_list[0] and "T_e" in diagnostics_to_plot_list[1]:
             pass
 
-    plt.xlabel(diagnostics_to_plot_list[0])
-    plt.ylabel(diagnostics_to_plot_list[1])
-    plt.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left')
-    plt.title("Scatter plot for selected runs at port ~27-29"
-              "\nJan 2024 runs: x marker = post-gas puff"
-              "\nColor map: ln(collision frequency at port 27/29)")
+    plt.xlabel(f"{get_title(diagnostics_to_plot_list[0])} [{get_diagnostic_keys_units()[diagnostics_to_plot_list[0]]}]")
+    plt.ylabel(f"{get_title(diagnostics_to_plot_list[1])} [{get_diagnostic_keys_units()[diagnostics_to_plot_list[1]]}]")
+    # plt.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left')
+    plt.legend()
+    normalizer = matplotlib.colors.LogNorm(vmin=np.min(collision_frequencies),
+                                           vmax=np.max(collision_frequencies))
+    color_bar = plt.colorbar(matplotlib.cm.ScalarMappable(norm=normalizer, cmap='plasma'), ax=plt.gca())
+    color_bar.set_label(r"$\nu_{ei}$" " [Hz]\n(midplane)", rotation=0, labelpad=30)
+    # plt.title("Midplane scatter plot")
+    # "\nJan 2024 runs: x marker = post-gas puff")
     plt.tight_layout()
     plt.show()
 
@@ -332,9 +335,16 @@ def plot_parallel_inverse_scale_length(datasets, steady_state_plateaus_runs, dia
         plt.plot(z, diagnostic_scale_length, marker=marker_styles_split[i], color=color_map[i],
                  label=f"{datasets_split[i].attrs['Exp name'][:3]}, #{datasets_split[i].attrs['Run name'][:2]}"
                        f":  {collision_frequencies[i]:.2E} Hz")
-    plt.title(f"Parallel gradient scale length (m) of {diagnostic} versus z"  # ({operation})
-              f"\nColor map: ln(collision frequency at port ~27)")
-    plt.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left')
+    plt.title(f"Parallel gradient scale length [m] \n\n{get_title(diagnostic)} ", y=0.9)  # loc='right'
+    plt.xlabel("z position [m]")
+
+    normalizer = matplotlib.colors.LogNorm(vmin=np.min(collision_frequencies),
+                                           vmax=np.max(collision_frequencies))
+    color_bar = plt.colorbar(matplotlib.cm.ScalarMappable(norm=normalizer, cmap='plasma'), ax=plt.gca())
+    color_bar.set_label(r"$\nu_{ei}$" " [Hz]\n(midplane)", rotation=0, labelpad=30)
+    # color_bar.set_label("Midplane electron-ion \ncollision frequency [Hz]", rotation=90, labelpad=10)
+
+    # plt.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left')
     plt.tight_layout()
     plt.show()
 
