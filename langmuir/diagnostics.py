@@ -27,6 +27,14 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, ports, pr
 
     x = np.unique(positions[:, 0])
     y = np.unique(positions[:, 1])
+    ports = np.unique(langmuir_configs['port'])
+    faces = np.unique(langmuir_configs['face'])
+    port_zs = np.array([portnum_to_z(port).to(u.cm).value for port in ports])
+
+    num_probe = len(ports)
+    num_face = len(faces)
+    num_x = len(x)
+    num_y = len(y)
     num_plateaus = characteristic_arrays.shape[-1]
     num_shots = characteristic_arrays.shape[2]
     num_isweep = characteristic_arrays.shape[0]
@@ -37,29 +45,30 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, ports, pr
         probe_areas = np.repeat(probe_areas, num_isweep)
     keys_units = get_diagnostic_keys_units(probe_areas[0], ion_type, bimaxwellian=bimaxwellian)
 
-    # num_x * num_y * num_shots * num_plateaus template numpy_array
-    templates = {key: np.full(shape=(num_isweep, len(x), len(y), num_shots, num_plateaus),
+    # num_probe * num_face * num_x * num_y * num_shots * num_plateaus template numpy_array
+    templates = {key: np.full(shape=(num_probe, num_face, num_x, num_y, num_shots, num_plateaus),
                               fill_value=np.nan, dtype=float)
                  for key in keys_units.keys()}
     diagnostics_ds = xr.Dataset({key: xr.DataArray(data=templates[key],
-                                                   dims=['isweep', 'x', 'y', 'shot', 'time'],
-                                                   coords=(('isweep', np.arange(num_isweep)),
+                                                   dims=['probe', 'face', 'x', 'y', 'shot', 'time'],
+                                                   coords=(('probe', np.arange(num_probe)),
+                                                           ('face', faces),
                                                            ('x', x, {"units": str(u.cm)}),
                                                            ('y', y, {"units": str(u.cm)}),
                                                            ('shot', np.arange(num_shots)),
                                                            ('time', ramp_times.to(u.ms).value, {"units": str(u.ms)}))
                                                    ).assign_coords({'plateau': ('time', np.arange(num_plateaus) + 1),
-                                                                    'port': ('isweep', ports),
-                                                                    'z': ('isweep', ports_z, {"units": str(u.cm)})}
+                                                                    'port': ('probe', ports),
+                                                                    'z':    ('probe', port_zs, {"units": str(u.cm)})}
                                                                    ).assign_attrs({"units": keys_units[key]})
                                  for key in keys_units.keys()}).assign_attrs({"Interferometry calibrated": False})
 
-    num_characteristics = (diagnostics_ds.sizes['isweep'] * diagnostics_ds.sizes['x'] * diagnostics_ds.sizes['y']
-                           * diagnostics_ds.sizes['shot'] * diagnostics_ds.sizes['time'])
+    num_characteristics = (diagnostics_ds.sizes['probe'] * diagnostics_ds.sizes['face'] * diagnostics_ds.sizes['x']
+                           * diagnostics_ds.sizes['y'] * diagnostics_ds.sizes['shot'] * diagnostics_ds.sizes['time'])
 
     # """
     error_types = []
-    error_chart = np.zeros(shape=(num_isweep, len(x), len(y), num_shots, num_plateaus))
+    error_chart = np.zeros(shape=(num_probe, num_face, num_x, num_y, num_shots, num_plateaus))
     # """
 
     print(f"Calculating Langmuir diagnostics...")
@@ -82,9 +91,13 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, ports, pr
                         if bimaxwellian:
                             diagnostics = unpack_bimaxwellian(diagnostics)
                         for key in diagnostics.keys():
-                            # REMOVED: crop diagnostics with "T_e" in name because otherwise skew averages/pressure data
-                            val = value_safe(diagnostics[key])  # if "T_e" not in / crop_value(diagnostics[key], 0, 10)
-                            diagnostics_ds[key].loc[i, positions[l, 0], positions[l, 1], s, ramp_times[r]] = val
+                            # REMOVED: crop diagnostics with "T_e" in name because otherwise skew averages:
+                            # if "T_e" in key: crop_value(diagnostics[key], 0, 10)
+                            val = value_safe(diagnostics[key])
+                            diagnostics_ds[key].loc[{"probe": np.where(ports == langmuir_configs['port'][i])[0][0],
+                                                     "face": langmuir_configs['face'][i],
+                                                     "x": positions[l, 0],  "y": positions[l, 1],
+                                                     "shot": s,             "time": ramp_times[r]}] = val
 
     warnings.simplefilter(action='default')  # Restore warnings to default handling
 
@@ -152,7 +165,7 @@ def detect_steady_state_ramps(langmuir_dataset: xr.Dataset, core_rad):
     else:
         density = langmuir_dataset['n_e']
         core_density = density.where(np.logical_and(*in_core([density.x, density.y], core_rad)), drop=True)
-        core_density_time = core_density.isel(isweep=0).mean(['x', 'y', 'shot']).squeeze()
+        core_density_time = core_density.isel(probe=0, face=0).mean(['x', 'y', 'shot']).squeeze()
         threshold = 0.9 * core_density_time.max()
         start_index = (core_density_time > threshold).argmax().item() + 1
         end_index = core_density_time.sizes['time'] - np.nanargmax(

@@ -54,7 +54,7 @@ def get_diagnostic_keys_units(probe_area=1.*u.mm**2, ion_type="He-4+", bimaxwell
     return keys_units
 
 
-def isweep_selector(ds, vectors):
+def probe_face_selector(ds, vectors):
     r"""
     Select an isweep signal, linear combination of isweep signals, or multiple such linear combinations from a
     diagnostic dataset. For example, on a dataset with two isweep signals (e.g. from 2 different probes or probe faces),
@@ -64,13 +64,15 @@ def isweep_selector(ds, vectors):
     When multiple datasets are returned, they are placed on separate contour plots, but
     the same line plot with different line styles.
     :param ds: The Dataset of Langmuir data to select from
-    :param vectors: The linear combination of isweep signals to compute
+    :param vectors: "3D" nested list of linear combination of isweep signals to compute
     :return: Dataset containing data from the selected isweep signal or combination of isweep signals
     """
 
     manual_attrs = ds.attrs  # TODO raise xarray issue about losing attrs even with xr.set_options(keep_attrs=True):
     manual_sub_attrs = {key: ds[key].attrs for key in ds}
-    vectors = np.atleast_2d(vectors)
+    if len(np.array(vectors).shape) != 3:
+        raise ValueError(f"Expected '3D' nested list for probe_face_choices parameter, "
+                         f"but got dimension {len(np.array(vectors).shape)}")
     ds_s = []
     for vector in vectors:
         ds_isweep_selected = 0 * ds.isel(isweep=0).copy()

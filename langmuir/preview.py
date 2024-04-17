@@ -9,9 +9,13 @@ def preview_characteristics(characteristics_array, positions, ports, ramp_times,
 
     x = np.unique(positions[:, 0])
     y = np.unique(positions[:, 1])
-    print(f"\nDimensions of plateaus array: {characteristics_array.shape[0]} isweep signals, {len(x)} x-positions, "
-          f"{len(y)} y-positions, {characteristics_array.shape[2]} shots, and {characteristics_array.shape[-1]} ramps.")
-    print(f"  * isweep probe ports are {ports}",
+    print(f"\nDimensions of plateaus array: "
+          f"{characteristics_array.shape[0]} isweep signals, "
+          f"{len(x)} x-positions, "
+          f"{len(y)} y-positions, "
+          f"{characteristics_array.shape[2]} shots, and "
+          f"{characteristics_array.shape[-1]} ramps.")
+    print(f"  * isweep port-face combinations are {ports_faces}",
           f"  * x positions range from {min(x)} to {max(x)}",
           f"  * y positions range from {min(y)} to {max(y)}",
           f"  * shot indices range from 0 to {characteristics_array.shape[2]}",
@@ -38,8 +42,11 @@ def preview_characteristics(characteristics_array, positions, ports, ramp_times,
         """ while chara_view_mode not in ["s", "a"]:
             chara_view_mode = input("(S)how current plot or (a)dd another Characteristic?").lower()
         if chara_view_mode == "s": """
+        port_face = ports_faces[isweep_x_y_shot_ramp_to_plot[0]]
+        port_face_string = (str(port_face['port'])
+                            + (f" {port_face['face']}" if port_face['face'] else ""))
         plot_title = (f"Run: {exp_params_dict['Exp name']}, {exp_params_dict['Run name']}\n"
-                      f"Isweep: {isweep_x_y_shot_ramp_to_plot[0]} (port {ports[isweep_x_y_shot_ramp_to_plot[0]]}), "
+                      f"Isweep: {isweep_x_y_shot_ramp_to_plot[0]} ({port_face_string}), "
                       f"x: {loc_x}, y: {loc_y}, shot: {isweep_x_y_shot_ramp_to_plot[3]}, "
                       f"time: {ramp_times[isweep_x_y_shot_ramp_to_plot[4]]:.2f}")
         if diagnostics:
@@ -67,15 +74,18 @@ def preview_characteristics(characteristics_array, positions, ports, ramp_times,
             plt.show()
 
 
-def preview_raw_sweep(bias, currents, positions, ports, exp_params_dict, dt):
-    plt.rcParams['figure.dpi'] = 300
+def preview_raw_sweep(bias, currents, positions, ports_faces, exp_params_dict, dt):
+    plt.rcParams['figure.dpi'] = 160
     plt.rcParams['figure.figsize'] = (40, 4)
 
     x = np.unique(positions[:, 0])
     y = np.unique(positions[:, 1])
-    print(f"\nDimensions of isweep array: {currents.shape[0]} isweep signals, {len(x)} x-positions, "
-          f"{len(y)} y-positions, and {currents.shape[2]} shots")
-    print(f"  * isweep probe ports are {ports}",
+    print(f"\nDimensions of isweep array: "
+          f"{currents.shape[0]} isweep signals, "
+          f"{len(x)} x-positions, "
+          f"{len(y)} y-positions, and "
+          f"{currents.shape[2]} shots")
+    print(f"  * isweep port-face combinations are {ports_faces}",
           f"  * x positions range from {min(x)} to {max(x)}",
           f"  * y positions range from {min(y)} to {max(y)}",
           f"  * shot indices range from 0 to {currents.shape[2]}.", sep="\n")
@@ -103,9 +113,12 @@ def preview_raw_sweep(bias, currents, positions, ports, exp_params_dict, dt):
         bias_to_plot = bias[(loc,                                    *isweep_x_y_shot_to_plot[3:])]
         current_to_plot = currents[(isweep_x_y_shot_to_plot[0], loc, *isweep_x_y_shot_to_plot[3:])]
 
+        port_face = ports_faces[isweep_x_y_shot_to_plot[0]]
+        port_face_string = (str(port_face['port'])
+                            + (f" {port_face['face']}" if port_face['face'] else ""))
         plt.plot(np.arange(len(bias_to_plot)) * dt, bias_to_plot, label="Bias (V)")
         plt.title(f"Run: {exp_params_dict['Exp name']}, {exp_params_dict['Run name']}\n"
-                  f"Isweep: {isweep_x_y_shot_to_plot[0]} (port {ports[isweep_x_y_shot_to_plot[0]]}), "
+                  f"Isweep: {isweep_x_y_shot_to_plot[0]} ({port_face_string}), "
                   f"x: {loc_x}, y: {loc_y}, shot: {isweep_x_y_shot_to_plot[3]}")
         plt.tight_layout()
         plt.legend()
@@ -113,7 +126,7 @@ def preview_raw_sweep(bias, currents, positions, ports, exp_params_dict, dt):
 
         plt.plot(np.arange(len(bias_to_plot)) * dt, current_to_plot, label="Current (A)")
         plt.title(f"Run: {exp_params_dict['Exp name']}, {exp_params_dict['Run name']}\n"
-                  f"Isweep: {isweep_x_y_shot_to_plot[0]} (port {ports[isweep_x_y_shot_to_plot[0]]}), "
+                  f"Isweep: {isweep_x_y_shot_to_plot[0]} ({port_face_string}), "
                   f"x: {loc_x}, y: {loc_y}, shot: {isweep_x_y_shot_to_plot[3]}")
         plt.legend()
         plt.tight_layout()

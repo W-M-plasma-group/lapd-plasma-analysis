@@ -12,12 +12,11 @@ def get_isweep_vsweep(filename, vsweep_bc, isweep_metadatas, voltage_gain, orien
     ----------
     :param filename: file path of HDF5 file from LAPD
     :param vsweep_bc: board and channel number of vsweep data in HDF5 file
-    :param isweep_metadatas: structured array of board, channel, receptacle, port, resistance, and area
+    :param isweep_metadatas: structured array of board, channel, receptacle, port, face, resistance, and area
     for each isweep signal
     :param voltage_gain: numerical value of scaling constant for getting real bias voltages from abstract vsweep data
     :param orientation: +1 or -1, depending on if Isweep should be inverted before analysis
-    :return: bias, currents, positions, dt, ports: v_sweep array, i_sweeps array, position array, timestep amount,
-    and port numbers array
+    :return: bias, currents, positions, dt: v_sweep array, i_sweeps array, position array, and timestep amount
     """
 
     with lapd.File(filename) as lapd_file:
@@ -69,7 +68,9 @@ def get_isweep_vsweep(filename, vsweep_bc, isweep_metadatas, voltage_gain, orien
     currents *= orientation
 
     ports = np.array([motor_data.info['controls']['6K Compumotor']['probe']['port'] for motor_data in motor_datas])
-    return bias, currents, positions, dt, ports
+    assert np.all(ports == isweep_metadatas['port'])  # otherwise, ports in configurations.py do not match motor data
+
+    return bias, currents, positions, dt
 
 
 def get_shot_positions(isweep_motor_data):

@@ -112,7 +112,7 @@ def load_datasets(hdf5_folder, lang_nc_folder, bimaxwellian):
             config_id = get_config_id(exp_params_dict['Exp name'])
             vsweep_board_channel = get_vsweep_bc(config_id)
 
-            langmuir_probes = get_langmuir_config(hdf5_path, config_id)  # TODO print face strings in outputs
+            langmuir_configs = get_langmuir_config(hdf5_path, config_id)
             voltage_gain = get_voltage_gain(config_id)
             orientation = get_orientation(config_id)
 
@@ -121,7 +121,7 @@ def load_datasets(hdf5_folder, lang_nc_folder, bimaxwellian):
                                                                      langmuir_probes, voltage_gain, orientation)
 
             if sweep_view_mode:
-                preview_raw_sweep(bias, currents, positions, ports, exp_params_dict, dt)
+                preview_raw_sweep(bias, currents, positions, langmuir_configs[['port', 'face']], exp_params_dict, dt)
 
             # organize sweep bias and current into an array of Characteristic objects
             characteristics, ramp_times = characterize_sweep_array(bias, currents, dt)
@@ -130,9 +130,11 @@ def load_datasets(hdf5_folder, lang_nc_folder, bimaxwellian):
             del bias, currents
 
             if chara_view_mode:
-                preview_characteristics(characteristics, positions, ports, ramp_times, exp_params_dict,
-                                        diagnostics=True, areas=langmuir_probes['area'], ion=ion_type,
-                                        bimaxwellian=bimaxwellian)
+                preview_characteristics(characteristics, positions, langmuir_configs[['port', 'face']], ramp_times,
+                                        exp_params_dict,
+                                        diagnostics=True, areas=langmuir_configs['area'], ion=ion_type,
+                                        bimaxwellian=bimaxwellian,
+                                        plot_save_directory=plot_save_directory)
 
             # perform langmuir diagnostics on each dataset
             diagnostics_dataset = langmuir_diagnostics(characteristics, positions, ramp_times, ports,

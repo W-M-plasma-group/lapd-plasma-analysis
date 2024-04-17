@@ -12,14 +12,14 @@ matplotlib.rcParams.update(matplotlib.rcParamsDefault)
 # matplotlib.use('QtAgg')
 
 
-def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagnostic, isweep_choices, x_dim='x',
+def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagnostic, probe_face_choices, x_dim='x',
                               steady_state_by_runs=None, core_rad=None, attribute=None, tolerance=np.nan,
                               save_directory=""):
     r"""
 
     :param diagnostics_datasets: list of xarray Datasets
     :param plot_diagnostic: string identifying label of desired diagnostics
-    :param isweep_choices:
+    :param probe_face_choices:
     :param x_dim:
     :param steady_state_by_runs:
     :param core_rad:
@@ -70,9 +70,11 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
 
         y_limits = [0]
         for inner_index in range(num_datasets):     # discharge current index
+            ports = datasets[inner_index].coords['port'].data
+            faces = datasets[inner_index].coords['face'].data
 
-            ds_s = isweep_selector(datasets[inner_index], isweep_choices)
-            for i in range(len(ds_s)):              # isweep index
+            ds_s = probe_face_selector(datasets[inner_index], probe_face_choices)
+            for i in range(len(ds_s)):              # probe/face linear combination index
                 ds = ds_s[i]
 
                 inner_val = ds.attrs[attributes[0]]
@@ -192,16 +194,16 @@ def plot_line_diagnostic(diagnostics_ds_s: list[xr.Dataset], diagnostic, plot_ty
                           f"\n{repr(e)}")
 
 
-def plot_parallel_diagnostic(datasets_split, steady_state_plateaus_runs_split, isweep_choice_center_split,
-                             marker_styles_split, diagnostic, operation="mean", core_radius=26 * u.cm,
+def plot_parallel_diagnostic(datasets, steady_state_plateaus_runs, probes_faces_midplane, probes_faces_parallel,
+                             marker_styles, diagnostic, operation="mean", core_radius=26 * u.cm,
                              save_directory=""):
     plt.rcParams['figure.figsize'] = (6.5, 3.5)
     plt.rcParams['figure.dpi'] = 300
 
     anode_z = portnum_to_z(0).to(u.m)
 
-    collision_frequencies = extract_collision_frequencies(datasets_split, core_radius, steady_state_plateaus_runs_split,
-                                                          isweep_choice_center_split, operation)
+    collision_frequencies = extract_collision_frequencies(datasets, core_radius, steady_state_plateaus_runs,
+                                                          probes_faces_midplane, operation)
     collision_frequencies_log_normalized = normalize(np.log(collision_frequencies), 0, 0.9)
     color_map = matplotlib.colormaps["plasma"](collision_frequencies_log_normalized)
 
@@ -213,12 +215,15 @@ def plot_parallel_diagnostic(datasets_split, steady_state_plateaus_runs_split, i
 
         if diagnostic not in datasets_split[i]:  # TODO needs testing
             continue
-        diagnostic_means = core_steady_state(datasets_split[i][diagnostic], core_radius,
-                                             steady_state_plateaus_runs_split[i], operation, dims_to_keep=("isweep",))
+        diagnostic_means = core_steady_state(datasets[i][diagnostic], core_radius,
+                                             steady_state_plateaus_runs[i], operation,
+                                             dims_to_keep=("probe", "face"))
 
-        for isweep_choice in isweep_choices:
-            diagnostic_values += [diagnostic_means[{"isweep": isweep_choice}].item()]
-            zs += [diagnostic_means[{"isweep": isweep_choice}].coords['z'].item()]
+        for probe_face in probes_faces_parallel[i]:
+            diagnostic_values += [diagnostic_means[{"probe": probe_face[0],
+                                                    "face": probe_face[1]}].item()]
+            zs += [diagnostic_means[{"probe": probe_face[0],
+                                     "face": probe_face[1]}].coords['z'].item()]
         zs = anode_z - (zs * u.Unit(diagnostic_means.coords['z'].attrs['units'])).to(u.m)  # convert to meters
         diagnostic_units = datasets_split[i][diagnostic].attrs['units']
 
@@ -237,13 +242,14 @@ def plot_parallel_diagnostic(datasets_split, steady_state_plateaus_runs_split, i
     plt.show()
 
 
-def scatter_plot_diagnostics(datasets_split, diagnostics_to_plot_list, steady_state_plateaus_runs_split,
-                             isweep_choice_center_split, marker_styles_split, operation="mean", core_radius=26 * u.cm):
-    plt.rcParams['figure.figsize'] = (8.5, 5.5)
-    plt.rcParams['figure.dpi'] = 300
+def scatter_plot_diagnostics(datasets, diagnostics_to_plot_list, steady_state_plateaus_runs,
+                             probes_faces_midplane, marker_styles, operation="mean", core_radius=26 * u.cm,
+                             save_directory=""):
+    plt.rcParams['figure.figsize'] = (6, 4)
+    # plt.rcParams['figure.dpi'] = 300
 
-    collision_frequencies = extract_collision_frequencies(datasets_split, core_radius, steady_state_plateaus_runs_split,
-                                                          isweep_choice_center_split, operation)
+    collision_frequencies = extract_collision_frequencies(datasets, core_radius, steady_state_plateaus_runs,
+                                                          probes_faces_midplane, operation)
     collision_frequencies_log_normalized = normalize(np.log(collision_frequencies), 0, 0.9)
     color_map = matplotlib.colormaps["plasma"](collision_frequencies_log_normalized)
 
@@ -252,9 +258,10 @@ def scatter_plot_diagnostics(datasets_split, diagnostics_to_plot_list, steady_st
         diagnostics_point = []
         for plot_diagnostic in diagnostics_to_plot_list[:2]:
             diagnostic_mean = core_steady_state(
-                datasets_split[i][plot_diagnostic], core_radius, steady_state_plateaus_runs_split[i], operation,
-                dims_to_keep=("isweep",))
-            diagnostics_point += [diagnostic_mean[{"isweep": isweep_choice_center_split[i]}].item()]
+                datasets[i][plot_diagnostic], core_radius, steady_state_plateaus_runs[i], operation,
+                dims_to_keep=("probe", "face"))
+            diagnostics_point += [diagnostic_mean[{"probe": probes_faces_midplane[i][0],
+                                                   "face": probes_faces_midplane[i][1]}].item()]
         diagnostics_points += [diagnostics_point]
 
     scatter_points = np.array(diagnostics_points)
@@ -290,29 +297,40 @@ def scatter_plot_diagnostics(datasets_split, diagnostics_to_plot_list, steady_st
     plt.show()
 
 
-def plot_parallel_inverse_scale_length(datasets_split, steady_state_plateaus_runs_split, diagnostic,
-                                       isweep_choice_center_split, marker_styles_split, operation, core_radius):
-    plt.rcParams['figure.figsize'] = (7, 4.5)   # (8.5, 5.5)
-    plt.rcParams['figure.dpi'] = 300
+def plot_parallel_inverse_scale_length(datasets, steady_state_plateaus_runs, diagnostic, probes_faces_midplane,
+                                       probes_faces_parallel, marker_styles, operation, core_radius, save_directory):
+    plt.rcParams['figure.figsize'] = 6, 4  # (7, 4.5)   # (8.5, 5.5)
+    # plt.rcParams['figure.dpi'] = 300
+
+    anode_z = portnum_to_z(0).to(u.m).value
 
     # Get mean core-steady-state e-i collision frequencies for each dataset and store in list
-    collision_frequencies = extract_collision_frequencies(datasets_split, core_radius, steady_state_plateaus_runs_split,
-                                                          isweep_choice_center_split, operation)
+    collision_frequencies = extract_collision_frequencies(datasets, core_radius, steady_state_plateaus_runs,
+                                                          probes_faces_midplane, operation)
     collision_frequencies_log_normalized = normalize(np.log(collision_frequencies), 0, 0.9)
     color_map = matplotlib.colormaps["plasma"](collision_frequencies_log_normalized)
 
-    for i in range(len(datasets_split)):
-        isweep_choices = (0, 2) if datasets_split[i].attrs['Exp name'] == "January_2024" else (0, 1)
-        diagnostic_means = core_steady_state(datasets_split[i][diagnostic], core_radius,
-                                             steady_state_plateaus_runs_split[i], operation, dims_to_keep=("isweep",))
+    for i in range(len(datasets)):
+        probes_faces = probes_faces_parallel[i]
+        diagnostic_means = core_steady_state(datasets[i][diagnostic], core_radius,
+                                             steady_state_plateaus_runs[i], operation,
+                                             dims_to_keep=("probe", "face"))
 
-        diagnostic_difference = (diagnostic_means[{"isweep": isweep_choices[1]}].item()
-                                 - diagnostic_means[{"isweep": isweep_choices[0]}].item())
-        diagnostic_mean = 0.5 * (diagnostic_means[{"isweep": isweep_choices[1]}].item()
-                                 + diagnostic_means[{"isweep": isweep_choices[0]}].item())
-        diagnostic_normalized_gradient = diagnostic_difference / diagnostic_mean
-        z1 = -diagnostic_means[{"isweep": isweep_choices[1]}].coords['z'].item() / 100  # converts cm to m
-        z0 = -diagnostic_means[{"isweep": isweep_choices[0]}].coords['z'].item() / 100  # converts cm to m
+        diagnostic_difference = (diagnostic_means[{"probe": probes_faces[0][0],
+                                                   "face": probes_faces[0][1]}].item()
+                                 - diagnostic_means[{"probe": probes_faces[1][0],
+                                                     "face": probes_faces[1][1]}].item())
+        # diagnostic_mean = 0.5 * (diagnostic_means[{"probe": probes_faces[0][0],
+        #                                            "face": probes_faces[0][1]}].item()
+        #                          + diagnostic_means[{"probe": probes_faces[1][0],
+        #                                              "face": probes_faces[1][1]}].item())
+        diagnostic_value = diagnostic_means[{"probe": probes_faces[0][0],
+                                             "face": probes_faces[0][1]}]
+        diagnostic_normalized_difference = diagnostic_difference / diagnostic_value
+        z1 = anode_z - diagnostic_means[{"probe": probes_faces[0][0],
+                                         "face": probes_faces[0][1]}].coords['z'].item() / 100  # converts cm to m
+        z0 = anode_z - diagnostic_means[{"probe": probes_faces[1][0],
+                                         "face": probes_faces[1][1]}].coords['z'].item() / 100  # converts cm to m
         z = 0.5 * (z1 + z0)
         diagnostic_scale_length = (z1 - z0) / diagnostic_normalized_gradient
         diagnostic_inverse_scale_length = 1 / diagnostic_scale_length
@@ -403,7 +421,7 @@ def extract_collision_frequencies(datasets, core_radius, steady_state_plateaus_r
     :param datasets:
     :param core_radius:
     :param steady_state_plateaus_runs:
-    :param isweep_choice_center:
+    :param probe_face_midplane:
     :param operation:
     :return: tuple of (collision frequencies DataArray, log(collision frequencies) DataArray normalized to [0, 0.9])
     """
@@ -412,8 +430,9 @@ def extract_collision_frequencies(datasets, core_radius, steady_state_plateaus_r
     for i in range(len(datasets)):
         collision_frequencies_mean = core_steady_state(datasets[i]['nu_ei'], core_radius,
                                                        steady_state_plateaus_runs[i], operation,
-                                                       dims_to_keep=("isweep",))
-        collision_frequencies += [collision_frequencies_mean[{"isweep": isweep_choice_center[i]}].mean().item()]
+                                                       dims_to_keep=("probe", "face"))
+        collision_frequencies += [collision_frequencies_mean[{"probe": probe_face_midplane[i][0],
+                                                              "face": probe_face_midplane[i][1]}].mean().item()]
     collision_frequencies = np.array(collision_frequencies)
 
     return collision_frequencies

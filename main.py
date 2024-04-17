@@ -28,9 +28,13 @@ interferometry_folder = ("/Users/leomurphy/lapd-data/November_2022/uwave_288_GHz
 
 """ User parameters """                                         # TODO user adjust
 # isweep_choice is user choice for probe or linear combination to plot; see isweep_selector in helper.py for more
-isweep_choice = [[1, 0, 0, 0], [0, 0, 1, 0]]
-# isweep_choice = [[1, 0]]  # , [0, 1]]
-# isweep_choice = [0]
+# e.g. coefficients are for [[p1f1, p1f2], [p2f1, p2f2]]
+isweep_choices = [[[1, 0], [0, 0]],  # first combination to plot: 1 * (first face on first probe)
+                  [[0, 0], [1, 0]]]  # second combination to plot: 1 * (first face on second probe)
+# isweep_choices = [[[1, 0], [-1, 0]]]   # combination to plot: 1 * (face 1 on probe 1) - 1 * (face 1 on probe 2)
+# isweep_choices = [[1, 0, 0, 0], [0, 0, 1, 0]]
+# isweep_choices = [[1, 0]]  # , [0, 1]]
+# isweep_choices = [0]
 bimaxwellian = False                                        # note to self: perform both and store in same NetCDF file?
 core_radius = 26. * u.cm                                    # From MATLAB code
 
@@ -63,27 +67,27 @@ if __name__ == "__main__":
     print("\n===== Langmuir probe analysis =====")
     datasets, steady_state_plateaus_runs, diagnostic_name_dict, diagnostics_to_plot_list = get_langmuir_datasets(
         langmuir_nc_folder, hdf5_folder, interferometry_folder, interferometry_mode,
-        isweep_choice, core_radius, bimaxwellian)
+        isweep_choices, core_radius, bimaxwellian, plot_save_folder)
     print("Diagnostics selected:", diagnostics_to_plot_list)
 
     # Plot chosen diagnostics for each individual dataset
     if ask_yes_or_no("Generate contour plot of selected diagnostics over time and radial position? (y/n) "):
         for plot_diagnostic in diagnostics_to_plot_list:
             for i in range(len(datasets)):
-                plot_line_diagnostic(isweep_selector(datasets[i], isweep_choice), plot_diagnostic, 'contour',
+                plot_line_diagnostic(probe_face_selector(datasets[i], isweep_choices), plot_diagnostic, 'contour',
                                      steady_state_plateaus_runs[i])
 
     # Plot radial profiles of diagnostic (steady-state time average), with color corresponding to first attribute
     #    and plot position on multiplot corresponding to second attribute
     if ask_yes_or_no("Generate line plot of selected diagnostics over radial position? (y/n) "):
         for plot_diagnostic in diagnostics_to_plot_list:
-            multiplot_line_diagnostic(datasets, plot_diagnostic, isweep_choice, 'x',
+            multiplot_line_diagnostic(datasets, plot_diagnostic, isweep_choices, 'x',
                                       steady_state_by_runs=steady_state_plateaus_runs,
                                       core_rad=core_radius, save_directory=plot_save_folder)
 
     if ask_yes_or_no("Generate line plot of selected diagnostics over time? (y/n) "):
         for plot_diagnostic in diagnostics_to_plot_list:
-            multiplot_line_diagnostic(datasets, plot_diagnostic, isweep_choice, 'time',
+            multiplot_line_diagnostic(datasets, plot_diagnostic, isweep_choices, 'time',
                                       steady_state_by_runs=steady_state_plateaus_runs,
                                       core_rad=core_radius, save_directory=plot_save_folder)
 
@@ -99,7 +103,11 @@ if __name__ == "__main__":
             linestyles_split += ["dotted"]
     marker_styles_split = ['o' if style == 'solid' else 'x' for style in linestyles_split]
 
-    isweep_choice_center_split = [2 if dataset.attrs['Exp name'] == "January_2024" else 0 for dataset in datasets_split]
+    # List that identifies probes and faces for 1) midplane and 2) upstream/downstream
+    probes_faces_midplane_split = [(1, 0) if dataset.attrs['Exp name'] == "January_2024" else (0, 0)
+                                   for dataset in datasets_split]
+    probes_faces_parallel_split = [((0, 0), (1, 0)) for dataset in datasets_split]
+    # above: first face on first probe & first face on second probe
 
     if ask_yes_or_no(f"Generate parallel plot of selected diagnostics? (y/n) "):  # plot of {parallel_diagnostics[key]}
         for plot_diagnostic in diagnostics_to_plot_list:  # for key in parallel_diagnostics:
