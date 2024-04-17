@@ -210,12 +210,11 @@ def plot_parallel_diagnostic(datasets, steady_state_plateaus_runs, probes_faces_
     color_map = matplotlib.colormaps["plasma"](collision_frequencies_log_normalized)
 
     diagnostic_units = ""
-    for i in range(len(datasets_split)):
-        isweep_choices = (0, 2) if datasets_split[i].attrs['Exp name'] == "January_2024" else (0, 1)
+    for i in range(len(datasets)):
         diagnostic_values = []
         zs = []
 
-        if diagnostic not in datasets_split[i]:  # TODO needs testing
+        if diagnostic not in datasets[i]:  # TODO needs testing
             continue
         diagnostic_means = core_steady_state(datasets[i][diagnostic], core_radius,
                                              steady_state_plateaus_runs[i], operation,
@@ -227,10 +226,10 @@ def plot_parallel_diagnostic(datasets, steady_state_plateaus_runs, probes_faces_
             zs += [diagnostic_means[{"probe": probe_face[0],
                                      "face": probe_face[1]}].coords['z'].item()]
         zs = anode_z - (zs * u.Unit(diagnostic_means.coords['z'].attrs['units'])).to(u.m)  # convert to meters
-        diagnostic_units = datasets_split[i][diagnostic].attrs['units']
+        diagnostic_units = datasets[i][diagnostic].attrs['units']
 
-        plt.plot(zs, diagnostic_values, marker=marker_styles_split[i], color=color_map[i], linestyle='none')
-    plt.title(get_title(diagnostic) + " ", y=0.9, loc='right')  # ({operation})
+        plt.plot(zs, diagnostic_values, marker=marker_styles[i], color=color_map[i], linestyle='none')
+    plt.title(f"{get_title(diagnostic)} [{get_diagnostic_keys_units()[diagnostic]}] ", y=0.9, loc='right')  # ({operation})
     plt.xlabel("z position [m]")
     plt.ylabel(f"[{diagnostic_units}]", rotation=0, labelpad=25)   # {get_title(diagnostic)}
     normalizer = matplotlib.colors.LogNorm(vmin=np.min(collision_frequencies),
@@ -255,7 +254,7 @@ def scatter_plot_diagnostics(datasets, diagnostics_to_plot_list, steady_state_pl
     color_map = matplotlib.colormaps["plasma"](collision_frequencies_log_normalized)
 
     diagnostics_points = []
-    for i in range(len(datasets_split)):
+    for i in range(len(datasets)):
         diagnostics_point = []
         for plot_diagnostic in diagnostics_to_plot_list[:2]:
             diagnostic_mean = core_steady_state(
