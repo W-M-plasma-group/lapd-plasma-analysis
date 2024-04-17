@@ -1,9 +1,10 @@
 from langmuir.helper import *
 
 
-def preview_characteristics(characteristics_array, positions, ports_faces, ramp_times, exp_params_dict, diagnostics=False,
-                            areas=None, ion=None, bimaxwellian=False, plot_save_directory=""):
-
+def preview_characteristics(characteristics_array, positions, ramp_times, langmuir_configs, exp_params_dict,
+                            diagnostics=False, ion=None, bimaxwellian=False, plot_save_directory=""):
+    ports_faces = langmuir_configs[['port', 'face']]
+    areas = langmuir_configs['area']
     plt.rcParams['figure.figsize'] = (6, 4)
 
     x = np.unique(positions[:, 0])

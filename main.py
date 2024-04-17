@@ -6,8 +6,7 @@ Comments are added inline. A separate documentation page is not yet complete.
 
 from langmuir.file_access import ask_yes_or_no
 from langmuir.analysis import get_langmuir_datasets
-from langmuir.plots import multiplot_line_diagnostic, plot_line_diagnostic
-from langmuir.plots import plot_parallel_diagnostic, scatter_plot_diagnostics, plot_parallel_inverse_scale_length
+from langmuir.plots import *
 
 """ HDF5 file directory; end path with a slash """              # TODO user adjust
 # hdf5_folder = "/Users/leomurphy/lapd-data/April_2018/"

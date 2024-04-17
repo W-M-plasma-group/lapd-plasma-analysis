@@ -2,6 +2,7 @@ import numpy as np
 import xarray as xr
 import astropy.units as u
 from plasmapy.diagnostics.langmuir import swept_probe_analysis, reduce_bimaxwellian_temperature, Characteristic
+from bapsflib.lapd.tools import portnum_to_z
 
 import matplotlib
 from matplotlib import pyplot as plt

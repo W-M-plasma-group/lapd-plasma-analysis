@@ -1,7 +1,6 @@
 import sys
 import warnings
 from tqdm import tqdm
-from bapsflib.lapd.tools import portnum_to_z
 
 from plasmapy.formulary.collisions import Coulomb_logarithm
 from plasmapy.formulary.collisions.frequencies import MaxwellianCollisionFrequencies
@@ -9,7 +8,7 @@ from plasmapy.formulary.collisions.frequencies import MaxwellianCollisionFrequen
 from langmuir.helper import *
 
 
-def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, ports, probe_area, ion_type, bimaxwellian=False):
+def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, langmuir_configs, ion_type, bimaxwellian=False):
     r"""
     Performs plasma diagnostics on a DataArray of Characteristic objects and returns the diagnostics as a Dataset.
 
@@ -18,8 +17,7 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, ports, pr
     :param characteristic_arrays: list of 3D NumPy arrays of Characteristics (dims: position #, shot, plateau)
     :param positions: list of coordinates for position of each shot
     :param ramp_times: list of time-based Quantities corresponding to time of each shot (peak vsweep)
-    :param ports: list of port numbers corresponding to each probe
-    :param probe_area: area Quantity or list of area Quantities
+    :param langmuir_configs:
     :param ion_type: string corresponding to a Particle
     :param bimaxwellian: boolean
     :return: Dataset object containing diagnostic values at each position
@@ -37,12 +35,8 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, ports, pr
     num_y = len(y)
     num_plateaus = characteristic_arrays.shape[-1]
     num_shots = characteristic_arrays.shape[2]
-    num_isweep = characteristic_arrays.shape[0]
-    ports_z = np.array([portnum_to_z(port).to(u.cm).value for port in ports])
 
-    probe_areas = np.atleast_1d(probe_area)
-    if len(probe_areas) == 1:
-        probe_areas = np.repeat(probe_areas, num_isweep)
+    probe_areas = langmuir_configs['area']
     keys_units = get_diagnostic_keys_units(probe_areas[0], ion_type, bimaxwellian=bimaxwellian)
 
     # num_probe * num_face * num_x * num_y * num_shots * num_plateaus template numpy_array
