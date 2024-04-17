@@ -124,7 +124,6 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
         ax.legend(title=f"\n{attributes[0]} (probe face)", loc="upper center", bbox_to_anchor=(0.5, -0.15), ncol=2)
 
     fig.suptitle(get_title(plot_diagnostic), size=18)
-    plt.tight_layout()
     if save_directory:
         plt.savefig(save_directory + "multiplot_line_" + plot_diagnostic + ".pdf", bbox_inches="tight")
     plt.show()
@@ -176,8 +175,11 @@ def plot_line_diagnostic(diagnostics_ds_s: list[xr.Dataset], diagnostic, plot_ty
                                                  dims_to_keep=linear_dimensions[d])
                 linear_plot_1d(linear_ds_1d[key], linear_dimensions[d])
             plot_title = f"{run_names[0]}\n{get_title(key)} {plot_type} plot"
+            # TODO change
+            """
             if hasattr(linear_ds_s_1d[0], "facevector"):
                 plot_title += f"\nLinear combination of faces: {linear_ds_s_1d[0].attrs['facevector']}"
+            """
             plt.title(plot_title)
             plt.tight_layout()
             if show:
@@ -189,6 +191,7 @@ def plot_line_diagnostic(diagnostics_ds_s: list[xr.Dataset], diagnostic, plot_ty
                 try:
                     linear_plot_2d(linear_ds_s[d][key], plot_type, linear_dimensions[d])
                     plot_title = f"{run_names[d]}\n{get_title(key)} {plot_type} plot (2D)"
+                    # TODO change
                     if hasattr(linear_ds_s[0], "facevector"):
                         plot_title += f"\nLinear combination of faces: {linear_ds_s[d].attrs['facevector']}"
                     plt.title(plot_title)
@@ -340,11 +343,12 @@ def plot_parallel_inverse_scale_length(datasets, steady_state_plateaus_runs, dia
         z0 = anode_z - diagnostic_means[{"probe": probes_faces[1][0],
                                          "face": probes_faces[1][1]}].coords['z'].item() / 100  # converts cm to m
         z = 0.5 * (z1 + z0)
-        diagnostic_scale_length = (z1 - z0) / diagnostic_normalized_gradient
+        diagnostic_scale_length = (z1 - z0) / diagnostic_normalized_difference
+        diagnostic_scale_length_abs = np.abs(diagnostic_scale_length)
         diagnostic_inverse_scale_length = 1 / diagnostic_scale_length
 
-        plt.plot(z, diagnostic_scale_length, marker=marker_styles_split[i], color=color_map[i],
-                 label=f"{datasets_split[i].attrs['Exp name'][:3]}, #{datasets_split[i].attrs['Run name'][:2]}"
+        plt.plot(z, diagnostic_scale_length_abs, marker=marker_styles[i], color=color_map[i],
+                 label=f"{datasets[i].attrs['Exp name'][:3]}, #{datasets[i].attrs['Run name'][:2]}"
                        f":  {collision_frequencies[i]:.2E} Hz")
     plt.title(f"Parallel gradient scale length [m] \n\n{get_title(diagnostic)} ", y=0.9)  # loc='right'
     plt.xlabel("z position [m]")
