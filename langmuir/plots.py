@@ -164,8 +164,8 @@ def plot_line_diagnostic(diagnostics_dataset: xr.Dataset, probe_face_coefficient
         # This is still here for contour plots!
         # Filter out certain points due to inconsistent data (likely random noise that skews average higher)
         if np.isfinite(tolerance):  # note: an insidious error was made here with (tolerance != np.nan)
-            da_mean = linear_ds.mean()
-            linear_ds = linear_ds.where(linear_ds_std < tolerance * da_mean)
+            da_median = linear_ds.median()
+            linear_ds = linear_ds.where(linear_ds_std < tolerance * da_median)
         linear_ds_s += [linear_ds]
 
     diagnostic_list = np.atleast_1d(diagnostic)
