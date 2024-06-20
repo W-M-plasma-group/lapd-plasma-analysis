@@ -130,6 +130,7 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
         ax.legend(title=f"\n{attributes[0]} (probe face)", loc="upper center", bbox_to_anchor=(0.5, -0.15), ncol=2)
 
     fig.suptitle(get_title(plot_diagnostic), size=18)
+    plt.tight_layout()
     if save_directory:
         plt.savefig(f"{save_directory}multiplot_line_{x_dim}_{plot_diagnostic}.pdf", bbox_inches="tight")
     plt.show()
@@ -188,8 +189,7 @@ def plot_line_diagnostic(diagnostics_dataset: xr.Dataset, probe_face_coefficient
             """
             plt.title(plot_title)
             plt.tight_layout()
-            if show:
-                plt.show()
+            plt.show()
     # 2D plot type
     elif plot_type in plot_types_2d:
         for key in diagnostic_list:
