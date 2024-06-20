@@ -187,7 +187,18 @@ def interferometry_calibrate_datasets(datasets, density_diagnostic, interferomet
     return datasets
 
 
-def save_datasets(datasets: list[xr.Dataset], lang_nc_folder, bimaxwellian):
+def get_diagnostics_to_plot(diagnostic_name_dict):
+    # Ask users for list of diagnostics to plot
+    print("The following diagnostics are available to plot: ")
+    diagnostics_sort_indices = np.argsort(list(diagnostic_name_dict.values()))
+    diagnostics_to_plot_ints = choose_multiple_list(
+        np.array(list(diagnostic_name_dict.values()))[diagnostics_sort_indices],
+        "diagnostic", null_action="skip")
+    return [np.array(list(diagnostic_name_dict.keys()))[diagnostics_sort_indices][choice]
+            for choice in diagnostics_to_plot_ints]
+
+
+def save_datasets_nc(datasets: list[xr.Dataset], nc_folder, prefix="lang", bimaxwellian=False):
     for i in range(len(datasets)):
         ds_save_name = get_dataset_save_name(datasets[i].attrs, prefix, bimaxwellian)
         ds_save_path = make_path(nc_folder, ds_save_name, "nc")
