@@ -221,8 +221,10 @@ def plot_parallel_diagnostic(datasets, steady_state_times_runs, probes_faces_mid
     color_map = matplotlib.colormaps["plasma"](collision_frequencies_log_normalized)
 
     diagnostic_units = ""
+    max_diagnostic = 0
     for i in range(len(datasets)):
         diagnostic_values = []
+        diagnostic_errors = []
         zs = []
 
         if diagnostic not in datasets[i]:  # TODO needs testing
@@ -239,6 +241,8 @@ def plot_parallel_diagnostic(datasets, steady_state_times_runs, probes_faces_mid
                                                     "face": probe_face[1]}].item()]
             zs += [diagnostic_means[{"probe": probe_face[0],
                                      "face": probe_face[1]}].coords['z'].item()]
+            if diagnostic_value > max_diagnostic:
+                max_diagnostic = diagnostic_value
         zs = anode_z - (zs * u.Unit(diagnostic_means.coords['z'].attrs['units'])).to(u.m)  # convert to meters
         diagnostic_units = datasets[i][diagnostic].attrs['units']
 
@@ -251,6 +255,7 @@ def plot_parallel_diagnostic(datasets, steady_state_times_runs, probes_faces_mid
     color_bar = plt.colorbar(matplotlib.cm.ScalarMappable(norm=normalizer, cmap='plasma'), ax=plt.gca())
     color_bar.set_label(r"$\nu_{ei}$" " [Hz]\n(midplane)", rotation=0, labelpad=30)
     # color_bar.set_label("Midplane electron-ion \ncollision frequency [Hz]", rotation=90, labelpad=10)
+    plt.ylim(0, 1.05 * max_diagnostic)  # TODO hardcoded
     plt.tight_layout()
     if save_directory:
         plt.savefig(f"{save_directory}parallel_plot_{diagnostic}.pdf")
@@ -472,8 +477,9 @@ def plot_grid(datasets, diagnostics_to_plot_list, steady_state_times_runs, probe
                                   + ", run_name " + dataset.attrs['Run name'][:2])"""
 
                 # ax.legend(title=f"\n{attributes[0]} (probe face)", loc="upper center", bbox_to_anchor=(0.5, -0.15), ncol=1)
-                ax.legend(title="z [m]")
-            ax.set_ylim(top=1.05 * max_val)
+                # ax.legend(title="z [m]")
+                ax.legend(title="Experiment")
+                ax.set_ylim(top=1.05 * max_val)
         normalizer = matplotlib.colors.LogNorm(vmin=np.min(collision_frequencies),
                                                vmax=np.max(collision_frequencies))
         color_bar = fig.colorbar(matplotlib.cm.ScalarMappable(norm=normalizer, cmap='plasma'),
