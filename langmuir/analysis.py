@@ -64,10 +64,7 @@ def get_langmuir_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder
         datasets[i] = datasets[i].assign_attrs({"Neutral density": neutral_density})
 
     # Final save diagnostics datasets to folder (after earlier save point in load_datasets function)
-    save_datasets(datasets, netcdf_folder, bimaxwellian)
-
-    # Get possible diagnostics and their full names, e.g. "n_e" and "Electron density"
-    diagnostic_name_dict = {key: get_title(key) for key in set.intersection(*[set(dataset) for dataset in datasets])}
+    save_datasets_nc(datasets, netcdf_folder, "lang_", bimaxwellian)
 
     return datasets, steady_state_times_runs, hdf5_paths
 
@@ -100,7 +97,12 @@ def load_datasets(hdf5_folder, lang_nc_folder, bimaxwellian, plot_save_directory
     else:
         print("\nThe following HDF5 files were found in the HDF5 folder (specified in main.py): ")
         hdf5_paths = sorted(search_folder(hdf5_folder, "hdf5", limit=52))
-        hdf5_chosen_ints = choose_multiple_list(hdf5_paths, "HDF5 file")
+        hdf5_chosen_ints = choose_multiple_list(hdf5_paths, "HDF5 file",
+                                                null_action="skip to Mach number calculations only")
+
+        if len(hdf5_chosen_ints) == 0:
+            return None
+
         hdf5_chosen_list = [hdf5_paths[choice] for choice in hdf5_chosen_ints]
 
         sweep_view_mode = (len(hdf5_chosen_list) == 1) and ask_yes_or_no("Use raw sweep preview mode? (y/n) ")
@@ -126,7 +128,8 @@ def load_datasets(hdf5_folder, lang_nc_folder, bimaxwellian, plot_save_directory
                                                               langmuir_configs, voltage_gain, orientation)
 
             if sweep_view_mode:
-                preview_raw_sweep(bias, currents, positions, langmuir_configs[['port', 'face']], exp_params_dict, dt)
+                preview_raw_sweep(bias, currents, positions, langmuir_configs[['port', 'face']], exp_params_dict, dt,
+                                  plot_save_directory=plot_save_directory)
 
             # organize sweep bias and current into an array of Characteristic objects
             characteristics, ramp_times = characterize_sweep_array(bias, currents, dt)
@@ -154,7 +157,7 @@ def load_datasets(hdf5_folder, lang_nc_folder, bimaxwellian, plot_save_directory
             save_datasets_nc([diagnostics_dataset], lang_nc_folder, "lang_", bimaxwellian)
             datasets.append(diagnostics_dataset)
 
-    return datasets
+    return datasets, hdf5_chosen_list
 
 
 def interferometry_calibrate_datasets(datasets, density_diagnostic, interferometry_folder, interferometry_mode,
