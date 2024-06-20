@@ -116,6 +116,7 @@ def load_datasets(hdf5_folder, lang_nc_folder, bimaxwellian, plot_save_directory
             exp_params_dict = get_exp_params(hdf5_path)  # list of experimental parameters
 
             ion_type = get_ion(exp_params_dict['Run name'])
+            exp_params_dict = exp_params_dict | {"Ion type": ion_type}
             config_id = get_config_id(exp_params_dict['Exp name'])
             vsweep_board_channel = get_vsweep_bc(config_id)
 
