@@ -22,7 +22,9 @@ def get_langmuir_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder
     print_file_choices(hdf5_folder, langmuir_nc_folder, interferometry_folder, interferometry_mode, isweep_choices)
 
     # Ask user to choose either NetCDF files or HDF5 files, then create datasets from them
-    datasets = load_datasets(hdf5_folder, netcdf_folder, bimaxwellian, plot_save_directory)
+    datasets, hdf5_paths = load_datasets(hdf5_folder, netcdf_folder, bimaxwellian, plot_save_directory)
+    if datasets is None:
+        return None, None, None, None
 
     steady_state_times_runs = [detect_steady_state_times(dataset, core_radius) for dataset in datasets]
 
