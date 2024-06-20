@@ -454,7 +454,7 @@ def plot_grid(datasets, diagnostics_to_plot_list, steady_state_times_runs, probe
                     da = core_steady_state(da, *core_steady_state_params)
                     # print(f"{get_exp_run_string(ds.attrs)}: {steady_state_times_runs[index]}")
 
-                    dims_to_average_out = ['shot'] + [dim for dim in x_dims if dim != "x"]  # hardcoded
+                    dims_to_average_out = ['shot'] + [dim for dim in x_dims if dim != x_dim]  # hardcoded
                     da_mean = da.mean(dims_to_average_out, keep_attrs=True)
                     da_median = da.median()
                     da_std = da.std(dims_to_average_out, ddof=1, keep_attrs=True)
@@ -483,7 +483,7 @@ def plot_grid(datasets, diagnostics_to_plot_list, steady_state_times_runs, probe
                                     # label=f"{z_real:.1f}")  # str(port)
                                     label=get_exp_run_string(ds.attrs, mode="short"))
                         max_val = np.nanmax([max_val, np.nanmax(da_mean)])
-                    ax.set_xlabel(da_mean.coords["x"].attrs['units'])
+                    ax.set_xlabel(f"{x_dim} [{da_mean.coords[x_dim].attrs['units']}]")
                     ax.set_ylabel(da_mean.attrs['units'])
 
                 # ax.set_ylim(0, [30, 20][index])  # TODO extremely hardcoded
