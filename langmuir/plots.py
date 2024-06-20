@@ -185,7 +185,9 @@ def plot_line_diagnostic(diagnostics_dataset: xr.Dataset, probe_face_coefficient
                 linear_ds_1d = core_steady_state(linear_ds_s[d], steady_state_times=steady_state, operation="mean",
                                                  dims_to_keep=linear_dimensions[d])
                 linear_plot_1d(linear_ds_1d[key], linear_dimensions[d])
-            plot_title = f"{run_names[0]}\n{get_title(key)} {plot_type} plot"
+            # probe_eq_string = probe_face_choice_to_eq_string(probe_face_coefficients[d], ports, faces)
+            plot_title = (f"{run_names[0]}"  # , {probe_eq_string}"
+                          f"\n{get_title(key)} {plot_type} plot")
             # TODO change
             """
             if hasattr(linear_ds_s_1d[0], "facevector"):
@@ -200,10 +202,21 @@ def plot_line_diagnostic(diagnostics_dataset: xr.Dataset, probe_face_coefficient
             for d in range(len(linear_ds_s)):
                 try:
                     linear_plot_2d(linear_ds_s[d][key], plot_type, linear_dimensions[d])
-                    plot_title = f"{run_names[d]}\n{get_title(key)} {plot_type} plot (2D)"
+                    plot_title = f"{run_names[d]}"
+                    try:
+                        probe_eq_string = probe_face_choice_to_eq_string(probe_face_coefficients[d],
+                                                                         diagnostics_dataset.coords['port'].data,
+                                                                         diagnostics_dataset.coords['face'].data)
+                        plot_title += f", {probe_eq_string}"
+                    except (ValueError, TypeError, AttributeError, KeyError, IndexError) as e:
+                        print(e)
+                        pass
+                    plot_title += f"\n{get_title(key)} {plot_type} plot (2D)"
                     # TODO change
+                    """
                     if hasattr(linear_ds_s[0], "facevector"):
                         plot_title += f"\nLinear combination of faces: {linear_ds_s[d].attrs['facevector']}"
+                    """
                     plt.title(plot_title)
                     plt.tight_layout()
                     if save_directory:
