@@ -3,19 +3,22 @@ import astropy.units as u
 import xarray as xr
 
 
-def neutral_ratio(electron_density, experimental_parameters, steady_state_start, steady_state_end):
-    # SETUP CODE #
-    # __________ #
+def get_neutral_density(gas_pressure):
+
+    # TODO We assume that neutrals are evenly distributed throughout LAPD and follow the ideal gas law.
+    #   But they may not be evenly spread
 
     # LAPD parameters from MATLAB code
     neutral_temperature = 300. * u.K
-    neutral_pressure = experimental_parameters['Fill pressure'].to(u.Pa)
-    length = 16.5 * u.m
+    neutral_pressure = gas_pressure.to(u.Pa)
 
     # Correction factor for electron density measurements from ion gauge
     correction_factor = 0.18  # from MATLAB
 
-    neutral_density = neutral_pressure / (neutral_temperature * u.k) / correction_factor  # u.k is Boltzmann constant
+    # Ideal gas law: p = nKT, so n = p / KT / (correction_factor)
+    neutral_density = neutral_pressure / (neutral_temperature * const.k_B) / correction_factor
+    return neutral_density.to(u.m ** -3)
+
 
 def get_neutral_ratio(electron_density, experimental_parameters, steady_state_times, operation="median"):
 
