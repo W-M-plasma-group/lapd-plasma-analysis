@@ -57,7 +57,6 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
     outer_bounds = np.append(outer_indexes, len(outer_values))
 
     visualization.quantity_support()
-    # plt.rcParams['figure.dpi'] = 300
     plt.rcParams['figure.figsize'] = (3 + 3 * len(outer_indexes), 4.5 + 0.1 * len(diagnostics_datasets))  # TODO hardcoded
     fig, axes = plt.subplots(1, len(outer_indexes), sharey="row", sharex="col", layout="constrained")
 
@@ -147,6 +146,7 @@ def plot_line_diagnostic(diagnostics_dataset: xr.Dataset, probe_face_coefficient
     linear_ds_s = []
     linear_dimensions = []
     run_names = []
+    diagnostics_ds_s = probe_face_selector(diagnostics_dataset, probe_face_coefficients)
     for diagnostics_ds in diagnostics_ds_s:
         run_names += [get_exp_run_string(diagnostics_ds.attrs)]
 
