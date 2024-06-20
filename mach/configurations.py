@@ -1,10 +1,8 @@
 import numpy as np
 import astropy.units as u
 
+from langmuir.configurations import get_ports_receptacles
 
-mach_receptacles = [3, 4]
-mach_face_resistances = [{2: 14.9, 5: 15.0},
-                         {2: 14.9, 5: 15.0}]
 
 def get_mach_config(hdf5_path, config_id):
 
@@ -24,13 +22,13 @@ def get_mach_config(hdf5_path, config_id):
                            (2, 4, 33, -1, 5, 16.1, 8 * u.mm ** 2, 1 / 2)],
 
                           [(2, 1, 18, -1, 2, 7.36, 2 * u.mm ** 2, 0.89),        # January_2024
-                           (2, 2, 18, -1, 0, 7.32, 2 * u.mm ** 2, 0.95),        # every other is Upper (up) vs Lower (d)
+                           (2, 2, 18, -1, -2, 7.32, 2 * u.mm ** 2, 0.95),       # every other is Upper (up) vs Lower (d)
                            (2, 3, 18, -1, 5, 7.51, 2 * u.mm ** 2, 0.96),        # first four are US, second four are DS
-                           (2, 4, 18, -1, 0, 7.32, 2 * u.mm ** 2, 0.89),
+                           (2, 4, 18, -1, -5, 7.32, 2 * u.mm ** 2, 0.89),       # neg faces mean lower
                            (3, 1, 29, -1, 2, 5.26, 8 * u.mm ** 2, 0.89),
-                           (3, 3, 29, -1, 0, 5.21, 8 * u.mm ** 2, 0.95),
-                           (3, 5, 29, -1, 5, 5.21, 8 * u.mm ** 2, 0.96),
-                           (3, 6, 29, -1, 0, 5.21, 8 * u.mm ** 2, 0.89)
+                           (3, 3, 29, -1, -2, 5.21, 8 * u.mm ** 2, 0.95),
+                           (3, 4, 29, -1, 5, 5.21, 8 * u.mm ** 2, 0.96),
+                           (3, 5, 29, -1, -5, 5.21, 8 * u.mm ** 2, 0.89)
                            ]
                           )
 
