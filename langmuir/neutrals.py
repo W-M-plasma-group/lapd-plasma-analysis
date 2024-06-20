@@ -1,6 +1,8 @@
 import matplotlib.pyplot as plt
 import astropy.units as u
-import xarray as xr
+import astropy.constants as const
+
+from langmuir.helper import core_steady_state
 
 
 def get_neutral_density(gas_pressure):
@@ -26,8 +28,7 @@ def get_neutral_ratio(electron_density, experimental_parameters, steady_state_ti
     # RADIAL/AREAL CODE #
     # _________________ #
 
-    both = xr.ufuncs.logical_and
-    plateau = electron_density.coords['plateau']  # rename variables for comprehensibility
+    # plateau = electron_density.coords['plateau']  # rename variables for comprehensibility
 
     steady_state_electron_density = core_steady_state(electron_density, steady_state_times=steady_state_times,
                                                       operation=operation,

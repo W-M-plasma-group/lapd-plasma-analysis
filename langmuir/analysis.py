@@ -7,6 +7,7 @@ from langmuir.characterization import characterize_sweep_array
 from langmuir.preview import preview_raw_sweep, preview_characteristics
 from langmuir.diagnostics import (langmuir_diagnostics, detect_steady_state_times, get_pressure,
                                   get_electron_ion_collision_frequencies)
+from langmuir.neutrals import get_neutral_density
 from langmuir.interferometry import interferometry_calibration
 from langmuir.plots import get_title
 
