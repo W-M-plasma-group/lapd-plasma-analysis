@@ -241,8 +241,11 @@ def plot_parallel_diagnostic(datasets, steady_state_times_runs, probes_faces_mid
                                                   dims_to_keep=("probe", "face"))
 
         for probe_face in probes_faces_parallel[i]:
-            diagnostic_values += [diagnostic_means[{"probe": probe_face[0],
-                                                    "face": probe_face[1]}].item()]
+            diagnostic_value = diagnostic_means[{"probe": probe_face[0],
+                                                 "face": probe_face[1]}].item()
+            diagnostic_values += [diagnostic_value]
+            diagnostic_errors += [diagnostic_std_errors[{"probe": probe_face[0],
+                                                         "face": probe_face[1]}].item()]
             zs += [diagnostic_means[{"probe": probe_face[0],
                                      "face": probe_face[1]}].coords['z'].item()]
             if diagnostic_value > max_diagnostic:
@@ -250,7 +253,8 @@ def plot_parallel_diagnostic(datasets, steady_state_times_runs, probes_faces_mid
         zs = anode_z - (zs * u.Unit(diagnostic_means.coords['z'].attrs['units'])).to(u.m)  # convert to meters
         diagnostic_units = datasets[i][diagnostic].attrs['units']
 
-        plt.plot(zs, diagnostic_values, marker=marker_styles[i], color=color_map[i], linestyle='none')
+        plt.errorbar(zs, diagnostic_values, yerr=diagnostic_errors, marker=marker_styles[i],
+                     color=color_map[i], linestyle='none')
     plt.title(f"{get_title(diagnostic)} [{get_diagnostic_keys_units()[diagnostic]}] ", y=0.9, loc='right')  # ({operation})
     plt.xlabel("z location [m]")
     # plt.ylabel(f"[{diagnostic_units}]", rotation=0, labelpad=25)   # {get_title(diagnostic)}
