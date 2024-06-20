@@ -403,7 +403,8 @@ def plot_parallel_inverse_scale_length(datasets, steady_state_times_runs, diagno
 def plot_grid(datasets, diagnostics_to_plot_list, steady_state_times_runs, probes_faces_midplane,
               probes_faces_parallel, operation, core_radius, x_dim, num_rows=2, plot_save_folder=""):
     # Split into top plot row and bottom plot row
-    tolerance = 0.5
+    num_cols = (len(datasets) - 1) // num_rows + 1
+    tolerance = 0.5  # TODO note; set very high to only discard points with nan error bars
     port_marker_styles = {20: 'x', 27: '.', 29: '.', 35: '^', 43: '^'}
     save_directory = plot_save_folder
     x_dims = ['x', 'y', 'time']
@@ -414,31 +415,31 @@ def plot_grid(datasets, diagnostics_to_plot_list, steady_state_times_runs, probe
                     probes_faces_midplane, probes_faces_parallel,
                     port_marker_styles, operation, core_radius): """
 
-        plt.rcParams['figure.figsize'] = (6.5, 6.5)  # TODO hardcoded
-        fig, axes = plt.subplots(2, 1, sharex='all', sharey='row', layout="constrained")  # sharey=all
-        axes_1d = np.atleast_1d(axes)
+        plt.rcParams['figure.figsize'] = (1 + 3 * num_cols, 3 * num_rows)  # TODO hardcoded
+        fig, axes = plt.subplots(num_rows, num_cols, sharex='none', sharey='row', layout="constrained")  # sharey=all
+        axes_2d = np.atleast_2d(axes)
 
         collision_frequencies = extract_collision_frequencies(datasets, core_radius, steady_state_times_runs,
                                                               probes_faces_midplane, operation)
         collision_frequencies_log_normalized = normalize(np.log(collision_frequencies), 0, 0.9)
         color_map = matplotlib.colormaps["plasma"](collision_frequencies_log_normalized)
 
-        indices = np.arange(2 * (len(datasets) // 2)).reshape(2, -1)  # e.g. 1 2 3; 4 5 6
-        for row in range(2):  # row of the plot grid
+        indices = np.arange(num_rows * (len(datasets) // num_rows)).reshape(num_rows, -1)  # e.g. 1 2 3; 4 5 6
+        for row in range(num_rows):  # row of the plot grid
             max_val = 0
-            for run in range(len(indices[row])):  # column of the plot grid
-                index = indices[row][run]
+            for col in range(len(indices[row])):  # column of the plot grid
+                index = indices[row][col]
 
-                ax = axes_1d[row]
+                ax = axes_2d[row][col]
                 dataset = datasets[index]
-                ports = dataset.coords['port'].data
-                faces = dataset.coords['face'].data
-                # """
+                # ports = dataset.coords['port'].data
+                # faces = dataset.coords['face'].data
+                """
                 ds_s = [dataset[{"probe": probe_face[0],
                                  "face": probe_face[1]}]
                         for probe_face in probes_faces_parallel[index]]  # todo [0:1]  !
                 """
-                probe_face = probes_faces_midplane_split[unsort_indices[index]]
+                probe_face = probes_faces_midplane[index]
                 ds_s = [dataset[{"probe": probe_face[0],
                                  "face": probe_face[1]}]]
                 # """
@@ -497,7 +498,7 @@ def plot_grid(datasets, diagnostics_to_plot_list, steady_state_times_runs, probe
         normalizer = matplotlib.colors.LogNorm(vmin=np.min(collision_frequencies),
                                                vmax=np.max(collision_frequencies))
         color_bar = fig.colorbar(matplotlib.cm.ScalarMappable(norm=normalizer, cmap='plasma'),
-                                 ax=axes_1d.ravel().tolist())
+                                 ax=axes_2d.ravel().tolist())
         color_bar.set_label(r"$\nu_{ei}$" " [Hz]\n(midplane)", rotation=0, labelpad=32)
 
         fig.suptitle(get_title(plot_diagnostic), size=18)
