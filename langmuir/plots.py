@@ -2,7 +2,6 @@ from warnings import warn
 
 from astropy import visualization
 
-from bapsflib.lapd.tools import portnum_to_z
 from langmuir.helper import *
 
 # matplotlib.use('TkAgg')
@@ -44,9 +43,14 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
     sort_indices = np.arange(len(diagnostics_datasets))         # not sorted yet
     for attr in attributes:
         try:
-            diagnostics_datasets_sorted.sort(key=lambda d: d.attrs[attr])
+            sort_indices = sorted(sort_indices, key=lambda j: diagnostics_datasets[j].attrs[attr])
+            # diagnostics_datasets_sorted.sort(key=lambda d: d.attrs[attr])
         except KeyError:
             raise KeyError("Key error for key " + repr(attr))
+
+    diagnostics_datasets_sorted = [diagnostics_datasets[sort_index] for sort_index in sort_indices]
+    steady_state_by_runs_sorted = [steady_state_by_runs[sort_index] for sort_index in sort_indices]
+
     outer_values = [dataset.attrs[attributes[-1]] for dataset in diagnostics_datasets_sorted]
     outer_quants = u.Quantity([value_safe(value) for value in outer_values], unit_safe(outer_values[0]))
     outer_unique, outer_indexes = np.unique(outer_quants, return_index=True) if len(attributes) == 2 else ([None], [0])
