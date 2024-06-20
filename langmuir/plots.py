@@ -280,8 +280,7 @@ def scatter_plot_diagnostics(datasets, diagnostics_to_plot_list, steady_state_ti
     for i in range(len(scatter_points)):
         plt.scatter(scatter_points[i, 0], scatter_points[i, 1], marker=marker_styles[i], color=color_map[i])
         """
-                    label=f"{datasets[i].attrs['Exp name'][:3]}, #{datasets[i].attrs['Run name'][:2]}"
-                          f":  {collision_frequencies[i]:.2E} Hz")
+                    label=get_exp_run_string(datasets[i].attrs)
                           + f":  {collision_frequencies[i]:.2E} Hz")
         """
         plt.annotate(get_exp_run_string(datasets[i].attrs),
