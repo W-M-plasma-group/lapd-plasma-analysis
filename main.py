@@ -41,7 +41,9 @@ isweep_choices = [[[1, 0], [0, 0]],     # first combination to plot: 1 * (first 
 # isweep_choices = [[[0, 0], [1, 0]]]
 # isweep_choices = [[[1, 0], [-1, 0]]]   # combination to plot: 1 * (face 1 on probe 1) - 1 * (face 1 on probe 2)
 bimaxwellian = False                                        # note to self: perform both and store in same NetCDF file?
-core_radius = 26. * u.cm                                    # From MATLAB code
+core_radius = 21 * u.cm  # 26. * u.cm                                   # From MATLAB code TODO !
+plot_tolerance = np.nan  # 0.25                                         # TODO
+velocity_plot_unit = u.km / u.s         # TODO not yet working          # TODO adjust !
 
 """ Optional directory to save plots; end path with a slash"""          # TODO user adjust
 plot_save_folder = ("/Users/leomurphy/Desktop/wm/Plasma research/Research images/Research images spring 2024/"
