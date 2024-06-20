@@ -131,12 +131,12 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
 
     fig.suptitle(get_title(plot_diagnostic), size=18)
     if save_directory:
-        plt.savefig(save_directory + "multiplot_line_" + plot_diagnostic + ".pdf", bbox_inches="tight")
+        plt.savefig(f"{save_directory}multiplot_line_{x_dim}_{plot_diagnostic}.pdf", bbox_inches="tight")
     plt.show()
 
 
-def plot_line_diagnostic(diagnostics_ds_s: list[xr.Dataset], diagnostic, plot_type, steady_state, show=True,
-                         shot_mode="mean", tolerance=np.nan):
+def plot_line_diagnostic(diagnostics_dataset: xr.Dataset, probe_face_coefficients, diagnostic, plot_type, steady_state,
+                         shot_mode="mean", save_directory="", tolerance=np.nan):
     # Plots the given diagnostic(s) from the dataset in the given style
 
     linear_ds_s = []
@@ -202,8 +202,9 @@ def plot_line_diagnostic(diagnostics_ds_s: list[xr.Dataset], diagnostic, plot_ty
                         plot_title += f"\nLinear combination of faces: {linear_ds_s[d].attrs['facevector']}"
                     plt.title(plot_title)
                     plt.tight_layout()
-                    if show:
-                        plt.show()
+                    if save_directory:
+                        plt.savefig(save_directory + "2D_plot_" + diagnostic + ".pdf", bbox_inches="tight")
+                    plt.show()
                 except ValueError as e:
                     print(f"Problem plotting {key} for {linear_ds_s[d].attrs['Run name']}:"
                           f"\n{repr(e)}")
@@ -481,7 +482,7 @@ def plot_grid(datasets, diagnostics_to_plot_list, steady_state_times_runs, probe
 
         fig.suptitle(get_title(plot_diagnostic), size=18)
         if save_directory:
-            plt.savefig(save_directory + "vertical_line_" + plot_diagnostic + ".pdf", bbox_inches="tight")
+            plt.savefig(f"{save_directory}grid_{plot_diagnostic}_{x_dim}.pdf", bbox_inches="tight")
         plt.show()
 
 
