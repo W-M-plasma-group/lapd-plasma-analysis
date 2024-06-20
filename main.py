@@ -65,8 +65,7 @@ if __name__ == "__main__":
     #    (16, 24) for January_2024 steady state period (detect_steady_state_period in diagnostics.py)
 
     print("\n===== Langmuir probe analysis =====")
-
-    datasets, steady_state_plateaus_runs, diagnostic_name_dict, diagnostics_to_plot_list = get_langmuir_datasets(
+    datasets, steady_state_times_runs, hdf5_paths = get_langmuir_datasets(
         langmuir_nc_folder, hdf5_folder, interferometry_folder, interferometry_mode,
         isweep_choices, core_radius, bimaxwellian, plot_save_folder)
     print("Diagnostics selected:", diagnostics_to_plot_list)
@@ -75,21 +74,21 @@ if __name__ == "__main__":
     if ask_yes_or_no("Generate contour plot of selected diagnostics over time and radial position? (y/n) "):
         for plot_diagnostic in diagnostics_to_plot_list:
             for i in range(len(datasets)):
-                plot_line_diagnostic(probe_face_selector(datasets[i], isweep_choices), plot_diagnostic, 'contour',
-                                     steady_state_plateaus_runs[i])
+                plot_line_diagnostic(datasets[i], isweep_choices, plot_diagnostic, 'contour',
+                                     steady_state_times_runs[i])
 
     # Plot radial profiles of diagnostic (steady-state time average), with color corresponding to first attribute
     #    and plot position on multiplot corresponding to second attribute
     if ask_yes_or_no("Generate line plot of selected diagnostics over radial position? (y/n) "):
         for plot_diagnostic in diagnostics_to_plot_list:
             multiplot_line_diagnostic(datasets, plot_diagnostic, isweep_choices, 'x',
-                                      steady_state_by_runs=steady_state_plateaus_runs,
-                                      core_rad=core_radius, save_directory=plot_save_folder)
+                                      steady_state_by_runs=steady_state_times_runs,
+                                      core_rad=core_radius, save_directory=plot_save_folder, tolerance=plot_tolerance)
 
     if ask_yes_or_no("Generate line plot of selected diagnostics over time? (y/n) "):
         for plot_diagnostic in diagnostics_to_plot_list:
             multiplot_line_diagnostic(datasets, plot_diagnostic, isweep_choices, 'time',
-                                      steady_state_by_runs=steady_state_plateaus_runs,
+                                      steady_state_by_runs=steady_state_times_runs,
                                       core_rad=core_radius, save_directory=plot_save_folder)
 
     # Create indices for preserving order in which datasets were entered
@@ -101,14 +100,17 @@ if __name__ == "__main__":
 
     # Split two steady state periods for jan_2024 data: (16, 24) and (27, 33) and plot with dotted
     datasets_split = datasets.copy()
-    steady_state_plateaus_runs_split = steady_state_plateaus_runs.copy()
-    linestyles_split = ["solid"] * len(datasets)
+    steady_state_times_runs_split = steady_state_times_runs.copy()
+    # linestyles_split = ["solid"] * len(datasets)
+    available_marker_styles = ('D', 'o', '^', 's')  # markers for Apr_18, Mar_22, Nov_22, Jan_24
+    marker_styles_split = [available_marker_styles[get_config_id(dataset.attrs['Exp name'])] for dataset in datasets]
     for i in range(len(datasets)):
         if datasets[i].attrs['Exp name'] == "January_2024":
             datasets_split += [datasets[i]]
-            steady_state_plateaus_runs_split += [(27, 33)]
-            linestyles_split += ["dotted"]
-    marker_styles_split = ['o' if style == 'solid' else 'x' for style in linestyles_split]
+            steady_state_times_runs_split += [(27, 33) * u.ms]
+            # linestyles_split += ["dotted"]
+            marker_styles_split += ['x']
+    # marker_styles_split = ['o' if style == 'solid' else 'x' for style in linestyles_split]
 
     # List that identifies probes and faces for 1) midplane and 2) upstream/downstream
     probes_faces_midplane_split = [(1, 0) if dataset.attrs['Exp name'] == "January_2024" else (0, 0)
@@ -118,19 +120,19 @@ if __name__ == "__main__":
 
     if ask_yes_or_no(f"Generate parallel plot of selected diagnostics? (y/n) "):  # plot of {parallel_diagnostics[key]}
         for plot_diagnostic in diagnostics_to_plot_list:  # for key in parallel_diagnostics:
-            plot_parallel_diagnostic(datasets_split, steady_state_plateaus_runs_split,
+            plot_parallel_diagnostic(datasets_split, steady_state_times_runs_split,
                                      probes_faces_midplane_split, probes_faces_parallel_split,
                                      marker_styles_split, diagnostic=plot_diagnostic, operation="median",
                                      core_radius=core_radius, save_directory=plot_save_folder)
 
     if ask_yes_or_no("Generate scatter plot of first two selected diagnostics? (y/n) "):
-        scatter_plot_diagnostics(datasets_split, diagnostics_to_plot_list, steady_state_plateaus_runs_split,
-                                 probes_faces_midplane_split, marker_styles_split, operation="median",
+        scatter_plot_diagnostics(datasets_split, diagnostics_to_plot_list, steady_state_times_runs_split,
+                                 probes_faces_midplane_split, marker_styles_split, operation="mean",
                                  core_radius=core_radius, save_directory=plot_save_folder)
 
     if ask_yes_or_no("Generate plot of inverse gradient scale length by position for selected diagnostics? (y/n) "):
         for plot_diagnostic in diagnostics_to_plot_list:
-            plot_parallel_inverse_scale_length(datasets_split, steady_state_plateaus_runs_split, plot_diagnostic,
+            plot_parallel_inverse_scale_length(datasets_split, steady_state_times_runs_split, plot_diagnostic,
                                                probes_faces_midplane_split, probes_faces_parallel_split,
                                                marker_styles_split, "median", core_radius, plot_save_folder)
 
@@ -139,9 +141,10 @@ if __name__ == "__main__":
         steady_state_plateaus_runs_unsorted = np.array(steady_state_plateaus_runs)[unsort_indices]
         probes_faces_midplane_unsorted = np.array(probes_faces_midplane_split)[unsort_indices]
         probes_faces_parallel_unsorted = np.array(probes_faces_parallel_split)[unsort_indices]
-        plot_vertical_stack(datasets_unsorted, diagnostics_to_plot_list, steady_state_plateaus_runs_unsorted,
-                            probes_faces_midplane_unsorted, probes_faces_parallel_unsorted, "median",
-                            core_radius, plot_save_folder)
+        for x_dim in ("x", "time"):
+            plot_grid(datasets_unsorted, diagnostics_to_plot_list, steady_state_times_runs_unsorted,
+                      probes_faces_midplane_unsorted, probes_faces_parallel_unsorted, "mean", core_radius, x_dim,
+                      num_rows=1, plot_save_folder=plot_save_folder)
 
     # (UNFINISHED) Shot plot: multiplot line diagnostics at specific time, with x-axis = x pos and curve color = shot #
     """if ask_yes_or_no("Generate line shot plot of selected diagnostics over radial position? (y/n) "):

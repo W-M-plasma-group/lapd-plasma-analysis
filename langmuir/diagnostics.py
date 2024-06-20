@@ -155,12 +155,12 @@ def get_electron_ion_collision_frequencies(lang_ds: xr.Dataset, ion_type="He-4+"
     return electron_ion_collision_frequencies
 
 
-def detect_steady_state_ramps(langmuir_dataset: xr.Dataset, core_rad):
-    r"""Return start and end ramp indices for the steady-state period (where density is ~constant in time)"""
+def detect_steady_state_times(langmuir_dataset: xr.Dataset, core_rad):
+    r"""Return start and end times for the steady-state period (where density is ~constant in time)"""
     # TODO very hardcoded!
     exp_name = langmuir_dataset.attrs['Exp name']
     if "january" in exp_name.lower():
-        return 16, 24
+        return [16, 24] * u.ms
     else:
         density = langmuir_dataset['n_e']
         core_density = density.where(np.logical_and(*in_core([density.x, density.y], core_rad)), drop=True)

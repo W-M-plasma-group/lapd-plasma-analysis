@@ -62,6 +62,7 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
         ax = np.atleast_1d(axes)[outer_index]
 
         datasets = diagnostics_datasets_sorted[outer_bounds[outer_index]:outer_bounds[outer_index + 1]]
+        steady_state_times = steady_state_by_runs_sorted[outer_bounds[outer_index]:outer_bounds[outer_index + 1]]
         num_datasets = outer_bounds[outer_index + 1] - outer_bounds[outer_index]
 
         color_map = matplotlib.colormaps["plasma"](np.linspace(0, 0.9, num_datasets))
@@ -82,7 +83,7 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
                 core_steady_state_params = []
                 # below: only consider steady state
                 core_steady_state_params += [core_rad] if x_dim == 'time' else [None]
-                core_steady_state_params += [steady_state_by_runs[inner_index]] if x_dim in ('x', 'y') else [None]
+                core_steady_state_params += [steady_state_times[inner_index]] if x_dim in ('x', 'y') else [None]
                 # above: only consider core region
                 da = core_steady_state(da, *core_steady_state_params)
 
@@ -100,6 +101,10 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
                                 ] = (da_std * 1.96 / np.sqrt(effective_num_non_nan_per_std - 1)
                                      )[effective_num_non_nan_per_std > 1]  # unbiased
 
+                if np.isfinite(tolerance):  # remove points with too much variation  # TODO hardcoded! document!
+                    da_median = core_steady_state(da, core_rad, steady_state_times[inner_index], "median")
+                    da_mean = apply_tolerance(da_mean, linear_da_error, da_median, tolerance)
+
                 if np.isfinite(da_mean).any():
                     probe_face_eq_str = probe_face_choice_to_eq_string(probe_face_choices[i], ports, faces)
                     ax.errorbar(da_mean.coords[x_dim], da_mean, yerr=linear_da_error, linestyle="none",
@@ -110,10 +115,10 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
 
                 # TODO very hardcoded; TODO document fill_na!
                 da_small_core_steady_state_max = core_steady_state(da.fillna(0), core_rad / 2,
-                                                                   steady_state_by_runs[inner_index]
+                                                                   steady_state_times[inner_index]
                                                                    ).max().item()
                 y_limits += [np.nanmin([1.1 * da_small_core_steady_state_max,
-                                        2.2 * core_steady_state(da, core_rad, steady_state_by_runs[inner_index],
+                                        2.2 * core_steady_state(da, core_rad, steady_state_times[inner_index],  # TODO?
                                                                 operation="median", dims_to_keep=["probe", "face"]
                                                                 ).max().item()])]
         if not np.nanmax(y_limits) > 0:
@@ -171,7 +176,7 @@ def plot_line_diagnostic(diagnostics_ds_s: list[xr.Dataset], diagnostic, plot_ty
     if plot_type in plot_types_1d:
         for key in diagnostic_list:
             for d in range(len(linear_ds_s)):
-                linear_ds_1d = core_steady_state(linear_ds_s[d], steady_state_plateaus=steady_state, operation="mean",
+                linear_ds_1d = core_steady_state(linear_ds_s[d], steady_state_times=steady_state, operation="mean",
                                                  dims_to_keep=linear_dimensions[d])
                 linear_plot_1d(linear_ds_1d[key], linear_dimensions[d])
             plot_title = f"{run_names[0]}\n{get_title(key)} {plot_type} plot"
@@ -203,12 +208,12 @@ def plot_line_diagnostic(diagnostics_ds_s: list[xr.Dataset], diagnostic, plot_ty
                           f"\n{repr(e)}")
 
 
-def plot_parallel_diagnostic(datasets, steady_state_plateaus_runs, probes_faces_midplane, probes_faces_parallel,
+def plot_parallel_diagnostic(datasets, steady_state_times_runs, probes_faces_midplane, probes_faces_parallel,
                              marker_styles, diagnostic, operation="mean", core_radius=26 * u.cm,
                              save_directory=""):
     plt.rcParams['figure.figsize'] = (6.5, 3.5)
 
-    collision_frequencies = extract_collision_frequencies(datasets, core_radius, steady_state_plateaus_runs,
+    collision_frequencies = extract_collision_frequencies(datasets, core_radius, steady_state_times_runs,
                                                           probes_faces_midplane, operation)
     collision_frequencies_log_normalized = normalize(np.log(collision_frequencies), 0, 0.9)
     color_map = matplotlib.colormaps["plasma"](collision_frequencies_log_normalized)
@@ -221,8 +226,11 @@ def plot_parallel_diagnostic(datasets, steady_state_plateaus_runs, probes_faces_
         if diagnostic not in datasets[i]:  # TODO needs testing
             continue
         diagnostic_means = core_steady_state(datasets[i][diagnostic], core_radius,
-                                             steady_state_plateaus_runs[i], operation,
+                                             steady_state_times_runs[i], operation,
                                              dims_to_keep=("probe", "face"))
+        diagnostic_std_errors = core_steady_state(datasets[i][diagnostic], core_radius,
+                                                  steady_state_times_runs[i], "std_error",
+                                                  dims_to_keep=("probe", "face"))
 
         for probe_face in probes_faces_parallel[i]:
             diagnostic_values += [diagnostic_means[{"probe": probe_face[0],
@@ -247,12 +255,12 @@ def plot_parallel_diagnostic(datasets, steady_state_plateaus_runs, probes_faces_
     plt.show()
 
 
-def scatter_plot_diagnostics(datasets, diagnostics_to_plot_list, steady_state_plateaus_runs,
+def scatter_plot_diagnostics(datasets, diagnostics_to_plot_list, steady_state_times_runs,
                              probes_faces_midplane, marker_styles, operation="mean", core_radius=26 * u.cm,
                              save_directory=""):
     plt.rcParams['figure.figsize'] = (6, 4)
 
-    collision_frequencies = extract_collision_frequencies(datasets, core_radius, steady_state_plateaus_runs,
+    collision_frequencies = extract_collision_frequencies(datasets, core_radius, steady_state_times_runs,
                                                           probes_faces_midplane, operation)
     collision_frequencies_log_normalized = normalize(np.log(collision_frequencies), 0, 0.9)
     color_map = matplotlib.colormaps["plasma"](collision_frequencies_log_normalized)
@@ -262,7 +270,7 @@ def scatter_plot_diagnostics(datasets, diagnostics_to_plot_list, steady_state_pl
         diagnostics_point = []
         for plot_diagnostic in diagnostics_to_plot_list[:2]:
             diagnostic_mean = core_steady_state(
-                datasets[i][plot_diagnostic], core_radius, steady_state_plateaus_runs[i], operation,
+                datasets[i][plot_diagnostic], core_radius, steady_state_times_runs[i], operation,
                 dims_to_keep=("probe", "face"))
             diagnostics_point += [diagnostic_mean[{"probe": probes_faces_midplane[i][0],
                                                    "face": probes_faces_midplane[i][1]}].item()]
@@ -309,14 +317,15 @@ def scatter_plot_diagnostics(datasets, diagnostics_to_plot_list, steady_state_pl
     plt.show()
 
 
-def plot_parallel_inverse_scale_length(datasets, steady_state_plateaus_runs, diagnostic, probes_faces_midplane,
-                                       probes_faces_parallel, marker_styles, operation, core_radius, save_directory):
-    plt.rcParams['figure.figsize'] = 6, 4  # (7, 4.5)   # (8.5, 5.5)
+def plot_parallel_inverse_scale_length(datasets, steady_state_times_runs, diagnostic, probes_faces_midplane,
+                                       probes_faces_parallel, marker_styles, operation, core_radius, save_directory,
+                                       scale_length_mode="linear"):
+    plt.rcParams['figure.figsize'] = 6, 3.5  # (7, 4.5)   # (8.5, 5.5)
 
     anode_z = portnum_to_z(0).to(u.m).value
 
     # Get mean core-steady-state e-i collision frequencies for each dataset and store in list
-    collision_frequencies = extract_collision_frequencies(datasets, core_radius, steady_state_plateaus_runs,
+    collision_frequencies = extract_collision_frequencies(datasets, core_radius, steady_state_times_runs,
                                                           probes_faces_midplane, operation)
     collision_frequencies_log_normalized = normalize(np.log(collision_frequencies), 0, 0.9)
     color_map = matplotlib.colormaps["plasma"](collision_frequencies_log_normalized)
@@ -324,7 +333,7 @@ def plot_parallel_inverse_scale_length(datasets, steady_state_plateaus_runs, dia
     for i in range(len(datasets)):
         probes_faces = probes_faces_parallel[i]
         diagnostic_means = core_steady_state(datasets[i][diagnostic], core_radius,
-                                             steady_state_plateaus_runs[i], operation,
+                                             steady_state_times_runs[i], operation,
                                              dims_to_keep=("probe", "face"))
 
         diagnostic_difference = (diagnostic_means[{"probe": probes_faces[0][0],
@@ -370,17 +379,17 @@ def plot_parallel_inverse_scale_length(datasets, steady_state_plateaus_runs, dia
     plt.show()
 
 
-def plot_vertical_stack(datasets, diagnostics_to_plot_list, steady_state_plateaus_runs,
-                        probes_faces_midplane, probes_faces_parallel, operation, core_radius, plot_save_folder):
+def plot_grid(datasets, diagnostics_to_plot_list, steady_state_times_runs, probes_faces_midplane,
+              probes_faces_parallel, operation, core_radius, x_dim, num_rows=2, plot_save_folder=""):
     # Split into top plot row and bottom plot row
     tolerance = 0.5
     port_marker_styles = {20: 'x', 27: '.', 29: '.', 35: '^', 43: '^'}
     save_directory = plot_save_folder
     x_dims = ['x', 'y', 'time']
     for plot_diagnostic in diagnostics_to_plot_list:
-        """ plot_ab(datasets_split, steady_state_plateaus_runs_split, plot_diagnostic, probes_faces_midplane_split,
-                probes_faces_parallel_split, port_marker_styles, "median", core_radius)
-            def plot_ab(datasets, steady_state_plateaus_runs, plot_diagnostic,
+        """ plot_ab(datasets_split, steady_state_times_runs_split, plot_diagnostic, probes_faces_midplane_split,
+                probes_faces_parallel_split, port_marker_styles, "mean", core_radius)
+            def plot_ab(datasets, steady_state_times_runs, plot_diagnostic,
                     probes_faces_midplane, probes_faces_parallel,
                     port_marker_styles, operation, core_radius): """
 
@@ -415,9 +424,13 @@ def plot_vertical_stack(datasets, diagnostics_to_plot_list, steady_state_plateau
                 for ds in ds_s:  # ds for upstream (cathode) and downstream (anti-cathode)
                     da = ds[plot_diagnostic]
 
+                    core_steady_state_params = []
                     # below: only consider steady state
-                    da = core_steady_state(da,
-                                           steady_state_plateaus=steady_state_plateaus_runs[index])
+                    core_steady_state_params += [core_radius] if x_dim == 'time' else [None]
+                    core_steady_state_params += [steady_state_times_runs[index]] if x_dim in ('x', 'y') else [None]
+                    # above: only consider core region
+                    da = core_steady_state(da, *core_steady_state_params)
+                    # print(f"{get_exp_run_string(ds.attrs)}: {steady_state_times_runs[index]}")
 
                     dims_to_average_out = ['shot'] + [dim for dim in x_dims if dim != "x"]  # hardcoded
                     da_mean = da.mean(dims_to_average_out, keep_attrs=True)
@@ -537,12 +550,12 @@ def get_title(diagnostic: str) -> str:
     return diagnostic
 
 
-def extract_collision_frequencies(datasets, core_radius, steady_state_plateaus_runs, probe_face_midplane, operation):
+def extract_collision_frequencies(datasets, core_radius, steady_state_times_runs, probe_face_midplane, operation):
     r"""
     Finds typical core-steady-state electron-ion collision frequencies for each dataset.
     :param datasets:
     :param core_radius:
-    :param steady_state_plateaus_runs:
+    :param steady_state_times_runs:
     :param probe_face_midplane:
     :param operation:
     :return: tuple of (collision frequencies DataArray, log(collision frequencies) DataArray normalized to [0, 0.9])
@@ -551,7 +564,7 @@ def extract_collision_frequencies(datasets, core_radius, steady_state_plateaus_r
     collision_frequencies = []
     for i in range(len(datasets)):
         collision_frequencies_mean = core_steady_state(datasets[i]['nu_ei'], core_radius,
-                                                       steady_state_plateaus_runs[i], operation,
+                                                       steady_state_times_runs[i], operation,
                                                        dims_to_keep=("probe", "face"))
         collision_frequencies += [collision_frequencies_mean[{"probe": probe_face_midplane[i][0],
                                                               "face": probe_face_midplane[i][1]}].mean().item()]

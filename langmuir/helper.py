@@ -95,17 +95,13 @@ def array_lookup(array, value):
     return np.argmin(np.abs(array - value))
 
 
-def in_core(pos_list, core_rad):
-    return [np.abs(pos) < core_rad.to(u.cm).value for pos in pos_list]
-
-
-def core_steady_state(da_input: xr.DataArray, core_rad=None, steady_state_plateaus=None, operation=None,
-                      dims_to_keep=(None,)) -> xr.DataArray:
+def core_steady_state(da_input: xr.DataArray, core_rad=None, steady_state_times=None, operation=None,
+                      dims_to_keep: list | tuple = (None,)) -> xr.DataArray:
     r"""
 
     :param da_input: xarray DataArray with x and y dimensions
     :param core_rad: (optional) astropy Quantity convertible to centimeters giving radius of core
-    :param steady_state_plateaus: (optional) tuple or list giving indices of start and end of steady-state period
+    :param steady_state_times: (optional) tuple or list giving indices of start and end of steady-state period
     :param operation: (optional) Operation to perform on core/steady_state data
     :param dims_to_keep: (optional) optional list of dimensions not to calculate mean across
     :return: DataArray with dimensions dims_to_keep
@@ -113,11 +109,12 @@ def core_steady_state(da_input: xr.DataArray, core_rad=None, steady_state_platea
 
     da = da_input.copy()
     if core_rad is not None:
-        da = da.where(np.logical_and(*in_core([da.x, da.y], core_rad)), drop=True)
-    if steady_state_plateaus is not None:
-        # dataset[{'time': slice(*steady_state_plateaus)}]  # TODO bring back?
-        da = da.where(np.logical_and(da.plateau >= steady_state_plateaus[0],
-                                     da.plateau <= steady_state_plateaus[1]), drop=True)
+        da = da.where(np.logical_and(np.abs(da.coords['x']) < core_rad.to(u.cm).value,
+                                     np.abs(da.coords['y']) < core_rad.to(u.cm).value), drop=True)
+    if steady_state_times is not None:
+        steady_state_times_ms = steady_state_times.to(u.Unit(da.coords['time'].attrs['units'])).value
+        da = da.where(np.logical_and(da.time >= steady_state_times_ms[0],
+                                     da.time <= steady_state_times_ms[1]), drop=True)
 
     dims_to_reduce = [dim for dim in da.dims if dim not in dims_to_keep]
     if operation is None:

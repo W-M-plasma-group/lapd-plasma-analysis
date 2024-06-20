@@ -5,7 +5,7 @@ from experimental import get_exp_params
 from langmuir.getIVsweep import get_isweep_vsweep
 from langmuir.characterization import characterize_sweep_array
 from langmuir.preview import preview_raw_sweep, preview_characteristics
-from langmuir.diagnostics import (langmuir_diagnostics, detect_steady_state_ramps, get_pressure,
+from langmuir.diagnostics import (langmuir_diagnostics, detect_steady_state_times, get_pressure,
                                   get_electron_ion_collision_frequencies)
 from langmuir.interferometry import interferometry_calibration
 from langmuir.plots import get_title
@@ -23,12 +23,12 @@ def get_langmuir_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder
     # Ask user to choose either NetCDF files or HDF5 files, then create datasets from them
     datasets = load_datasets(hdf5_folder, netcdf_folder, bimaxwellian, plot_save_directory)
 
-    steady_state_plateaus_runs = [detect_steady_state_ramps(dataset, core_radius) for dataset in datasets]
+    steady_state_times_runs = [detect_steady_state_times(dataset, core_radius) for dataset in datasets]
 
     # Calibrate electron densities using interferometry data, depending on interferometry mode
     for density_diagnostic in ('n_e', 'n_i', 'n_i_OML'):
         datasets = interferometry_calibrate_datasets(datasets, density_diagnostic, interferometry_folder,
-                                                     interferometry_mode, core_radius, steady_state_plateaus_runs)
+                                                     interferometry_mode, core_radius, steady_state_times_runs)
 
     # Calculate pressures
     for i in range(len(datasets)):
@@ -57,16 +57,7 @@ def get_langmuir_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder
     # Get possible diagnostics and their full names, e.g. "n_e" and "Electron density"
     diagnostic_name_dict = {key: get_title(key) for key in set.intersection(*[set(dataset) for dataset in datasets])}
 
-    # Ask users for list of diagnostics to plot
-    print("The following diagnostics are available to plot: ")
-    diagnostics_sort_indices = np.argsort(list(diagnostic_name_dict.values()))
-    diagnostics_to_plot_ints = choose_multiple_list(
-        np.array(list(diagnostic_name_dict.values()))[diagnostics_sort_indices],
-        "diagnostic", null_action="skip")
-    diagnostics_to_plot_list = [np.array(list(diagnostic_name_dict.keys()))[diagnostics_sort_indices][choice]
-                                for choice in diagnostics_to_plot_ints]
-
-    return datasets, steady_state_plateaus_runs, diagnostic_name_dict, diagnostics_to_plot_list
+    return datasets, steady_state_times_runs, hdf5_paths
 
 
 def print_file_choices(hdf5_folder, lang_nc_folder, interferometry_folder, interferometry_mode, isweep_choices):
@@ -153,7 +144,7 @@ def load_datasets(hdf5_folder, lang_nc_folder, bimaxwellian, plot_save_directory
 
 
 def interferometry_calibrate_datasets(datasets, density_diagnostic, interferometry_folder, interferometry_mode,
-                                      core_radius, steady_state_ramps):
+                                      core_radius, steady_state_times):
     # datasets[i].attrs = exp params
     calibrated_density_diagnostic = density_diagnostic + '_cal'
     print(f"{get_title(density_diagnostic)} mean steady-state interferometry calibration factors")
@@ -166,7 +157,7 @@ def interferometry_calibrate_datasets(datasets, density_diagnostic, interferomet
             calibrated_electron_density = interferometry_calibration(datasets[i][density_diagnostic].copy(),
                                                                      datasets[i].attrs,
                                                                      interferometry_folder,
-                                                                     steady_state_ramps[i],
+                                                                     steady_state_times[i],
                                                                      core_radius)
             datasets[i] = datasets[i].assign({calibrated_density_diagnostic: calibrated_electron_density})
 

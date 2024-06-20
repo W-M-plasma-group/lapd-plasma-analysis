@@ -18,7 +18,7 @@ from langmuir.configurations import get_config_id
 def interferometry_calibration(density_da: xr.DataArray,
                                exp_attrs: dict,
                                itfm_folder: str,              # path to either HDF5 or text folder
-                               steady_state: tuple,
+                               steady_state: tuple,           # in ms
                                core_radius: u.Quantity = 26. * u.cm,
                                ) -> xr.DataArray:
 
@@ -75,8 +75,8 @@ def interferometry_calibration(density_da: xr.DataArray,
         raise NotImplementedError("Unsupported interferometry id " + repr(itfm_id))
 
     # Select steady state region only (given by plateau indices)
-    steady_state_density_scale_factor = density_scale_factor.where(np.logical_and(
-        density_da.plateau >= steady_state[0], density_da.plateau <= steady_state[1]))
+    steady_state_density_scale_factor = core_steady_state(density_scale_factor, steady_state_times=steady_state)
+
     print(f"Run {exp_attrs['Run name'][:2]}: \t"
           f"{np.nanmean(np.asarray(steady_state_density_scale_factor)):.2f}")
 
