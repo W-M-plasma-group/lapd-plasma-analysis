@@ -85,9 +85,8 @@ def preview_characteristics(characteristics_array, positions, ramp_times, langmu
             continue
 
 
-def preview_raw_sweep(bias, currents, positions, ports_faces, exp_params_dict, dt):
-    plt.rcParams['figure.dpi'] = 160
-    plt.rcParams['figure.figsize'] = (40, 4)
+def preview_raw_sweep(bias, currents, positions, ports_faces, exp_params_dict, dt, plot_save_directory=""):
+    plt.rcParams['figure.figsize'] = (8, 3)  # 40, 4 but decrease dpi!
 
     x = np.unique(positions[:, 0])
     y = np.unique(positions[:, 1])
