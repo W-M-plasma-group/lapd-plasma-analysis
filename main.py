@@ -140,7 +140,7 @@ if __name__ == "__main__":
         for plot_diagnostic in diagnostics_to_plot_list:  # for key in parallel_diagnostics:
             plot_parallel_diagnostic(datasets_split, steady_state_times_runs_split,
                                      probes_faces_midplane_split, probes_faces_parallel_split,
-                                     marker_styles_split, diagnostic=plot_diagnostic, operation="median",
+                                     marker_styles_split, diagnostic=plot_diagnostic, operation="mean",
                                      core_radius=core_radius, save_directory=plot_save_folder)
 
     if ask_yes_or_no("Generate scatter plot of first two selected diagnostics? (y/n) "):
