@@ -106,7 +106,7 @@ def get_shot_positions(isweep_motor_data):
         selected_shots = np.arange(num_shots)
 
     xy_at_positions = shot_positions[:, :2].reshape((num_positions, shots_per_position, 2))  # (x, y) at shots by pos.
-    if not (np.amax(xy_at_positions, axis=1) == np.amin(xy_at_positions, axis=1)).all():
+    if not (np.max(xy_at_positions, axis=1) == np.min(xy_at_positions, axis=1)).all():
         raise ValueError("Non-uniform position values when grouping sweep data by position")
 
     return positions, num_positions, shots_per_position, selected_shots
