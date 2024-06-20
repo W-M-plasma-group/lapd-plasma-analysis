@@ -353,25 +353,29 @@ def plot_parallel_inverse_scale_length(datasets, steady_state_times_runs, diagno
                                              steady_state_times_runs[i], operation,
                                              dims_to_keep=("probe", "face"))
 
-        diagnostic_difference = (diagnostic_means[{"probe": probes_faces[0][0],
-                                                   "face": probes_faces[0][1]}].item()
-                                 - diagnostic_means[{"probe": probes_faces[1][0],
-                                                     "face": probes_faces[1][1]}].item())
-        # diagnostic_mean = 0.5 * (diagnostic_means[{"probe": probes_faces[0][0],
-        #                                            "face": probes_faces[0][1]}].item()
-        #                          + diagnostic_means[{"probe": probes_faces[1][0],
-        #                                              "face": probes_faces[1][1]}].item())
-        diagnostic_value = diagnostic_means[{"probe": probes_faces[0][0],
-                                             "face": probes_faces[0][1]}]
-        diagnostic_normalized_difference = diagnostic_difference / diagnostic_value
+        diagnostic_value_0 = diagnostic_means[{"probe": probes_faces[0][0],
+                                               "face": probes_faces[0][1]}].item()
+        diagnostic_value_1 = diagnostic_means[{"probe": probes_faces[1][0],
+                                               "face": probes_faces[1][1]}].item()
         z1 = anode_z - diagnostic_means[{"probe": probes_faces[0][0],
                                          "face": probes_faces[0][1]}].coords['z'].item() / 100  # converts cm to m
         z0 = anode_z - diagnostic_means[{"probe": probes_faces[1][0],
                                          "face": probes_faces[1][1]}].coords['z'].item() / 100  # converts cm to m
         z = 0.5 * (z1 + z0)
-        diagnostic_scale_length = (z1 - z0) / diagnostic_normalized_difference
-        diagnostic_scale_length_abs = np.abs(diagnostic_scale_length)
-        diagnostic_inverse_scale_length = 1 / diagnostic_scale_length
+
+        if scale_length_mode == "linear":
+            diagnostic_difference = diagnostic_value_1 - diagnostic_value_0
+            diagnostic_value = diagnostic_value_0  # no longer the average of value_0 and value_1
+            diagnostic_normalized_difference = diagnostic_difference / diagnostic_value
+            diagnostic_inverse_scale_length = diagnostic_normalized_difference / (z1 - z0)
+        elif scale_length_mode == "exponential":
+            diagnostic_ratio = diagnostic_value_1 / diagnostic_value_0
+            diagnostic_inverse_scale_length = np.log(diagnostic_ratio) / (z1 - z0)
+        else:
+            raise ValueError(f"Unknown parallel gradient scale length method {repr(scale_length_mode)}."
+                             "Acceptable methods are 'linear' and 'exponential'.")
+
+        diagnostic_scale_length_abs = 1 / np.abs(diagnostic_inverse_scale_length)
 
         plt.plot(z, diagnostic_scale_length_abs, marker=marker_styles[i], color=color_map[i],
                  label=(get_exp_run_string(datasets[i].attrs)
