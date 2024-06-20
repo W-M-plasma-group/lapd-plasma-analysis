@@ -142,7 +142,7 @@ def plot_line_diagnostic(diagnostics_ds_s: list[xr.Dataset], diagnostic, plot_ty
     linear_dimensions = []
     run_names = []
     for diagnostics_ds in diagnostics_ds_s:
-        run_names += [f"{diagnostics_ds.attrs['Exp name']}, {diagnostics_ds.attrs['Run name']}"]
+        run_names += [get_exp_run_string(diagnostics_ds.attrs)]
 
         linear_dimensions += [get_valid_linear_dimension(diagnostics_ds.sizes)]
         pre_linear_ds = diagnostics_ds.squeeze()
@@ -282,8 +282,9 @@ def scatter_plot_diagnostics(datasets, diagnostics_to_plot_list, steady_state_ti
         """
                     label=f"{datasets[i].attrs['Exp name'][:3]}, #{datasets[i].attrs['Run name'][:2]}"
                           f":  {collision_frequencies[i]:.2E} Hz")
+                          + f":  {collision_frequencies[i]:.2E} Hz")
         """
-        plt.annotate(f"{datasets[i].attrs['Exp name'][:3]} {datasets[i].attrs['Run name'][:2]}",
+        plt.annotate(get_exp_run_string(datasets[i].attrs),
                      (scatter_points[i, 0], scatter_points[i, 1]), size="small")  # noqa
 
     if ("n_" in diagnostics_to_plot_list[0] or "n_" in diagnostics_to_plot_list[1]) \
@@ -357,8 +358,8 @@ def plot_parallel_inverse_scale_length(datasets, steady_state_times_runs, diagno
         diagnostic_inverse_scale_length = 1 / diagnostic_scale_length
 
         plt.plot(z, diagnostic_scale_length_abs, marker=marker_styles[i], color=color_map[i],
-                 label=f"{datasets[i].attrs['Exp name'][:3]}, #{datasets[i].attrs['Run name'][:2]}"
-                       f":  {collision_frequencies[i]:.2E} Hz")
+                 label=(get_exp_run_string(datasets[i].attrs)
+                        + f":  {collision_frequencies[i]:.2E} Hz"))
     plt.title(f"Parallel gradient scale length [m] \n\n{get_title(diagnostic)} ", y=0.9)  # loc='right'
     plt.xlabel("z position [m]")
 
@@ -455,15 +456,16 @@ def plot_grid(datasets, diagnostics_to_plot_list, steady_state_times_runs, probe
                         da_mean[~(linear_da_error < tolerance * da_median)] = np.nan  # TODO hardcoded! document!
                         ax.errorbar(da_mean.coords["x"], da_mean, yerr=linear_da_error, linestyle="none",
                                     color=color_map[index], marker=marker_style,
-                                    label=f"{z_real:.1f}")  # str(port)
+                                    # label=f"{z_real:.1f}")  # str(port)
+                                    label=get_exp_run_string(ds.attrs, mode="short"))
                         max_val = np.nanmax([max_val, np.nanmax(da_mean)])
                     ax.set_xlabel(da_mean.coords["x"].attrs['units'])
                     ax.set_ylabel(da_mean.attrs['units'])
 
                 # ax.set_ylim(0, [30, 20][index])  # TODO extremely hardcoded
                 ax.set_ylim(bottom=0)
-                """ax.title.set_text(dataset.attrs['Exp name'][:3] + " " + dataset.attrs['Exp name'][-2:]
-                                  + ", run " + dataset.attrs['Run name'][:2])"""
+                """ax.title.set_text(get_exp_run_string(dataset.attrs)
+                                  + ", run_name " + dataset.attrs['Run name'][:2])"""
 
                 # ax.legend(title=f"\n{attributes[0]} (probe face)", loc="upper center", bbox_to_anchor=(0.5, -0.15), ncol=1)
                 ax.legend(title="z [m]")
@@ -596,3 +598,14 @@ def probe_face_choice_to_eq_string(probe_face_choice, ports, faces):
     return eq_string[:-3]
 
 
+def get_exp_run_string(attrs, mode="long"):
+    if mode == "short":
+        series_number = ("April_2018", "March_2022", "November_2022", "January_2024").index(attrs['Exp name']) # TODO hc
+        return f"{series_number}-{attrs['Run name'][:2]}"
+    else:
+        return f"{attrs['Exp name'][:3]} {attrs['Exp name'][-2:]} #{attrs['Run name'][:2]}"
+
+
+def apply_tolerance(da, da_error, da_reference_value, tolerance):
+    da[~(da_error < tolerance * da_reference_value)] = np.nan  # TODO hardcoded! document!
+    return da
