@@ -134,7 +134,7 @@ def filter_characteristic(characteristic) -> bool:
 def get_pressure(density, temperature):
     r"""Calculate electron pressure from temperature and calibrated density"""
     pressure_unit = u.Pa
-    pressure = (3 / 2) * electron_temperature * electron_density * (1. * u.eV * u.m ** -3).to(pressure_unit)
+    pressure = 1 * temperature * density * (1. * u.eV * u.m ** -3).to(pressure_unit)  # 3 / 2 replaced by 1
     return pressure.assign_attrs({'units': str(pressure_unit)})
 
 
