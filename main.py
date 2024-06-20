@@ -111,11 +111,28 @@ if __name__ == "__main__":
                                       core_rad=core_radius, save_directory=plot_save_folder)
 
     # Create indices for preserving order in which datasets were entered
+    """
     unsort_run_indices = np.argsort(np.array(sorted(np.arange(len(datasets)), key=lambda i: datasets[i].attrs['Run name'])))
     datasets = sorted(datasets, key=lambda ds: ds.attrs['Run name'])
     unsort_exp_indices = np.argsort(np.array(sorted(np.arange(len(datasets)), key=lambda i: datasets[i].attrs['Exp name'])))
     datasets = sorted(datasets, key=lambda ds: ds.attrs['Exp name'])
     unsort_indices = unsort_exp_indices[unsort_run_indices]
+    """
+    # original order of datasets as entered by user
+    datasets_unsorted = datasets.copy()
+    steady_state_times_runs_unsorted = steady_state_times_runs.copy()
+
+    # Calculate list of indices that sort datasets array
+    sort_run_indices = np.array(sorted(np.arange(len(datasets)), key=lambda i: datasets[i].attrs['Run name']))
+    sort_exp_indices = np.array(sorted(np.arange(len(datasets)), key=lambda i: datasets[sort_run_indices[i]
+                                                                                        ].attrs['Exp name']))
+    sort_indices = sort_run_indices[sort_exp_indices]
+    unsort_indices = np.argsort(sort_indices)
+    del sort_run_indices, sort_exp_indices
+
+    # sort by lexicographical order of experiment series name and run name
+    datasets = [datasets[i] for i in sort_indices]
+    steady_state_times_runs = [steady_state_times_runs[i] for i in sort_indices]
 
     # Split two steady state periods for jan_2024 data: (16, 24) and (27, 33) and plot with dotted
     datasets_split = datasets.copy()
@@ -154,7 +171,8 @@ if __name__ == "__main__":
         for plot_diagnostic in diagnostics_to_plot_list:
             plot_parallel_inverse_scale_length(datasets_split, steady_state_times_runs_split, plot_diagnostic,
                                                probes_faces_midplane_split, probes_faces_parallel_split,
-                                               marker_styles_split, "median", core_radius, plot_save_folder)
+                                               marker_styles_split, "mean", core_radius, plot_save_folder,
+                                               scale_length_mode="exponential")  # 'linear' or 'exponential'
 
     if ask_yes_or_no("Generate grid line plots for selected diagnostics? (y/n) "):
         time_unit = unit_safe(steady_state_times_runs_split[0])
