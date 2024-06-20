@@ -1,7 +1,7 @@
-from langmuir.file_access import *
+from file_access import *
 from langmuir.helper import *
 from langmuir.configurations import *
-from langmuir.experimental import get_exp_params
+from experimental import get_exp_params
 from langmuir.getIVsweep import get_isweep_vsweep
 from langmuir.characterization import characterize_sweep_array
 from langmuir.preview import preview_raw_sweep, preview_characteristics

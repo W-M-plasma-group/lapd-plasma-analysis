@@ -4,8 +4,10 @@ written in MATLAB by Conor Perks (MIT) and using the PlasmaPy and bapsflib libra
 Comments are added inline. A separate documentation page is not yet complete.
 """
 
-from langmuir.file_access import ask_yes_or_no
-from langmuir.analysis import get_langmuir_datasets
+from file_access import ask_yes_or_no
+
+from langmuir.configurations import get_config_id, get_ion
+from langmuir.analysis import get_langmuir_datasets, get_diagnostics_to_plot, save_datasets_nc
 from langmuir.plots import *
 
 """ HDF5 file directory; end path with a slash """              # TODO user adjust
