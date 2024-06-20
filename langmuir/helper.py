@@ -43,8 +43,8 @@ def unpack_bimaxwellian(diagnostics):
 def get_diagnostic_keys_units(probe_area=1.*u.mm**2, ion_type="He-4+", bimaxwellian=False):
     # Perform diagnostic on some sample data to get all diagnostic names and units as dictionary of strings
 
-    bias = np.arange(-20, 20, 1) * u.V
-    current = ((bias.value / 100 + 0.2) ** 2 - 0.01) * u.A
+    bias = np.linspace(-20, 20, 200) * u.V
+    current = ((1 + np.exp(-bias.value / 2)) ** (-1) - 0.1) * u.A
     chara = Characteristic(bias, current)
     diagnostics = swept_probe_analysis(chara, probe_area, ion_type, bimaxwellian)
     if bimaxwellian:
