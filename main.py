@@ -66,6 +66,17 @@ if __name__ == "__main__":
     datasets, steady_state_times_runs, hdf5_paths = get_langmuir_datasets(
         langmuir_nc_folder, hdf5_folder, interferometry_folder, interferometry_mode,
         isweep_choices, core_radius, bimaxwellian, plot_save_folder)
+
+    print("\n===== Mach probe analysis =====")
+    mach_datasets = get_mach_datasets(mach_nc_folder, hdf5_folder, datasets, hdf5_paths, mach_velocity_mode)
+    if len(mach_datasets) > 0:
+        datasets = get_velocity_datasets(datasets, mach_datasets, mach_velocity_mode)
+        save_datasets_nc(datasets, langmuir_nc_folder, "lang_", bimaxwellian)
+        print(f"Velocities will be plotted in {str(velocity_plot_unit)}. Ensure that plots are labeled correctly.")
+
+    # Get possible diagnostics and their full names, e.g. "n_e" and "Electron density", and ask user to select some
+    diagnostic_name_dict = {key: get_title(key) for key in set.intersection(*[set(dataset) for dataset in datasets])}
+    diagnostics_to_plot_list = get_diagnostics_to_plot(diagnostic_name_dict)
     print("Diagnostics selected:", diagnostics_to_plot_list)
 
     # Plot chosen diagnostics for each individual dataset
@@ -135,9 +146,8 @@ if __name__ == "__main__":
                                                probes_faces_midplane_split, probes_faces_parallel_split,
                                                marker_styles_split, "median", core_radius, plot_save_folder)
 
-    if ask_yes_or_no("Generate vertically stacked line plots for selected diagnostics? (y/n) "):
-        datasets_unsorted = [datasets[unsort_indices[i]] for i in range(len(datasets))]
-        steady_state_plateaus_runs_unsorted = np.array(steady_state_plateaus_runs)[unsort_indices]
+    if ask_yes_or_no("Generate grid line plots for selected diagnostics? (y/n) "):
+        time_unit = unit_safe(steady_state_times_runs_split[0])
         probes_faces_midplane_unsorted = np.array(probes_faces_midplane_split)[unsort_indices]
         probes_faces_parallel_unsorted = np.array(probes_faces_parallel_split)[unsort_indices]
         for x_dim in ("x", "time"):
@@ -152,8 +162,155 @@ if __name__ == "__main__":
                                       tolerance=plot_tolerance)
     """
 
+    #
+    #
+    #
+    #
+    #
+    #
+    #
 
+    print("\nBeginning Mach plots")
+    if ask_yes_or_no("Plot contour plots for Mach number? (y/n) "):
+        for i in range(len(mach_datasets)):
+            mach_ds = mach_datasets[i]
+            for variable in mach_ds:
+                for probe in range(len(mach_ds.probe)):
+                    da = mach_ds.isel(probe=probe)[variable].mean(dim='shot', keep_attrs=True).squeeze()
+                    da.plot.contourf(vmax=np.nanquantile(da, 0.9), x='time')  # robust=True
+                    title = f"{get_title(variable)} (Probe {mach_ds.probe[probe].item()})"
+                    plt.title(get_exp_run_string(mach_ds.attrs) + "\n" + title)
+                    plt.show()
 
+    if ask_yes_or_no("Plot multiline plots for Mach number? (y/n) "):
+        for i in range(len(mach_datasets)):
+            mach_ds = mach_datasets[i]
+            for variable in mach_ds:
+                for probe in range(len(mach_ds.probe)):
+                    z = (anode_z - mach_ds.coords['z'][probe].item() * u.cm).to(u.m).value
+                    da = mach_ds.isel(probe=probe)[variable].mean(dim='shot', keep_attrs=True)
+                    core_steady_state_profile = core_steady_state(da_input=da,
+                                                                  steady_state_times=steady_state_times_runs_split[i],
+                                                                  operation="mean",
+                                                                  dims_to_keep=['x']  # , 'time']
+                                                                  ).squeeze().plot(x='x', label=f"z = {z:.2f} m")
+                plt.title(get_exp_run_string(mach_ds.attrs) + "\n" + get_title(variable))
+                plt.legend()
+                plt.tight_layout()
+                plt.show()
+
+    #
+    #
+
+    z_distances = [((anode_z - dataset['z'].isel(probe=1).item() * u.cm)
+                    - (anode_z - dataset['z'].isel(probe=0).item() * u.cm)).to(u.m)
+                   for dataset in datasets]
+
+    parallel_velocity_average = [(dataset['v_para'].isel(probe=1) + dataset['v_para'].isel(probe=0)) / 2
+                                 for dataset in datasets]
+    parallel_velocity_gradient = [(datasets[i]['v_para'].isel(probe=1) - datasets[i]['v_para'].isel(probe=0)
+                                   ) / z_distances[i] for i in range(len(datasets))]    # z is in m; v is in m/s
+    parallel_acceleration = [parallel_velocity_average[i] * parallel_velocity_gradient[i]
+                             for i in range(len(datasets))]
+
+    parallel_pressure_gradient = [(datasets[i]['P_ei_from_n_i_OML'].isel(probe=1)
+                                   - datasets[i]['P_ei_from_n_i_OML'].isel(probe=0)
+                                   ) / z_distances[i] for i in range(len(datasets))]
+    from plasmapy.particles import particle_mass
+    parallel_density_average = [particle_mass(get_ion(datasets[i].attrs['Run name']))
+                                * (datasets[i]['n_i_OML'].isel(probe=1)
+                                   + datasets[i]['n_i_OML'].isel(probe=0)) / 2
+                                for i in range(len(datasets))]
+    parallel_pressure_gradient_over_density = [-parallel_pressure_gradient[i] / parallel_density_average[i]
+                                               for i in range(len(datasets))]
+
+    #
+    #
+
+    if ask_yes_or_no("Plot parallel plasma acceleration term versus parallel pressure gradient? (y/n) "):
+        plt.rcParams['figure.figsize'] = (5.5, 3.5)
+        collision_frequencies = extract_collision_frequencies(datasets, core_radius, steady_state_times_runs,
+                                                              probes_faces_midplane_split, "mean")
+        collision_frequencies_log_normalized = normalize(np.log(collision_frequencies), 0, 0.9)
+        color_map = matplotlib.colormaps["plasma"](collision_frequencies_log_normalized)
+
+        max_pressure_gradient = 0
+        for i in range(len(datasets)):
+            pressure_gradient = core_steady_state(parallel_pressure_gradient_over_density[i], core_radius,
+                                                  steady_state_times_runs[i], "mean")
+            acceleration = core_steady_state(parallel_acceleration[i], core_radius,
+                                             steady_state_times_runs[i], "mean")
+            plt.scatter(pressure_gradient, acceleration, color=color_map[i], marker=marker_styles_split[i])
+            if max_pressure_gradient < pressure_gradient:
+                max_pressure_gradient = pressure_gradient
+
+        normalizer = matplotlib.colors.LogNorm(vmin=np.min(collision_frequencies),
+                                               vmax=np.max(collision_frequencies))
+        color_bar = plt.colorbar(matplotlib.cm.ScalarMappable(norm=normalizer, cmap='plasma'), ax=plt.gca())
+        color_bar.set_label(r"$\nu_{ei}$" " [Hz]\n(midplane)", rotation=0, labelpad=30)
+
+        # plt.title("LHS vs RHS of equation 2.2 in thesis")
+        # plt.ylabel(r"$v_z \ \frac{\partial v_z}{\partial_z}$ [m / s2]")
+        plt.title(r"$v_z \ \frac{\partial v_z}{\partial z}$ [m / s$^2$]  ", y=0.85, loc='right')
+        plt.xlabel(r"$- \frac{1}{\rho} \frac{\partial p}{\partial z}$ [m / s$^2$]")
+        plt.tight_layout()
+        if plot_save_folder:
+            plt.savefig(f"{plot_save_folder}parallel_acceleration_vs_parallel_pressure_gradient.pdf")
+        plt.show()
+
+    #
+    #
+
+    if ask_yes_or_no("Plot parallel plasma acceleration term versus parallel pressure gradient "
+                     "with predicted trend lines? (y/n) "):
+        plt.rcParams['figure.figsize'] = (5.5, 3.5)
+        collision_frequencies = extract_collision_frequencies(datasets, core_radius, steady_state_times_runs,
+                                                              probes_faces_midplane_split, "mean")
+        collision_frequencies_log_normalized = normalize(np.log(collision_frequencies), 0, 0.9)
+        color_map = matplotlib.colormaps["plasma"](collision_frequencies_log_normalized)
+
+        scaled_parallel_pressure_gradients = []
+        for i in range(len(datasets)):
+            scaled_parallel_pressure_gradient = core_steady_state(
+                parallel_pressure_gradient_over_density[i], core_radius, steady_state_times_runs[i], "mean")
+            scaled_parallel_pressure_gradients += [value_safe(scaled_parallel_pressure_gradient)]
+            acceleration = core_steady_state(parallel_acceleration[i], core_radius,
+                                             steady_state_times_runs[i], "mean")
+            plt.scatter(scaled_parallel_pressure_gradient, acceleration, color=color_map[i],
+                        marker=marker_styles_split[i])
+
+        max_scaled_parallel_pressure_gradient = np.max(scaled_parallel_pressure_gradients)
+        x = np.linspace(0,
+                        1.4 * max_scaled_parallel_pressure_gradient, 10)
+        x2 = np.linspace(0.8 * np.min(scaled_parallel_pressure_gradients),
+                         0.39 * max_scaled_parallel_pressure_gradient, 10)
+        plt.plot(x, 1 * x,  color='black',      linestyle='--',     # expected trend line
+                 # label=r"$v_z \ \frac{\partial v_z}{\partial z} = - \frac{1}{\rho} \frac{\partial p}{\partial z}$")
+                 label=r"$y = x$")  # r"$y = x$ (model)"
+        plt.plot(x, 0 * x,  color='gray',       linestyle=':',      # zero line
+                 # label=r"$v_z \ \frac{\partial v_z}{\partial z} = 0$")
+                 label=r"$y = 0$")  # r"$y = 0$"
+        plt.plot(x2, x2 - 2.7e7, color='silver',     linestyle='--',  # (0, (5, 10)),
+                 label=r"$y = x$, offset")   # r"$y = x - 2.7e7$"
+
+        normalizer = matplotlib.colors.LogNorm(vmin=np.min(collision_frequencies),
+                                               vmax=np.max(collision_frequencies))
+        color_bar = plt.colorbar(matplotlib.cm.ScalarMappable(norm=normalizer, cmap='plasma'), ax=plt.gca())
+        color_bar.set_label(r"$\nu_{ei}$" " [Hz]\n(midplane)", rotation=0, labelpad=30)
+
+        # plt.title("LHS vs RHS of equation 2.2 in thesis")
+        # plt.ylabel(r"$v_z \ \frac{\partial v_z}{\partial_z}$ [m / s2]")
+
+        plt.xlim(left=0, right=1.05 * max_scaled_parallel_pressure_gradient)
+        plt.ylim(top=max_scaled_parallel_pressure_gradient / 3)
+        plt.title(r"  $v_z \ \frac{\partial v_z}{\partial z}$ [m/s$^2$]  ",
+                  y=0.85, loc='right')  # loc='left'  # [m/s$^2$]
+        plt.xlabel(r"  $- \frac{1}{\rho} \frac{\partial p}{\partial z}$ [m/s$^2$]  ")
+        plt.legend(loc='upper right', bbox_to_anchor=(1.0, 0.84))  # loc="center right"   # \ \left[ \frac{\text{m}}{\text{s}^2} \right]
+        plt.tight_layout()
+        if plot_save_folder:
+            plt.savefig(f"{plot_save_folder}parallel_acceleration_vs_parallel_pressure_gradient_with_expectation.pdf")
+        plt.show()
 
     #
     #
