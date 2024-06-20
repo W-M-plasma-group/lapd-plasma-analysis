@@ -36,12 +36,11 @@ mach_velocity_mode = "append"                                           # not fu
 """ Other user parameters """                                           # TODO user adjust
 # isweep_choice is user choice for probe or linear combination to plot; see isweep_selector in helper.py for more
 # e.g. coefficients are for [[p1f1, p1f2], [p2f1, p2f2]]
-isweep_choices = [[[1, 0], [0, 0]],     # first combination to plot: 1 * (first face on first probe)
-                  [[0, 0], [1, 0]]]     # second combination to plot: 1 * (first face on second probe)
-# isweep_choices = [[[0, 0], [1, 0]]]
-# isweep_choices = [[[1, 0], [-1, 0]]]   # combination to plot: 1 * (face 1 on probe 1) - 1 * (face 1 on probe 2)
+isweep_choices = [[[1, 0], [0, 0]],     # . first combination to plot: 1 * (first face on first probe)
+                  [[0, 0], [1, 0]]]     # .second combination to plot: 1 * (first face on second probe)
+# isweep_choices = [[[1, 0], [-1, 0]]]  # .       combination to plot: 1 * (face 1 on probe 1) - 1 * (face 1 on probe 2)
 bimaxwellian = False                                        # note to self: perform both and store in same NetCDF file?
-core_radius = 21 * u.cm  # 26. * u.cm                                   # From MATLAB code TODO !
+core_radius = 21. * u.cm                                                # TODO user can adjust (26 cm in MATLAB code)
 plot_tolerance = np.nan  # 0.25                                         # TODO
 velocity_plot_unit = u.km / u.s         # TODO not yet working          # TODO adjust !
 
@@ -52,19 +51,20 @@ plot_save_folder = ("/Users/leomurphy/Desktop/wm/Plasma research/Research images
 
 # Diagram of LAPD
 """
-       <- ~18m plasma length -> 
-  ____________________________________       
-  |    |                      '      |       A       
-  |    |                      '      |       |   ~75 cm plasma diameter
-  |____|______________________'______|       V
-      (a)                    (b)    (c)
+           <- ~18m plasma length -> 
+  ,,,_______________________________       
+  |||     '                        |       A       
+  |||     '                        |       |  ~60 cm plasma diameter
+  LLL_____'________________________|       V
+  (a)    (b)                      (c)
+        
         +z direction (+ports) ==>
                   plasma flow ==> 
             magnetic field B0 <==
-
-a) LaB6 electron beam cathode
-b) downstream mesh anode
-c) downstream cathode
+ 
+ a) heated LaB6 cathode
+ b) grid anode
+ c) end anode
 """
 
 if __name__ == "__main__":
