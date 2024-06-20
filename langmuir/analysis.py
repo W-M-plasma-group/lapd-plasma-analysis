@@ -55,6 +55,12 @@ def get_langmuir_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder
             {"units": str(electron_ion_collision_frequencies.unit)})
         datasets[i] = datasets[i].assign({'nu_ei': electron_ion_collision_frequencies_da})
 
+    # Calculate neutral density
+    for i in range(len(datasets)):
+        # change units of saved fill pressure to Pa?
+        neutral_density = get_neutral_density(value_safe(datasets[i].attrs['Fill pressure']) * u.Torr)
+        datasets[i] = datasets[i].assign_attrs({"Neutral density": neutral_density})
+
     # Final save diagnostics datasets to folder (after earlier save point in load_datasets function)
     save_datasets(datasets, netcdf_folder, bimaxwellian)
 

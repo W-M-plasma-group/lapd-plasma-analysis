@@ -156,9 +156,44 @@ if __name__ == "__main__":
 
 
 
-    print("\n===== Mach probe analysis =====")
+    #
+    #
 
+    if ask_yes_or_no("Print run parameters and diagnostics? (y/n) "):
+        """
+        z_distances = [((anode_z - dataset['z'].isel(probe=1).item() * u.cm)
+                        - (anode_z - dataset['z'].isel(probe=0).item() * u.cm)).to(u.m)
+                       for dataset in datasets]
+        """
 
+        print(f"Run ID \t\t\t T_e \t\t n_i_OML \t\t\t P_from_n_i_OML \t\t nu_ei \t\t\t v_para ")
+        for i in range(len(datasets_split)):
+            probes_faces = probes_faces_parallel_split[i]
+            dataset = datasets_split[i]  # [{"probe": probes_faces_midplane_split[i][0], "face": probes_faces_midplane_split[i][1]}]
+
+            core_steady_state_args = core_radius, steady_state_times_runs_split[i], "mean"
+            density = []
+            pressure = []
+            temperature = []
+            collision_frequency = []
+            parallel_velocity = []
+            for j in range(len(probes_faces)):
+                ds = dataset[{"probe": probes_faces[j][0],
+                              "face": probes_faces[j][1]}]
+                temperature += [core_steady_state(ds['T_e'],                *core_steady_state_args).item()]
+                pressure += [core_steady_state(ds['P_ei_from_n_i_OML'],     *core_steady_state_args).item()]
+                density += [core_steady_state(ds['n_i_OML'],                *core_steady_state_args).item()]
+                collision_frequency += [core_steady_state(ds['nu_ei'],      *core_steady_state_args).item()]
+                parallel_velocity += [core_steady_state(ds['v_para'],       *core_steady_state_args).item()]
+                # gas_pressure_torr = dataset.attrs['Fill pressure']
+                # gas_density = dataset.attrs['Neutral density']
+
+            print(f"{get_exp_run_string(datasets_split[i].attrs)} \t "
+                  f"{temperature[0]:5.2f} {temperature[1]:5.2f} \t"
+                  f"{density[0]:.2e} {density[1]:.2e} \t "
+                  f"{pressure[0]:5.2f} {pressure[1]:5.2f} \t "
+                  f"{collision_frequency[0]:.2e} {collision_frequency[1]:.2e} \t"
+                  f"{parallel_velocity[0]:.2e} {parallel_velocity[1]:.2e} \t")
 
 # TODO Not all MATLAB code has been transferred (e.g. neutrals, ExB)
 # QUESTION: can we calibrate both Langmuir probes using an interferometry ratio depending only on one of them? (NO)
