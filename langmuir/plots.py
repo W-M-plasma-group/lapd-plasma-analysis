@@ -41,7 +41,7 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
         warn(f"Can currently only categorize line plots by two attributes. Selecting last two: {attributes[-2:]}")
         attributes = attributes[-2:]
 
-    diagnostics_datasets_sorted = diagnostics_datasets  # not sorted yet
+    sort_indices = np.arange(len(diagnostics_datasets))         # not sorted yet
     for attr in attributes:
         try:
             diagnostics_datasets_sorted.sort(key=lambda d: d.attrs[attr])
@@ -121,6 +121,7 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
                                         2.2 * core_steady_state(da, core_rad, steady_state_times[inner_index],  # TODO?
                                                                 operation="median", dims_to_keep=["probe", "face"]
                                                                 ).max().item()])]
+
         if not np.nanmax(y_limits) > 0:
             warn("A plot was assigned a NaN upper axis limit")
         ax.set_ylim(0, np.nanmax(y_limits))
@@ -370,7 +371,7 @@ def plot_parallel_inverse_scale_length(datasets, steady_state_times_runs, diagno
 
     # plt.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left')
     plt.tight_layout()
-    plt.ylim(bottom=0) # TODO hardcoded
+    plt.ylim(bottom=0)  # TODO hardcoded
 
     if save_directory:
         plt.savefig(f"{save_directory}parallel_gradient_scale_length_plot_{diagnostic}.pdf")
@@ -452,8 +453,11 @@ def plot_grid(datasets, diagnostics_to_plot_list, steady_state_times_runs, probe
                         port = ds.coords['port'].item()
                         z_real = anode_z.to(u.m).value - ds.coords['z'].item() / 100
                         marker_style = port_marker_styles[port]
-                        da_mean[~(linear_da_error < tolerance * da_median)] = np.nan  # TODO hardcoded! document!
-                        ax.errorbar(da_mean.coords["x"], da_mean, yerr=linear_da_error, linestyle="none",
+
+                        # da_mean[~(linear_da_error < tolerance * da_median)] = np.nan  # TODO hardcoded! document!
+                        da_mean = apply_tolerance(da_mean, linear_da_error, da_median, tolerance)
+
+                        ax.errorbar(da_mean.coords[x_dim], da_mean, yerr=linear_da_error, linestyle="none",
                                     color=color_map[index], marker=marker_style,
                                     # label=f"{z_real:.1f}")  # str(port)
                                     label=get_exp_run_string(ds.attrs, mode="short"))

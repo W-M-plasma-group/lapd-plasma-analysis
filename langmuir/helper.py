@@ -56,7 +56,12 @@ def get_diagnostic_keys_units(probe_area=1.*u.mm**2, ion_type="He-4+", bimaxwell
                        "P_e": str(u.Pa),
                        "P_e_from_n_i_OML": str(u.Pa),
                        "P_e_cal": str(u.Pa),
-                       "nu_ei": str(u.Hz)})
+                       "P_ei": str(u.Pa),
+                       "P_ei_from_n_i_OML": str(u.Pa),
+                       "P_ei_cal": str(u.Pa),
+                       "nu_ei": str(u.Hz),
+                       "v_para": str(u.m / u.s),
+                       "v_perp": str(u.m / u.s)})
     return keys_units
 
 

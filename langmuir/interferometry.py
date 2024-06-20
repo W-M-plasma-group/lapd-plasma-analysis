@@ -66,9 +66,8 @@ def interferometry_calibration(density_da: xr.DataArray,
     elif itfm_id == 3:  # January 2024
         itfm_file = lapd.File(itfm_file_search_hdf5(run_str, itfm_folder))
         itfm = itfm_file.read_msi("Interferometer array")
-        density_scale_factor = itfm_calib_jan_2024(core_density, itfm, spatial_dims
-                                                   ).expand_dims({"probe": probe_coord,
-                                                                  "face": face_coord})
+        density_scale_factor = itfm_calib_jan_2024(core_density, itfm, spatial_dims).expand_dims({"probe": probe_coord,
+                                                                                                  "face": face_coord})
         itfm_file.close()
 
     else:

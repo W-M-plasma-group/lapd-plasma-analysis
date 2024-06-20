@@ -29,8 +29,9 @@ interferometry_folder = ("/Users/leomurphy/lapd-data/November_2022/uwave_288_GHz
 """ User parameters """                                         # TODO user adjust
 # isweep_choice is user choice for probe or linear combination to plot; see isweep_selector in helper.py for more
 # e.g. coefficients are for [[p1f1, p1f2], [p2f1, p2f2]]
-isweep_choices = [[[1, 0], [0, 0]],  # first combination to plot: 1 * (first face on first probe)
-                  [[0, 0], [1, 0]]]  # second combination to plot: 1 * (first face on second probe)
+isweep_choices = [[[1, 0], [0, 0]],     # first combination to plot: 1 * (first face on first probe)
+                  [[0, 0], [1, 0]]]     # second combination to plot: 1 * (first face on second probe)
+# isweep_choices = [[[0, 0], [1, 0]]]
 # isweep_choices = [[[1, 0], [-1, 0]]]   # combination to plot: 1 * (face 1 on probe 1) - 1 * (face 1 on probe 2)
 # isweep_choices = [[1, 0, 0, 0], [0, 0, 1, 0]]
 # isweep_choices = [[1, 0]]  # , [0, 1]]
@@ -38,9 +39,10 @@ isweep_choices = [[[1, 0], [0, 0]],  # first combination to plot: 1 * (first fac
 bimaxwellian = False                                        # note to self: perform both and store in same NetCDF file?
 core_radius = 26. * u.cm                                    # From MATLAB code
 
-""" Optional directory to save plots; end path with a slash"""  # TODO user adjust
+""" Optional directory to save plots; end path with a slash"""          # TODO user adjust
 plot_save_folder = ("/Users/leomurphy/Desktop/wm/Plasma research/Research images/Research images spring 2024/"
                     "new research plots mar-apr 2024/saved plots/")
+
 
 # Diagram of LAPD
 """
@@ -62,7 +64,7 @@ c) downstream cathode
 if __name__ == "__main__":
 
     # TODO list of hardcoded parameters
-    #    (16, 24) for January_2024 steady state period (detect_steady_state_period in diagnostics.py)
+    #    (16 ms, 24 ms) for January_2024 steady state period (detect_steady_state_period in diagnostics.py)
 
     print("\n===== Langmuir probe analysis =====")
     datasets, steady_state_times_runs, hdf5_paths = get_langmuir_datasets(
