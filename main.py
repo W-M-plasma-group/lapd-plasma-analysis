@@ -10,22 +10,30 @@ from langmuir.configurations import get_config_id, get_ion
 from langmuir.analysis import get_langmuir_datasets, get_diagnostics_to_plot, save_datasets_nc
 from langmuir.plots import *
 
-""" HDF5 file directory; end path with a slash """              # TODO user adjust
+from mach.analysis import get_mach_datasets, get_velocity_datasets
+
+
+""" HDF5 file directory; end path with a slash """                      # TODO user adjust
 # hdf5_folder = "/Users/leomurphy/lapd-data/April_2018/"
 # hdf5_folder = "/Users/leomurphy/lapd-data/March_2022/"
 # hdf5_folder = "/Users/leomurphy/lapd-data/November_2022/"
 # hdf5_folder = "/Users/leomurphy/lapd-data/January_2024/January_2024_all_working/"
 hdf5_folder = "/Users/leomurphy/lapd-data/combined/"
 
-""" Langmuir NetCDF directory; end path with a slash """        # TODO user adjust
 assert hdf5_folder.endswith("/")
+""" Langmuir & Mach NetCDF directories; end path with a slash """       # TODO user adjust
 langmuir_nc_folder = hdf5_folder + "lang_nc/"
+mach_nc_folder = hdf5_folder + "mach_nc/"
 
 """ Interferometry file directory; end path with a slash """            # TODO user adjust
 interferometry_folder = ("/Users/leomurphy/lapd-data/November_2022/uwave_288_GHz_waveforms/"
                          if "November_2022" in hdf5_folder else hdf5_folder)
 
-""" User parameters """                                         # TODO user adjust
+""" Interferometry & Mach access modes """  # Options are "skip", "append", "overwrite"; recommended is "append"
+interferometry_mode = "skip"                                            # TODO user adjust
+mach_velocity_mode = "append"                                           # not fully implemented
+
+""" Other user parameters """                                           # TODO user adjust
 # isweep_choice is user choice for probe or linear combination to plot; see isweep_selector in helper.py for more
 # e.g. coefficients are for [[p1f1, p1f2], [p2f1, p2f2]]
 isweep_choices = [[[1, 0], [0, 0]],     # first combination to plot: 1 * (first face on first probe)
