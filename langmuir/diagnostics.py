@@ -162,14 +162,17 @@ def detect_steady_state_times(langmuir_dataset: xr.Dataset, core_rad):
     if "january" in exp_name.lower():
         return [16, 24] * u.ms
     else:
-        density = langmuir_dataset['n_e']
-        core_density = density.where(np.logical_and(*in_core([density.x, density.y], core_rad)), drop=True)
-        core_density_time = core_density.isel(probe=0, face=0).mean(['x', 'y', 'shot']).squeeze()
-        threshold = 0.9 * core_density_time.max()
-        start_index = (core_density_time > threshold).argmax().item() + 1
-        end_index = core_density_time.sizes['time'] - np.nanargmax(
-                core_density_time.reindex(time=core_density_time.time[::-1]) > threshold).item()
-        return start_index, end_index
+        density = langmuir_dataset['n_i_OML']
+        # core_density = density.where(np.logical_and(*in_core([density.x, density.y], core_rad)), drop=True)
+        # core_density_vs_time = core_density.isel(probe=0, face=0).mean(['x', 'y', 'shot']).squeeze()
+        core_density_vs_time = core_steady_state(density.isel(probe=0, face=0), core_rad=core_rad,
+                                                 operation="median", dims_to_keep=["time"])
+        threshold = 0.9 * core_density_vs_time.max()
+        start_time = core_density_vs_time.time[core_density_vs_time > threshold].idxmin().item()
+        end_time = core_density_vs_time.time[core_density_vs_time > threshold].idxmax().item()
+
+        time_unit = u.Unit(langmuir_dataset.coords['time'].attrs['units'])
+        return (start_time, end_time) * time_unit
 
 
 def diagnose_char(characteristic, probe_area, ion_type, bimaxwellian, indices=None):
