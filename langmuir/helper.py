@@ -10,6 +10,7 @@ matplotlib.rcParams['figure.dpi'] = 300
 plt.rcParams['figure.dpi'] = 300
 
 anode_z = portnum_to_z(0).to(u.m)
+ion_temperature = 1 * u.eV
 
 
 def value_safe(quantity_or_scalar):  # Get value of quantity or scalar, depending on type

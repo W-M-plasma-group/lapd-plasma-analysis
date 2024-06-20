@@ -1,7 +1,7 @@
 """
 The lapd-plasma-analysis repository was written by Leo Murphy based on code
 written in MATLAB by Conor Perks (MIT) and using the PlasmaPy and bapsflib libraries.
-Comments are added inline. A separate documentation page is not yet complete.
+Comments are added inline. Separate documentation is not yet complete.
 """
 
 from file_access import ask_yes_or_no
@@ -15,14 +15,13 @@ from langmuir.plots import *
 # hdf5_folder = "/Users/leomurphy/lapd-data/March_2022/"
 # hdf5_folder = "/Users/leomurphy/lapd-data/November_2022/"
 # hdf5_folder = "/Users/leomurphy/lapd-data/January_2024/January_2024_all_working/"
-hdf5_folder = "/Users/leomurphy/lapd-data/combined_lang_nc/"
+hdf5_folder = "/Users/leomurphy/lapd-data/combined/"
 
 """ Langmuir NetCDF directory; end path with a slash """        # TODO user adjust
 assert hdf5_folder.endswith("/")
 langmuir_nc_folder = hdf5_folder + "lang_nc/"
 
-""" Interferometry file directory; end path with a slash """    # TODO user adjust
-interferometry_mode = "append"                                  # "skip", "append", "overwrite"; recommended: "append"
+""" Interferometry file directory; end path with a slash """            # TODO user adjust
 interferometry_folder = ("/Users/leomurphy/lapd-data/November_2022/uwave_288_GHz_waveforms/"
                          if "November_2022" in hdf5_folder else hdf5_folder)
 
@@ -33,9 +32,6 @@ isweep_choices = [[[1, 0], [0, 0]],     # first combination to plot: 1 * (first 
                   [[0, 0], [1, 0]]]     # second combination to plot: 1 * (first face on second probe)
 # isweep_choices = [[[0, 0], [1, 0]]]
 # isweep_choices = [[[1, 0], [-1, 0]]]   # combination to plot: 1 * (face 1 on probe 1) - 1 * (face 1 on probe 2)
-# isweep_choices = [[1, 0, 0, 0], [0, 0, 1, 0]]
-# isweep_choices = [[1, 0]]  # , [0, 1]]
-# isweep_choices = [0]
 bimaxwellian = False                                        # note to self: perform both and store in same NetCDF file?
 core_radius = 26. * u.cm                                    # From MATLAB code
 
@@ -53,7 +49,7 @@ plot_save_folder = ("/Users/leomurphy/Desktop/wm/Plasma research/Research images
   |____|______________________'______|       V
       (a)                    (b)    (c)
         +z direction (+ports) ==>
-                  plasma flow ==> ???
+                  plasma flow ==> 
             magnetic field B0 <==
 
 a) LaB6 electron beam cathode
@@ -114,11 +110,12 @@ if __name__ == "__main__":
             marker_styles_split += ['x']
     # marker_styles_split = ['o' if style == 'solid' else 'x' for style in linestyles_split]
 
-    # List that identifies probes and faces for 1) midplane and 2) upstream/downstream
+    # List that identifies probes and faces for 1) midplane and 2) low-z / high-z
     probes_faces_midplane_split = [(1, 0) if dataset.attrs['Exp name'] == "January_2024" else (0, 0)
                                    for dataset in datasets_split]
     probes_faces_parallel_split = [((0, 0), (1, 0)) for dataset in datasets_split]
-    # above: first face on first probe & first face on second probe
+    # format: ((low-z probe, low-z face), (high-z probe, high-z face)) for ds in ...
+    # above: selects first (0th) probe's first (0th) face & second (1th) probe's first (0th) face
 
     if ask_yes_or_no(f"Generate parallel plot of selected diagnostics? (y/n) "):  # plot of {parallel_diagnostics[key]}
         for plot_diagnostic in diagnostics_to_plot_list:  # for key in parallel_diagnostics:
@@ -132,7 +129,7 @@ if __name__ == "__main__":
                                  probes_faces_midplane_split, marker_styles_split, operation="mean",
                                  core_radius=core_radius, save_directory=plot_save_folder)
 
-    if ask_yes_or_no("Generate plot of inverse gradient scale length by position for selected diagnostics? (y/n) "):
+    if ask_yes_or_no("Generate plot of gradient scale length by position for selected diagnostics? (y/n) "):
         for plot_diagnostic in diagnostics_to_plot_list:
             plot_parallel_inverse_scale_length(datasets_split, steady_state_times_runs_split, plot_diagnostic,
                                                probes_faces_midplane_split, probes_faces_parallel_split,

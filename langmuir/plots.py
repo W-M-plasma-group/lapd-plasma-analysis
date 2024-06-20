@@ -92,10 +92,10 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
                 da_std = da.std(dims_to_average_out, ddof=1, keep_attrs=True)
                 # both of the above should have only one dimension left?
 
-                # 95% (~two standard deviation) confidence interval
-                non_nan_element_da = da.copy()
-                non_nan_element_da[...] = ~np.isnan(da)
-                effective_num_non_nan_per_std = non_nan_element_da.sum(dims_to_average_out)
+                # 95% (~two standard deviation) confidence interval TODO replace by std_error in core_steady_state func?
+                non_nan_elements_da = da.copy()
+                non_nan_elements_da[...] = ~np.isnan(da)
+                effective_num_non_nan_per_std = non_nan_elements_da.sum(dims_to_average_out)
                 linear_da_error = da_std * np.nan
                 linear_da_error[effective_num_non_nan_per_std > 1
                                 ] = (da_std * 1.96 / np.sqrt(effective_num_non_nan_per_std - 1)
@@ -243,8 +243,8 @@ def plot_parallel_diagnostic(datasets, steady_state_times_runs, probes_faces_mid
 
         plt.plot(zs, diagnostic_values, marker=marker_styles[i], color=color_map[i], linestyle='none')
     plt.title(f"{get_title(diagnostic)} [{get_diagnostic_keys_units()[diagnostic]}] ", y=0.9, loc='right')  # ({operation})
-    plt.xlabel("z position [m]")
-    plt.ylabel(f"[{diagnostic_units}]", rotation=0, labelpad=25)   # {get_title(diagnostic)}
+    plt.xlabel("z location [m]")
+    # plt.ylabel(f"[{diagnostic_units}]", rotation=0, labelpad=25)   # {get_title(diagnostic)}
     normalizer = matplotlib.colors.LogNorm(vmin=np.min(collision_frequencies),
                                            vmax=np.max(collision_frequencies))
     color_bar = plt.colorbar(matplotlib.cm.ScalarMappable(norm=normalizer, cmap='plasma'), ax=plt.gca())
@@ -361,7 +361,7 @@ def plot_parallel_inverse_scale_length(datasets, steady_state_times_runs, diagno
                  label=(get_exp_run_string(datasets[i].attrs)
                         + f":  {collision_frequencies[i]:.2E} Hz"))
     plt.title(f"Parallel gradient scale length [m] \n\n{get_title(diagnostic)} ", y=0.9)  # loc='right'
-    plt.xlabel("z position [m]")
+    plt.xlabel("z location [m]")
 
     normalizer = matplotlib.colors.LogNorm(vmin=np.min(collision_frequencies),
                                            vmax=np.max(collision_frequencies))
@@ -398,7 +398,7 @@ def plot_grid(datasets, diagnostics_to_plot_list, steady_state_times_runs, probe
         fig, axes = plt.subplots(2, 1, sharex='all', sharey='row', layout="constrained")  # sharey=all
         axes_1d = np.atleast_1d(axes)
 
-        collision_frequencies = extract_collision_frequencies(datasets, core_radius, steady_state_plateaus_runs,
+        collision_frequencies = extract_collision_frequencies(datasets, core_radius, steady_state_times_runs,
                                                               probes_faces_midplane, operation)
         collision_frequencies_log_normalized = normalize(np.log(collision_frequencies), 0, 0.9)
         color_map = matplotlib.colormaps["plasma"](collision_frequencies_log_normalized)
@@ -582,7 +582,6 @@ def extract_collision_frequencies(datasets, core_radius, steady_state_times_runs
         collision_frequencies += [collision_frequencies_mean[{"probe": probe_face_midplane[i][0],
                                                               "face": probe_face_midplane[i][1]}].mean().item()]
     collision_frequencies = np.array(collision_frequencies)
-
     return collision_frequencies
 
 
@@ -590,13 +589,13 @@ def normalize(ndarray, lower=0., upper=1.):
     return lower + (upper - lower) * (ndarray - ndarray.min()) / (ndarray.max() - ndarray.min())
 
 
-def probe_face_choice_to_eq_string(probe_face_choice, ports, faces):
+def probe_face_choice_to_eq_string(probe_face_coefficient, ports, faces):
     eq_string = ""
-    for p in range(len(probe_face_choice)):
-        for f in range(len(probe_face_choice[p])):
-            if probe_face_choice[p][f] != 0:
+    for p in range(len(probe_face_coefficient)):
+        for f in range(len(probe_face_coefficient[p])):
+            if probe_face_coefficient[p][f] != 0:
                 port_face_string = str(ports[p]) + str(faces[f])   # (faces[f] if faces[f] else "")
-                eq_string += (((probe_face_choice[p][f] + "*") if probe_face_choice[p][f] != 1 else '')
+                eq_string += (((probe_face_coefficient[p][f] + "*") if probe_face_coefficient[p][f] != 1 else '')
                               + str(port_face_string) + " + ")
     return eq_string[:-3]
 

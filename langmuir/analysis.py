@@ -87,13 +87,14 @@ def print_file_choices(hdf5_folder, lang_nc_folder, interferometry_folder, inter
 
 def load_datasets(hdf5_folder, lang_nc_folder, bimaxwellian, plot_save_directory):
 
-    print("\nThe following NetCDF files were found in the NetCDF folder (specified in main.py): ")
+    print("\nThe following Langmuir NetCDF files were found in the NetCDF folder (specified in main.py): ")
     nc_paths = sorted(search_folder(lang_nc_folder, 'nc', limit=52))
-    nc_paths_to_open_ints = choose_multiple_list(nc_paths, "NetCDF file",
-                                                 null_action="perform diagnostics on HDF5 files")
+    nc_paths_chosen_ints = choose_multiple_list(nc_paths, "Langmuir data NetCDF file",
+                                                null_action="perform diagnostics on HDF5 files")
 
-    if len(nc_paths_to_open_ints) > 0:
-        datasets = [xr.open_dataset(nc_paths[choice]) for choice in nc_paths_to_open_ints]
+    if len(nc_paths_chosen_ints) > 0:
+        hdf5_chosen_list = None
+        datasets = [xr.open_dataset(nc_paths[choice]) for choice in nc_paths_chosen_ints]
     else:
         print("\nThe following HDF5 files were found in the HDF5 folder (specified in main.py): ")
         hdf5_paths = sorted(search_folder(hdf5_folder, "hdf5", limit=52))
@@ -148,7 +149,7 @@ def load_datasets(hdf5_folder, lang_nc_folder, bimaxwellian, plot_save_directory
             diagnostics_dataset = diagnostics_dataset.assign_attrs(exp_params_dict)
 
             # Intermediate save point in case diagnostics are interrupted later
-            save_datasets([diagnostics_dataset], lang_nc_folder, bimaxwellian)
+            save_datasets_nc([diagnostics_dataset], lang_nc_folder, "lang_", bimaxwellian)
             datasets.append(diagnostics_dataset)
 
     return datasets
@@ -177,8 +178,6 @@ def interferometry_calibrate_datasets(datasets, density_diagnostic, interferomet
                 print(f"Error in calibrating electron density: \n{str(e)}")
                 calibrated_electron_density = datasets[i]['n_e'].copy()
             """
-
-            # datasets[i] = datasets[i].assign_attrs({"Interferometry calibrated": True})  # TODO necessary?/improve
 
     return datasets
 
