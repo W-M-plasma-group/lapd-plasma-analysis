@@ -36,47 +36,53 @@ def preview_characteristics(characteristics_array, positions, ramp_times, langmu
         if not chara_view_mode:
             break
         print()
-        loc_x, loc_y = x[isweep_x_y_shot_ramp_to_plot[1]], y[isweep_x_y_shot_ramp_to_plot[2]]
-        loc = (positions == [loc_x, loc_y]).all(axis=1).nonzero()[0][0]
-        chara_to_plot = characteristics_array[(isweep_x_y_shot_ramp_to_plot[0], loc, *isweep_x_y_shot_ramp_to_plot[3:])]
-        """ while chara_view_mode not in ["s", "a"]:
-            chara_view_mode = input("(S)how current plot or (a)dd another Characteristic?").lower()
-        if chara_view_mode == "s": """
-        port_face = ports_faces[isweep_x_y_shot_ramp_to_plot[0]]
-        port_face_string = (str(port_face['port'])
-                            + (f" {port_face['face']}" if port_face['face'] else ""))
-        plot_title = (f"Run: {exp_params_dict['Exp name']}, {exp_params_dict['Run name']}\n"
-                      f"Isweep: {isweep_x_y_shot_ramp_to_plot[0]} ({port_face_string}), "
-                      f"x: {loc_x}, y: {loc_y}, shot: {isweep_x_y_shot_ramp_to_plot[3]}, "
-                      f"time: {ramp_times[isweep_x_y_shot_ramp_to_plot[4]]:.2f}")
-        if diagnostics:
-            if areas is None or ion is None:
-                raise ValueError("Area or ion not specified in characteristic preview mode, but 'diagnostics' is True.")
-            try:
-                diagnostics = swept_probe_analysis(chara_to_plot, areas[isweep_x_y_shot_ramp_to_plot[0]], ion,
-                                                   bimaxwellian)
-                electron_temperature = diagnostics['T_e'] if not bimaxwellian \
-                    else unpack_bimaxwellian(diagnostics)['T_e_avg']
-                plot_title += f"\nTemperature: {electron_temperature:.3f}"
-                chara_to_plot.plot()
-                plt.plot(diagnostics['V_F'],
-                         chara_to_plot.current[array_lookup(chara_to_plot.bias, diagnostics['V_F'])], 'go',
-                         label=r"$V_F$")
-                plt.plot(diagnostics['V_P'],
-                         chara_to_plot.current[array_lookup(chara_to_plot.bias, diagnostics['V_P'])], 'ro',
-                         label=r"$V_P$")
-                plt.legend()
 
-            except (ValueError, RuntimeError, TypeError) as e:
-                plot_title += f"\n(Error calculating plasma diagnostics: \n{str(e)[:35]})"
-                chara_to_plot.plot()
+        try:
+            loc_x, loc_y = x[isweep_x_y_shot_ramp_to_plot[1]], y[isweep_x_y_shot_ramp_to_plot[2]]
+            loc = (positions == [loc_x, loc_y]).all(axis=1).nonzero()[0][0]
+            chara_to_plot = characteristics_array[(isweep_x_y_shot_ramp_to_plot[0], loc, *isweep_x_y_shot_ramp_to_plot[3:])]
+            """ while chara_view_mode not in ["s", "a"]:
+                chara_view_mode = input("(S)how current plot or (a)dd another Characteristic?").lower()
+            if chara_view_mode == "s": """
+            port_face = ports_faces[isweep_x_y_shot_ramp_to_plot[0]]
+            port_face_string = (str(port_face['port'])
+                                + (f" {port_face['face']}" if port_face['face'] else ""))
+            plot_title = (f"Run: {exp_params_dict['Exp name']}, {exp_params_dict['Run name']}\n"
+                          f"Isweep: {isweep_x_y_shot_ramp_to_plot[0]} ({port_face_string}), "
+                          f"x: {loc_x}, y: {loc_y}, shot: {isweep_x_y_shot_ramp_to_plot[3]}, "
+                          f"time: {ramp_times[isweep_x_y_shot_ramp_to_plot[4]]:.2f}")
+            if diagnostics:
+                if areas is None or ion is None:
+                    raise ValueError("Area or ion not specified in characteristic preview mode, but 'diagnostics' is True.")
+                try:
+                    diagnostics = swept_probe_analysis(chara_to_plot, areas[isweep_x_y_shot_ramp_to_plot[0]], ion,
+                                                       bimaxwellian)
+                    electron_temperature = diagnostics['T_e'] if not bimaxwellian \
+                        else unpack_bimaxwellian(diagnostics)['T_e_avg']
+                    ion_density = diagnostics['n_i_OML']
+                    plot_title += f"\nTemperature: {electron_temperature:.3f}; ion density: {ion_density:.2e}"
+                    chara_to_plot.plot()
+                    plt.plot(diagnostics['V_F'],
+                             chara_to_plot.current[array_lookup(chara_to_plot.bias, diagnostics['V_F'])], 'go',
+                             label=r"$V_F$")
+                    plt.plot(diagnostics['V_P'],
+                             chara_to_plot.current[array_lookup(chara_to_plot.bias, diagnostics['V_P'])], 'ro',
+                             label=r"$V_P$")
+                    plt.legend()
 
-            plt.title(plot_title)
-            plt.tight_layout()
+                except (ValueError, RuntimeError, TypeError) as e:
+                    plot_title += f"\n(Error calculating plasma diagnostics: \n{str(e)[:35]})"
+                    chara_to_plot.plot()
 
-            if plot_save_directory:
-                plt.savefig(f"{plot_save_directory}langmuir_sweep.pdf")
-            plt.show()
+                plt.title(plot_title)
+                plt.tight_layout()
+
+                if plot_save_directory:
+                    plt.savefig(f"{plot_save_directory}langmuir_sweep.pdf")
+                plt.show()
+        except IndexError as e:
+            print(e)
+            continue
 
 
 def preview_raw_sweep(bias, currents, positions, ports_faces, exp_params_dict, dt):
@@ -111,30 +117,40 @@ def preview_raw_sweep(bias, currents, positions, ports_faces, exp_params_dict, d
             break
         print()
 
-        loc_x, loc_y = x[isweep_x_y_shot_to_plot[1]], y[isweep_x_y_shot_to_plot[2]]
-        loc = (positions == [loc_x, loc_y]).all(axis=1).nonzero()[0][0]
+        try:
+            loc_x, loc_y = x[isweep_x_y_shot_to_plot[1]], y[isweep_x_y_shot_to_plot[2]]
+            loc = (positions == [loc_x, loc_y]).all(axis=1).nonzero()[0][0]
 
-        # Abbreviate "current" as "curr"
-        bias_to_plot = bias[(loc,                                    *isweep_x_y_shot_to_plot[3:])]
-        current_to_plot = currents[(isweep_x_y_shot_to_plot[0], loc, *isweep_x_y_shot_to_plot[3:])]
+            # Abbreviate "current" as "curr"
+            bias_to_plot = bias[(loc,                                    *isweep_x_y_shot_to_plot[3:])]
+            current_to_plot = currents[(isweep_x_y_shot_to_plot[0], loc, *isweep_x_y_shot_to_plot[3:])]
 
-        port_face = ports_faces[isweep_x_y_shot_to_plot[0]]
-        port_face_string = (str(port_face['port'])
-                            + (f" {port_face['face']}" if port_face['face'] else ""))
-        plt.plot(np.arange(len(bias_to_plot)) * dt, bias_to_plot, label="Bias (V)")
-        plt.title(f"Run: {exp_params_dict['Exp name']}, {exp_params_dict['Run name']}\n"
-                  f"Isweep: {isweep_x_y_shot_to_plot[0]} ({port_face_string}), "
-                  f"x: {loc_x}, y: {loc_y}, shot: {isweep_x_y_shot_to_plot[3]}")
-        plt.tight_layout()
-        plt.legend()
-        plt.show()
+            port_face = ports_faces[isweep_x_y_shot_to_plot[0]]
+            port_face_string = (str(port_face['port'])
+                                + (f" {port_face['face']}" if port_face['face'] else ""))
+            plt.plot(np.arange(len(bias_to_plot)) * dt.to(u.ms).value, bias_to_plot)  # , label="Bias (V)")
+            plt.title(f"Run: {exp_params_dict['Exp name']}, {exp_params_dict['Run name']}\n"
+                      f"Isweep: {isweep_x_y_shot_to_plot[0]} ({port_face_string}), "
+                      f"x: {loc_x}, y: {loc_y}, shot: {isweep_x_y_shot_to_plot[3]}\n\n"
+                      f"Voltage [V]")
+            plt.xlabel("Time [ms]")
+            # plt.legend()
+            plt.tight_layout()
+            if plot_save_directory:
+                plt.savefig(f"{plot_save_directory}vsweep_time.pdf")
+            plt.show()
 
-        plt.plot(np.arange(len(bias_to_plot)) * dt, current_to_plot, label="Current (A)")
-        plt.title(f"Run: {exp_params_dict['Exp name']}, {exp_params_dict['Run name']}\n"
-                  f"Isweep: {isweep_x_y_shot_to_plot[0]} ({port_face_string}), "
-                  f"x: {loc_x}, y: {loc_y}, shot: {isweep_x_y_shot_to_plot[3]}")
-        plt.legend()
-        plt.tight_layout()
-
-        plt.show()
-        plt.rcParams['figure.dpi'] = 300
+            plt.plot(np.arange(len(bias_to_plot)) * dt.to(u.ms).value, current_to_plot)  # , label="Current (A)")
+            plt.title(f"Run: {exp_params_dict['Exp name']}, {exp_params_dict['Run name']}\n"
+                      f"Isweep: {isweep_x_y_shot_to_plot[0]} ({port_face_string}), "
+                      f"x: {loc_x}, y: {loc_y}, shot: {isweep_x_y_shot_to_plot[3]}\n\n"
+                      f"Current [A]")
+            plt.xlabel("Time [ms]")
+            # plt.legend()
+            plt.tight_layout()
+            if plot_save_directory:
+                plt.savefig(f"{plot_save_directory}isweep_time.pdf")
+            plt.show()
+        except IndexError as e:
+            print(e)
+            continue
