@@ -309,9 +309,11 @@ def scatter_plot_diagnostics(datasets, diagnostics_to_plot_list, steady_state_ti
         pressure_max = np.max(scatter_points[:, 0] * scatter_points[:, 1])
 
         x_curve = np.linspace(x_min, x_max, 100)
-        pressures = np.linspace(np.sqrt(pressure_min), np.sqrt(pressure_max), 8)[1:-1] ** 2
-        for pressure in pressures:
-            plt.plot(x_curve, pressure / x_curve, color='gray')
+        # pressures_pa = np.linspace(np.sqrt(pressure_min), np.sqrt(pressure_max), 8)[1:-1] ** 2
+        pressures_pa = np.arange(1, 5)  # TODO very hardcoded
+        pa_to_ev_m3 = (1 * u.Pa).to(u.eV * u.m ** -3).value * 1 ** -1  # formerly * (3 / 2) ** (-1)
+        for pressure in pressures_pa:
+            plt.plot(x_curve, pa_to_ev_m3 * pressure / x_curve, color='#bbbbbb', label=f"{pressure} Pa")
         plt.ylim(0, 1.1 * y_max)
         if "n_" in diagnostics_to_plot_list[0] and "T_e" in diagnostics_to_plot_list[1]:
             pass
