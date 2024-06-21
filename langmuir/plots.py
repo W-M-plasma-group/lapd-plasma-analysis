@@ -9,9 +9,9 @@ from langmuir.configurations import get_ion
 # matplotlib.use('QtAgg')
 
 
-def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagnostic, probe_face_choices, x_dim='x',
-                              steady_state_by_runs=None, core_rad=None, attribute=None, tolerance=np.nan,
-                              save_directory=""):
+def multiplot_linear_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagnostic, probe_face_choices, x_dim='x',
+                                steady_state_by_runs=None, core_rad=None, attribute=None, tolerance=np.nan,
+                                save_directory=""):
     r"""
 
     :param diagnostics_datasets: list of xarray Datasets
@@ -140,8 +140,8 @@ def multiplot_line_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagn
     plt.show()
 
 
-def plot_line_diagnostic(diagnostics_dataset: xr.Dataset, probe_face_coefficients, diagnostic, plot_type, steady_state,
-                         shot_mode="mean", save_directory="", tolerance=np.nan):
+def plot_linear_diagnostic(diagnostics_dataset: xr.Dataset, probe_face_coefficients, diagnostic, plot_type, steady_state,
+                           shot_mode="mean", save_directory="", tolerance=np.nan):
     # Plots the given diagnostic(s) from the dataset in the given style
 
     linear_ds_s = []

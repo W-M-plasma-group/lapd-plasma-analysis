@@ -93,22 +93,22 @@ if __name__ == "__main__":
     if ask_yes_or_no("Generate contour plot of selected diagnostics over time and radial position? (y/n) "):
         for plot_diagnostic in diagnostics_to_plot_list:
             for i in range(len(datasets)):
-                plot_line_diagnostic(datasets[i], isweep_choices, plot_diagnostic, 'contour',
-                                     steady_state_times_runs[i])
+                plot_linear_diagnostic(datasets[i], isweep_choices, plot_diagnostic, 'contour',
+                                       steady_state_times_runs[i])
 
     # Plot radial profiles of diagnostic (steady-state time average), with color corresponding to first attribute
     #    and plot position on multiplot corresponding to second attribute
     if ask_yes_or_no("Generate line plot of selected diagnostics over radial position? (y/n) "):
         for plot_diagnostic in diagnostics_to_plot_list:
-            multiplot_line_diagnostic(datasets, plot_diagnostic, isweep_choices, 'x',
-                                      steady_state_by_runs=steady_state_times_runs,
-                                      core_rad=core_radius, save_directory=plot_save_folder, tolerance=plot_tolerance)
+            multiplot_linear_diagnostic(datasets, plot_diagnostic, isweep_choices, 'x',
+                                        steady_state_by_runs=steady_state_times_runs, core_rad=core_radius,
+                                        tolerance=plot_tolerance, save_directory=plot_save_folder)
 
     if ask_yes_or_no("Generate line plot of selected diagnostics over time? (y/n) "):
         for plot_diagnostic in diagnostics_to_plot_list:
-            multiplot_line_diagnostic(datasets, plot_diagnostic, isweep_choices, 'time',
-                                      steady_state_by_runs=steady_state_times_runs,
-                                      core_rad=core_radius, save_directory=plot_save_folder)
+            multiplot_linear_diagnostic(datasets, plot_diagnostic, isweep_choices, 'time',
+                                        steady_state_by_runs=steady_state_times_runs, core_rad=core_radius,
+                                        save_directory=plot_save_folder)
 
     # Create indices for preserving order in which datasets were entered
     """
