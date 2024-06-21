@@ -52,15 +52,15 @@ plot_save_folder = ("/Users/leomurphy/Desktop/wm/Plasma research/Research images
 # Diagram of LAPD
 """
            <- ~18m plasma length -> 
-  ,,,_______________________________       
+  __________________________________       
   |||     '                        |       A       
   |||     '                        |       |  ~60 cm plasma diameter
-  LLL_____'________________________|       V
+  |||_____'________________________|       V
   (a)    (b)                      (c)
         
-        +z direction (+ports) ==>
-                  plasma flow ==> 
-            magnetic field B0 <==
+        +z direction (+ports) ==>>
+                  plasma flow ==>> 
+            magnetic field B0 <<==
  
  a) heated LaB6 cathode
  b) grid anode
