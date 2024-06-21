@@ -1,30 +1,38 @@
 import matplotlib.pyplot as plt
 import astropy.units as u
-import xarray as xr
+import astropy.constants as const
+
+from langmuir.helper import core_steady_state
 
 
-def neutral_ratio(electron_density, experimental_parameters, steady_state_start, steady_state_end):
-    # SETUP CODE #
-    # __________ #
+def get_neutral_density(gas_pressure):
+
+    # TODO We assume that neutrals are evenly distributed throughout LAPD and follow the ideal gas law.
+    #   But they may not be evenly spread
 
     # LAPD parameters from MATLAB code
     neutral_temperature = 300. * u.K
-    neutral_pressure = experimental_parameters['Fill pressure'].to(u.Pa)
-    length = 16.5 * u.m
+    neutral_pressure = gas_pressure.to(u.Pa)
 
     # Correction factor for electron density measurements from ion gauge
     correction_factor = 0.18  # from MATLAB
 
-    neutral_density = neutral_pressure / (neutral_temperature * u.k) / correction_factor  # u.k is Boltzmann constant
+    # Ideal gas law: p = nKT, so n = p / KT / (correction_factor)
+    neutral_density = neutral_pressure / (neutral_temperature * const.k_B) / correction_factor
+    return neutral_density.to(u.m ** -3)
 
+
+def get_neutral_ratio(electron_density, experimental_parameters, steady_state_times, operation="median"):
+
+    length = 16.5 * u.m
     # RADIAL/AREAL CODE #
     # _________________ #
 
-    both = xr.ufuncs.logical_and
-    plateau = electron_density.coords['plateau']  # rename variables for comprehensibility
+    # plateau = electron_density.coords['plateau']  # rename variables for comprehensibility
 
-    steady_state_mask = both(plateau >= steady_state_start, plateau <= steady_state_end)
-    steady_state_electron_density = electron_density.where(steady_state_mask, drop=True).mean('time')
+    steady_state_electron_density = core_steady_state(electron_density, steady_state_times=steady_state_times,
+                                                      operation=operation,
+                                                      dims_to_keep=["probe", "face", "x", "y", "shot"])
 
     if electron_density.sizes['x'] == 1 and electron_density.sizes['y'] == 1:  # scalar (0D) data
         raise ValueError("Finding neutral gas ratio for zero-dimensional position data is unsupported")
