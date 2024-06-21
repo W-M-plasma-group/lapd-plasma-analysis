@@ -595,7 +595,7 @@ def plot_acceleration_vs_pressure_gradient(datasets, steady_state_times_runs, co
                  label=r"$y = x$")  # r"$y = x$ (model)"
         plt.plot(x_all, 0 * x_all, color='gray', linestyle=':',             # zero line
                  label=r"$y = 0$")  # r"$y = 0$"
-        plt.plot(x_some, x_some - 2.7e7, color='silver', linestyle='--',    # offset equality line
+        plt.plot(x_some, x_some + offset, color='silver', linestyle='--',    # offset equality line
                  label=r"$y = x$, offset")  # r"$y = x - 2.7e7$"
         # label=r"$v_z \ \frac{\partial v_z}{\partial z} = - \frac{1}{\rho} \frac{\partial p}{\partial z}$")
         # label=r"$v_z \ \frac{\partial v_z}{\partial z} = 0$")

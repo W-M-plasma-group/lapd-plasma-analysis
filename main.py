@@ -221,8 +221,10 @@ if __name__ == "__main__":
                 plt.tight_layout()
                 plt.show()
 
-    # Mixed plots and functions below
-    # (incorporating velocity and other diagnostics)
+    #
+    #   Mixed plots and functions below
+    #   (incorporating velocity and other diagnostics)
+    #
 
     if ask_yes_or_no("Plot parallel plasma acceleration term versus parallel pressure gradient? (y/n) "):
         plot_acceleration_vs_pressure_gradient(datasets, steady_state_times_runs, core_radius,
@@ -233,7 +235,7 @@ if __name__ == "__main__":
                      "with predicted trend lines? (y/n) "):
         plot_acceleration_vs_pressure_gradient(datasets, steady_state_times_runs, core_radius,
                                                probes_faces_midplane_split, marker_styles_split, "mean",
-                                               plot_save_folder, with_expectation=True)
+                                               plot_save_folder, with_expectation=True, offset=-2.7e7)
 
     if ask_yes_or_no("Print run parameters and diagnostics? (y/n) "):
         print(f"Run ID \t\t\t T_e \t\t n_i_OML \t\t\t P_from_n_i_OML \t\t nu_ei \t\t\t v_para ")
