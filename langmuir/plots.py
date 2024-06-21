@@ -3,6 +3,7 @@ from warnings import warn
 from astropy import visualization
 
 from langmuir.helper import *
+from langmuir.configurations import get_ion
 
 # matplotlib.use('TkAgg')
 # matplotlib.use('QtAgg')
@@ -518,6 +519,87 @@ def plot_grid(datasets, diagnostics_to_plot_list, steady_state_times_runs, probe
         if save_directory:
             plt.savefig(f"{save_directory}grid_{plot_diagnostic}_{x_dim}.pdf", bbox_inches="tight")
         plt.show()
+
+
+def plot_acceleration_vs_pressure_gradient(datasets, steady_state_times_runs, core_radius,
+                                           probes_faces_midplane, marker_styles_split,
+                                           operation="mean", plot_save_folder="", with_expectation=False):
+    r""""""
+    z_distances = [((anode_z - dataset['z'].isel(probe=1).item() * u.cm)
+                    - (anode_z - dataset['z'].isel(probe=0).item() * u.cm)).to(u.m)
+                   for dataset in datasets]
+
+    parallel_velocity_average = [(dataset['v_para'].isel(probe=1) + dataset['v_para'].isel(probe=0)) / 2
+                                 for dataset in datasets]
+    parallel_velocity_gradient = [(datasets[i]['v_para'].isel(probe=1) - datasets[i]['v_para'].isel(probe=0)
+                                   ) / z_distances[i] for i in range(len(datasets))]    # z is in m; v is in m/s
+    parallel_acceleration = [parallel_velocity_average[i] * parallel_velocity_gradient[i]
+                             for i in range(len(datasets))]
+
+    parallel_pressure_gradient = [(datasets[i]['P_ei_from_n_i_OML'].isel(probe=1)
+                                   - datasets[i]['P_ei_from_n_i_OML'].isel(probe=0)
+                                   ) / z_distances[i] for i in range(len(datasets))]
+    from plasmapy.particles import particle_mass
+    parallel_mass_density_average = [particle_mass(get_ion(datasets[i].attrs['Run name']))
+                                     * (datasets[i]['n_i_OML'].isel(probe=1)
+                                     + datasets[i]['n_i_OML'].isel(probe=0)) / 2
+                                     for i in range(len(datasets))]
+    parallel_pressure_gradient_over_density = [-parallel_pressure_gradient[i] / parallel_mass_density_average[i]
+                                               for i in range(len(datasets))]
+
+    plt.rcParams['figure.figsize'] = (5.5, 3.5)
+    collision_frequencies = extract_collision_frequencies(datasets, core_radius, steady_state_times_runs,
+                                                          probes_faces_midplane, "mean")
+    collision_frequencies_log_normalized = normalize(np.log(collision_frequencies), 0, 0.9)
+    color_map = matplotlib.colormaps["plasma"](collision_frequencies_log_normalized)
+
+    pressure_gradients = []
+    accelerations = []
+    for i in range(len(datasets)):
+        pressure_gradient = core_steady_state(parallel_pressure_gradient_over_density[i], core_radius,
+                                              steady_state_times_runs[i], operation)
+        acceleration = core_steady_state(parallel_acceleration[i], core_radius,
+                                         steady_state_times_runs[i], operation)
+        pressure_gradients += [value_safe(pressure_gradient)]
+        accelerations += [value_safe(acceleration)]
+        plt.scatter(pressure_gradient, acceleration, color=color_map[i], marker=marker_styles_split[i])
+
+    if with_expectation:
+        min_pressure_gradient = np.min(pressure_gradients)
+        max_pressure_gradient = np.max(pressure_gradients)
+        min_acceleration = np.min(accelerations)
+        max_acceleration = np.max(accelerations)
+
+        x_all = np.linspace(0,
+                            1.1 * max_pressure_gradient, 10)
+        x_some = np.linspace(0.8 * min_pressure_gradient,
+                             0.4 * max_pressure_gradient, 10)  # was 0.39
+        plt.plot(x_all, 1 * x_all, color='black', linestyle='--',           # equality line (predicted)
+                 label=r"$y = x$")  # r"$y = x$ (model)"
+        plt.plot(x_all, 0 * x_all, color='gray', linestyle=':',             # zero line
+                 label=r"$y = 0$")  # r"$y = 0$"
+        plt.plot(x_some, x_some - 2.7e7, color='silver', linestyle='--',    # offset equality line
+                 label=r"$y = x$, offset")  # r"$y = x - 2.7e7$"
+        # label=r"$v_z \ \frac{\partial v_z}{\partial z} = - \frac{1}{\rho} \frac{\partial p}{\partial z}$")
+        # label=r"$v_z \ \frac{\partial v_z}{\partial z} = 0$")
+        # \ \left[ \frac{\text{m}}{\text{s}^2} \right]
+
+        plt.legend(loc='upper right', bbox_to_anchor=(1.0, 0.84))
+        plt.xlim(left=0, right=1.05 * max_pressure_gradient)
+        plt.ylim(bot=min_acceleration - 0.2 * (max_acceleration - min_acceleration), top=0.3 * max_pressure_gradient)
+
+
+    normalizer = matplotlib.colors.LogNorm(vmin=np.min(collision_frequencies),
+                                           vmax=np.max(collision_frequencies))
+    color_bar = plt.colorbar(matplotlib.cm.ScalarMappable(norm=normalizer, cmap='plasma'), ax=plt.gca())
+    color_bar.set_label(r"$\nu_{ei}$" " [Hz]\n(midplane)", rotation=0, labelpad=30)
+
+    plt.title(r"$v_z \ \frac{\partial v_z}{\partial z}$ [m/s$^2$]  ", y=0.85, loc='right')
+    plt.xlabel(r"$- \frac{1}{\rho} \frac{\partial p}{\partial z}$ [m/s$^2$]")
+    plt.tight_layout()
+    if plot_save_folder:
+        plt.savefig(f"{plot_save_folder}parallel_acceleration_vs_parallel_pressure_gradient"
+                    f"{'_with_expectation' if with_expectation else ''}.pdf")
 
 
 def get_valid_linear_dimension(diagnostics_dataset_sizes):
