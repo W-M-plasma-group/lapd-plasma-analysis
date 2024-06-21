@@ -523,8 +523,25 @@ def plot_grid(datasets, diagnostics_to_plot_list, steady_state_times_runs, probe
 
 def plot_acceleration_vs_pressure_gradient(datasets, steady_state_times_runs, core_radius,
                                            probes_faces_midplane, marker_styles_split,
-                                           operation="mean", plot_save_folder="", with_expectation=False):
-    r""""""
+                                           operation="mean", plot_save_folder="", with_expectation=False,
+                                           offset=-2.7e7):
+    r"""
+    Plot the parallel acceleration versus the scaled parallel pressure gradient.
+
+    :param datasets: list of datasets to plot
+    :param steady_state_times_runs: list of Quantities indicating the start and end times of the steady-state period
+    for each dataset
+    :param core_radius: Quantity, length of radius of core region
+    :param probes_faces_midplane: list of (probe, face) tuples indicating the midplane of each dataset
+    :param marker_styles_split:
+    :param operation:
+    :param plot_save_folder:
+    :param with_expectation: bool. If true, add three lines to the plot for visualization purposes:
+    the equality line, predicted by MHD; the zero-acceleration line; and the equality line shifted by a constant offset.
+    :param offset: float or int. The offset applied to the equality line in the third line plotted above
+    :return:
+    """
+
     z_distances = [((anode_z - dataset['z'].isel(probe=1).item() * u.cm)
                     - (anode_z - dataset['z'].isel(probe=0).item() * u.cm)).to(u.m)
                    for dataset in datasets]
