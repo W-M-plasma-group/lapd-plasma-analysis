@@ -681,7 +681,7 @@ def get_title(diagnostic: str) -> str:
                   'P_ei':           "Plasma pressure",                                  # Electron + ion pressure
                   'P_ei_cal':       "Calibrated plasma pressure",
                   'P_ei_from_n_i':  "Plasma pressure (from ion density)",               # not added yet
-                  'P_ei_from_n_i_OML': "Plasma pressure" " (from ion density (OML))",
+                  'P_ei_from_n_i_OML': "Plasma pressure (from ion density (OML))",
                   'n_e_cal':        "Calibrated electron density",
                   'n_i_cal':        "Calibrated ion density",
                   'n_i_OML_cal':    "Calibrated ion density (OML)",
