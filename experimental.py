@@ -64,7 +64,7 @@ def get_magnetic_field(file):
 def get_nominal_magnetic_field(file):
     magnetic_field = get_magnetic_field(file)["Peak magnetic field"]
     # Round magnetic field to nearest 500 Gauss
-    nominal_magnetic_field = 500 * int(np.round(magnetic_field.to(u.gauss).value / 500)) * u.gauss
+    nominal_magnetic_field = 500 * int(np.round(magnetic_field.to(u.gauss).value / 500)) * u.gauss  # round to 500s
     return {"Nominal magnetic field": nominal_magnetic_field}
 
 

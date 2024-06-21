@@ -8,7 +8,9 @@ import astropy.units as u
 from astropy import constants as const
 from bapsflib import lapd
 
-from langmuir.file_access import search_folder
+from file_access import search_folder
+
+from langmuir.helper import crunch_data, core_steady_state
 from langmuir.configurations import get_config_id
 
 
@@ -16,7 +18,7 @@ from langmuir.configurations import get_config_id
 def interferometry_calibration(density_da: xr.DataArray,
                                exp_attrs: dict,
                                itfm_folder: str,              # path to either HDF5 or text folder
-                               steady_state: tuple,
+                               steady_state: tuple,           # in ms
                                core_radius: u.Quantity = 26. * u.cm,
                                ) -> xr.DataArray:
 
@@ -31,9 +33,10 @@ def interferometry_calibration(density_da: xr.DataArray,
 
     run_str = exp_attrs['Run name'][:2]
 
-    # Use only probe listed first for generating scale factors
-    isweep_coord = density_da['isweep']
-    core_density = density_da.isel(isweep=0)
+    # Use only probe and face listed first for generating scale factors
+    probe_coord = density_da['probe']
+    face_coord = density_da['face']
+    core_density = density_da.isel(probe=0, face=0)
 
     # Select core region in x and y and interpolate nan values to allow integration; 10 cm (arbitrary) max gap
     # TODO describe averaging across shots! Preserve structure in that direction, since only time varies in itfm data?
@@ -45,7 +48,8 @@ def interferometry_calibration(density_da: xr.DataArray,
     if itfm_id == 0:  # April 2018
         itfm_file = lapd.File(itfm_file_search_hdf5(run_str, itfm_folder))
         itfm = itfm_file.read_msi("Interferometer array")
-        density_scale_factor = itfm_calib_56ghz(core_density, itfm, spatial_dims).expand_dims({"isweep": isweep_coord})
+        density_scale_factor = itfm_calib_56ghz(core_density, itfm, spatial_dims).expand_dims({"probe": probe_coord,
+                                                                                               "face": face_coord})
         itfm_file.close()
 
     elif itfm_id == 1:  # March 2022
@@ -62,16 +66,16 @@ def interferometry_calibration(density_da: xr.DataArray,
     elif itfm_id == 3:  # January 2024
         itfm_file = lapd.File(itfm_file_search_hdf5(run_str, itfm_folder))
         itfm = itfm_file.read_msi("Interferometer array")
-        density_scale_factor = itfm_calib_jan_2024(core_density, itfm, spatial_dims
-                                                   ).expand_dims({"isweep": isweep_coord})
+        density_scale_factor = itfm_calib_jan_2024(core_density, itfm, spatial_dims).expand_dims({"probe": probe_coord,
+                                                                                                  "face": face_coord})
         itfm_file.close()
 
     else:
         raise NotImplementedError("Unsupported interferometry id " + repr(itfm_id))
 
     # Select steady state region only (given by plateau indices)
-    steady_state_density_scale_factor = density_scale_factor.where(np.logical_and(
-        density_da.plateau >= steady_state[0], density_da.plateau <= steady_state[1]))
+    steady_state_density_scale_factor = core_steady_state(density_scale_factor, steady_state_times=steady_state)
+
     print(f"Run {exp_attrs['Run name'][:2]}: \t"
           f"{np.nanmean(np.asarray(steady_state_density_scale_factor)):.2f}")
 
@@ -140,7 +144,7 @@ def itfm_calib_56ghz(langmuir_da, itfm, spatial_dimensions) -> xr.DataArray:
         itfm_da = itfm_da.assign_coords({dim + '_time': ('time', aligned_time.data)})
 
         # Average all interferometry measurements into data point with the closest corresponding density time coordinate
-        itfm_time_avg = crunch_data(itfm_da, dim + '_time', langmuir_da.coords['time'], dt)
+        itfm_time_avg = crunch_data(itfm_da, dim + '_time', langmuir_da.coords['time'])
 
         density_scales[dim] = itfm_time_avg / integral
 
@@ -249,7 +253,7 @@ def itfm_calib_288ghz(density_da: xr.DataArray,
                            ).assign_attrs(mean_density_da.attrs)
 
     # Average all interferometry measurements into data point with the closest corresponding density time coordinate
-    itfm_da_crunched = crunch_data(itfm_da, 'time', density_da.coords['time'], dt)
+    itfm_da_crunched = crunch_data(itfm_da, 'time', density_da.coords['time'])
 
     return itfm_da_crunched / mean_density_da  # density scale factor
 
@@ -309,8 +313,8 @@ def itfm_calib_jan_2024(lang_da, itfm, spatial_dimensions) -> xr.DataArray:
     # ______________________ #
 
     # Average all interferometry measurements into data point with the closest corresponding density time coordinate
-    itfm_crunched = crunch_data(source_da=itfm_da, source_coord_name='time',
-                                destination_coord_da=lang_da.coords['time'], step=lang_dt)
+    itfm_crunched = crunch_data(source_data=itfm_da, source_coord_name='time',
+                                destination_coord_da=lang_da.coords['time'])
 
     """
     Note: Maybe just extend each dimension that was integrated out back to its original size?
@@ -331,55 +335,3 @@ def itfm_calib_jan_2024(lang_da, itfm, spatial_dimensions) -> xr.DataArray:
     density_scales = itfm_crunched / integral
 
     return density_scales
-
-
-def crunch_data(source_da: xr.DataArray,
-                source_coord_name: str,
-                destination_coord_da: xr.DataArray,
-                step):
-    # "Crunch" interferometry data into the density data timescale by averaging all interferometry measurements
-    #     into a "bucket" around the closest matching density time coordinate (within half a time step)
-    #     [inter. ]   (*   *) (*) (*   *) (*) (*   *)   <-- average together all (grouped together) measurements
-    #     [density]   |__o__|__o__|__o__|__o__|__o__|   <-- measurements grouped by closest density measurement "o"
-    # Take the mean of all interferometry measurements in the same "bucket" to match timescales
-    r"""
-    Group data along a specified dimension into bins determined by a destination coordinate and a step size,
-    then return the mean of each bin with the dimensions and coordinates of the destination coordinate.
-
-    Parameters
-    ----------
-    :param source_da: DataArray containing data to bin and average
-    :param source_coord_name: string, dimension in data_array; used to bin data
-    :param destination_coord_da: xarray DataArray, used as coordinate
-    :param step:
-    :return:
-    """
-
-    # Group input data "source_da" along the dimension specified by "source_coord_name"
-    #    by the coordinate in the xarray "destination_coord_da", assumed to have regular spacing "step", and take means
-    grouped_mean = source_da.groupby_bins(source_coord_name,
-                                          np.linspace(destination_coord_da[0] - step / 2,
-                                                      destination_coord_da[-1] + step / 2,
-                                                      len(destination_coord_da) + 1
-                                                      ), labels=destination_coord_da.data
-                                          ).mean()
-
-    # This result has only one dimension, the input data "dimension" + "_bins", labeled with the destination coordinate.
-    #    We want to return a DataArray with all the dimensions and coordinates (in this case: time dimension,
-    #    time dimension coordinate, plateau non-dimension coordinate) of the destination data.
-    #    This involves renaming the "_bins" dimension to match the destination coordinate,
-    #    creating a new coordinate identical to the destination coordinate's dimension coordinate,
-    #    and swapping the two new coordinates to give the xarray the same dimension coordinate as the destination.
-
-    destination_dimension = destination_coord_da.dims[0]  # The name of the dimension of the 1D destination coordinate
-    destination_coordinate_name = destination_coord_da.name  # The name of the destination coordinate
-
-    # Rename position-time-"_bins" dimension name to match destination coordinate, for example "x_time_bins" to "time"
-    named_mean = grouped_mean.rename({source_coord_name + "_bins": destination_coordinate_name})
-    # Add the destination dimension coordinate to the output xarray as a new coordinate
-    named_mean = named_mean.assign_coords({destination_dimension: (destination_coordinate_name,
-                                                                   destination_coord_da[destination_dimension].data)})
-    # Make the new destination dimension coordinate the main (dimension) coordinate of the output as well
-    named_mean = named_mean.swap_dims({destination_coordinate_name: destination_dimension})
-
-    return named_mean

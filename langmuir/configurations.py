@@ -26,7 +26,7 @@ def get_vsweep_bc(config_id):  # return (board, channel) for vsweep data
 def get_voltage_gain(config_id):
     # TODO get from HDF5 metadata?
     return (100, 100, 100, 100)[config_id]
-    # Note: here, gain refers to the inverse gain applies. Multiply by this gain to undo.
+    # Note: here, gain refers to the inverse gain applied. Multiply by this gain to undo.
 
 
 def get_langmuir_config(hdf5_path, config_id):
@@ -34,25 +34,26 @@ def get_langmuir_config(hdf5_path, config_id):
     # each list in tuple corresponds to an experiment series;
     # each tuple in list corresponds to configuration data for a single probe used in those experiments
     # -1 is placeholder; what each entry corresponds to is given in 'dtype' parameter below
-    langmuir_probe_configs = ([(1, 2, 25, -1, "", 11.,  1 * u.mm ** 2, 1)],    # April_2018
+    langmuir_probe_configs = (
+                              [(1, 2, -1, 25, "", 11.,  1 * u.mm ** 2, 1)],    # April_2018
 
-                              [(1, 2, 27, -1, "", 1.25, 1 * u.mm ** 2, 1),     # March_2022
-                               (1, 3, 43, -1, "", 2.10, 1 * u.mm ** 2, 1)],
+                              [(1, 2, -1, 27, "", 1.25, 1 * u.mm ** 2, 1),     # March_2022
+                               (1, 3, -1, 43, "", 2.10, 1 * u.mm ** 2, 1)],
 
-                              [(1, 2, 29, -1, "", 2.20, 2 * u.mm ** 2, 1),     # November_2022
-                               (1, 3, 35, -1, "", 2.20, 2 * u.mm ** 2, 1)],
+                              [(1, 2, -1, 29, "", 2.20, 2 * u.mm ** 2, 1),     # November_2022
+                               (1, 3, -1, 35, "", 2.20, 2 * u.mm ** 2, 1)],
 
-                              [(1, 2, 20, -1, "L", 1.,  2 * u.mm ** 2, 0.87 / 2),     # January_2024
-                               (1, 3, 20, -1, "R", 1.,  2 * u.mm ** 2, 1.07 / 2),
-                               (1, 4, 27, -1, "L", 1.,  4 * u.mm ** 2, 1.124 / 2),
-                               (1, 7, 27, -1, "R", 1.,  4 * u.mm ** 2, 0.96 / 2)]
+                              [(1, 2, -1, 20, "L", 1.,  2 * u.mm ** 2, 0.87 / 2),     # January_2024
+                               (1, 3, -1, 20, "R", 1.,  2 * u.mm ** 2, 1.07 / 2),
+                               (1, 4, -1, 27, "L", 1.,  4 * u.mm ** 2, 1.124 / 2),
+                               (1, 7, -1, 27, "R", 1.,  4 * u.mm ** 2, 0.96 / 2)]
                               )
 
     langmuir_configs_array = np.array(langmuir_probe_configs[config_id], dtype=[('board', int),
                                                                                 ('channel', int),
-                                                                                ('port', int),
                                                                                 ('receptacle', int),
-                                                                                ('face', str),
+                                                                                ('port', int),
+                                                                                ('face', 'U10'),
                                                                                 ('resistance', float),
                                                                                 ('area', u.Quantity),
                                                                                 ('gain', float)])  # see note below
