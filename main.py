@@ -39,7 +39,7 @@ mach_velocity_mode = "append"                                           # not fu
 isweep_choices = [[[1, 0], [0, 0]],     # . first combination to plot: 1 * (first face on first probe)
                   [[0, 0], [1, 0]]]     # .second combination to plot: 1 * (first face on second probe)
 # isweep_choices = [[[1, 0], [-1, 0]]]  # .       combination to plot: 1 * (face 1 on probe 1) - 1 * (face 1 on probe 2)
-bimaxwellian = False                                        # note to self: perform both and store in same NetCDF file?
+bimaxwellian = False                                                 # TODO perform both and store in same NetCDF file?
 core_radius = 21. * u.cm                                                # TODO user can adjust (26 cm in MATLAB code)
 plot_tolerance = np.nan  # 0.25                                         # TODO
 velocity_plot_unit = u.km / u.s         # TODO not yet working          # TODO adjust !
@@ -111,13 +111,6 @@ if __name__ == "__main__":
                                         save_directory=plot_save_folder)
 
     # Create indices for preserving order in which datasets were entered
-    """
-    unsort_run_indices = np.argsort(np.array(sorted(np.arange(len(datasets)), key=lambda i: datasets[i].attrs['Run name'])))
-    datasets = sorted(datasets, key=lambda ds: ds.attrs['Run name'])
-    unsort_exp_indices = np.argsort(np.array(sorted(np.arange(len(datasets)), key=lambda i: datasets[i].attrs['Exp name'])))
-    datasets = sorted(datasets, key=lambda ds: ds.attrs['Exp name'])
-    unsort_indices = unsort_exp_indices[unsort_run_indices]
-    """
     # original order of datasets as entered by user
     datasets_unsorted = datasets.copy()
     steady_state_times_runs_unsorted = steady_state_times_runs.copy()
@@ -192,13 +185,14 @@ if __name__ == "__main__":
 
     #
     #
-    #
-    #
-    #
+    #       Mach
+    #       plots
+    #       below
     #
     #
 
     print("\nBeginning Mach plots")
+
     if ask_yes_or_no("Plot contour plots for Mach number? (y/n) "):
         for i in range(len(mach_datasets)):
             mach_ds = mach_datasets[i]
@@ -227,33 +221,8 @@ if __name__ == "__main__":
                 plt.tight_layout()
                 plt.show()
 
-    #
-    #
-
-    z_distances = [((anode_z - dataset['z'].isel(probe=1).item() * u.cm)
-                    - (anode_z - dataset['z'].isel(probe=0).item() * u.cm)).to(u.m)
-                   for dataset in datasets]
-
-    parallel_velocity_average = [(dataset['v_para'].isel(probe=1) + dataset['v_para'].isel(probe=0)) / 2
-                                 for dataset in datasets]
-    parallel_velocity_gradient = [(datasets[i]['v_para'].isel(probe=1) - datasets[i]['v_para'].isel(probe=0)
-                                   ) / z_distances[i] for i in range(len(datasets))]    # z is in m; v is in m/s
-    parallel_acceleration = [parallel_velocity_average[i] * parallel_velocity_gradient[i]
-                             for i in range(len(datasets))]
-
-    parallel_pressure_gradient = [(datasets[i]['P_ei_from_n_i_OML'].isel(probe=1)
-                                   - datasets[i]['P_ei_from_n_i_OML'].isel(probe=0)
-                                   ) / z_distances[i] for i in range(len(datasets))]
-    from plasmapy.particles import particle_mass
-    parallel_density_average = [particle_mass(get_ion(datasets[i].attrs['Run name']))
-                                * (datasets[i]['n_i_OML'].isel(probe=1)
-                                   + datasets[i]['n_i_OML'].isel(probe=0)) / 2
-                                for i in range(len(datasets))]
-    parallel_pressure_gradient_over_density = [-parallel_pressure_gradient[i] / parallel_density_average[i]
-                                               for i in range(len(datasets))]
-
-    #
-    #
+    # Mixed plots and functions below
+    # (incorporating velocity and other diagnostics)
 
     if ask_yes_or_no("Plot parallel plasma acceleration term versus parallel pressure gradient? (y/n) "):
         plot_acceleration_vs_pressure_gradient(datasets, steady_state_times_runs, core_radius,
@@ -270,7 +239,7 @@ if __name__ == "__main__":
         print(f"Run ID \t\t\t T_e \t\t n_i_OML \t\t\t P_from_n_i_OML \t\t nu_ei \t\t\t v_para ")
         for i in range(len(datasets_split)):
             probes_faces = probes_faces_parallel_split[i]
-            dataset = datasets_split[i]  # [{"probe": probes_faces_midplane_split[i][0], "face": probes_faces_midplane_split[i][1]}]
+            dataset = datasets_split[i]
 
             core_steady_state_args = core_radius, steady_state_times_runs_split[i], "mean"
             density = []
@@ -296,5 +265,5 @@ if __name__ == "__main__":
                   f"{collision_frequency[0]:.2e} {collision_frequency[1]:.2e} \t"
                   f"{parallel_velocity[0]:.2e} {parallel_velocity[1]:.2e} \t")
 
-# TODO Not all MATLAB code has been transferred (e.g. neutrals, ExB)
+# TODO Not all MATLAB code has been transferred (e.g. ExB)
 # QUESTION: can we calibrate both Langmuir probes using an interferometry ratio depending only on one of them? (NO)
