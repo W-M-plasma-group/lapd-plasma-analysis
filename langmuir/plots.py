@@ -355,10 +355,10 @@ def plot_parallel_inverse_scale_length(datasets, steady_state_times_runs, diagno
                                                "face": probes_faces[0][1]}].item()
         diagnostic_value_1 = diagnostic_means[{"probe": probes_faces[1][0],
                                                "face": probes_faces[1][1]}].item()
-        z1 = anode_z - diagnostic_means[{"probe": probes_faces[0][0],
-                                         "face": probes_faces[0][1]}].coords['z'].item() / 100  # converts cm to m
-        z0 = anode_z - diagnostic_means[{"probe": probes_faces[1][0],
-                                         "face": probes_faces[1][1]}].coords['z'].item() / 100  # converts cm to m
+        z1 = anode_z.to(u.m).value - diagnostic_means[{"probe": probes_faces[0][0],
+                                                       "face": probes_faces[0][1]}].coords['z'].item() / 100  # cm -> m
+        z0 = anode_z.to(u.m).value - diagnostic_means[{"probe": probes_faces[1][0],
+                                                       "face": probes_faces[1][1]}].coords['z'].item() / 100  # cm -> m
         z = 0.5 * (z1 + z0)
 
         if scale_length_mode == "linear":
@@ -392,7 +392,6 @@ def plot_parallel_inverse_scale_length(datasets, steady_state_times_runs, diagno
         plt.savefig(f"{save_directory}parallel_gradient_scale_length_plot_{diagnostic}.pdf")
     plt.show()
 
-    plt.show()
 
 def plot_grid(datasets, diagnostics_to_plot_list, steady_state_times_runs, probes_faces_midplane, probe_faces_parallel,
               operation, core_radius, x_dim, num_rows=2, plot_save_folder=""):
@@ -571,7 +570,7 @@ def plot_acceleration_vs_pressure_gradient(datasets, steady_state_times_runs, co
 
         plt.legend(loc='upper right', bbox_to_anchor=(1.0, 0.84))
         plt.xlim(left=0, right=1.05 * max_pressure_gradient)
-        plt.ylim(bot=min_acceleration - 0.2 * (max_acceleration - min_acceleration), top=0.3 * max_pressure_gradient)
+        plt.ylim(bottom=min_acceleration - 0.2 * (max_acceleration - min_acceleration), top=0.3 * max_pressure_gradient)
 
     color_bar = plt.colorbar(matplotlib.cm.ScalarMappable(norm=normalizer, cmap='plasma'), ax=plt.gca())
     color_bar.set_label(r"$\nu_{ei}$" " [Hz]\n(midplane)", rotation=0, labelpad=30)
@@ -582,6 +581,7 @@ def plot_acceleration_vs_pressure_gradient(datasets, steady_state_times_runs, co
     if plot_save_folder:
         plt.savefig(f"{plot_save_folder}parallel_acceleration_vs_parallel_pressure_gradient"
                     f"{'_with_expectation' if with_expectation else ''}.pdf")
+    plt.show()
 
 
 def get_valid_linear_dimension(diagnostics_dataset_sizes):
