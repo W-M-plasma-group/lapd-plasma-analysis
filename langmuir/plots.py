@@ -235,10 +235,8 @@ def plot_parallel_diagnostic(datasets, steady_state_times_runs, probes_faces_mid
                              save_directory=""):
     plt.rcParams['figure.figsize'] = (6.5, 3.5)
 
-    collision_frequencies = extract_collision_frequencies(datasets, core_radius, steady_state_times_runs,
-                                                          probes_faces_midplane, operation)
-    collision_frequencies_log_normalized = normalize(np.log(collision_frequencies), 0, 0.9)
-    color_map = matplotlib.colormaps["plasma"](collision_frequencies_log_normalized)
+    color_map, normalizer = get_colormap_normalizer(datasets, core_radius, steady_state_times_runs,
+                                                    probes_faces_midplane, operation=operation)
 
     diagnostic_units = ""
     max_diagnostic = 0
@@ -273,9 +271,7 @@ def plot_parallel_diagnostic(datasets, steady_state_times_runs, probes_faces_mid
                      color=color_map[i], linestyle='none')
     plt.title(f"{get_title(diagnostic)} [{get_diagnostic_keys_units()[diagnostic]}] ", y=0.9, loc='right')  # ({operation})
     plt.xlabel("z location [m]")
-    # plt.ylabel(f"[{diagnostic_units}]", rotation=0, labelpad=25)   # {get_title(diagnostic)}
-    normalizer = matplotlib.colors.LogNorm(vmin=np.min(collision_frequencies),
-                                           vmax=np.max(collision_frequencies))
+
     color_bar = plt.colorbar(matplotlib.cm.ScalarMappable(norm=normalizer, cmap='plasma'), ax=plt.gca())
     color_bar.set_label(r"$\nu_{ei}$" " [Hz]\n(midplane)", rotation=0, labelpad=30)
     plt.ylim(0, 1.05 * max_diagnostic)  # TODO hardcoded
@@ -290,10 +286,8 @@ def scatter_plot_diagnostics(datasets, diagnostics_to_plot_list, steady_state_ti
                              save_directory=""):
     plt.rcParams['figure.figsize'] = (6, 4)
 
-    collision_frequencies = extract_collision_frequencies(datasets, core_radius, steady_state_times_runs,
-                                                          probes_faces_midplane, operation)
-    collision_frequencies_log_normalized = normalize(np.log(collision_frequencies), 0, 0.9)
-    color_map = matplotlib.colormaps["plasma"](collision_frequencies_log_normalized)
+    color_map, normalizer = get_colormap_normalizer(datasets, core_radius, steady_state_times_runs,
+                                                    probes_faces_midplane, operation=operation)
 
     diagnostics_points = []
     for i in range(len(datasets)):
@@ -332,8 +326,7 @@ def scatter_plot_diagnostics(datasets, diagnostics_to_plot_list, steady_state_ti
     plt.ylabel(f"{get_title(diagnostics_to_plot_list[1])} [{get_diagnostic_keys_units()[diagnostics_to_plot_list[1]]}]")
     # plt.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left')
     plt.legend()
-    normalizer = matplotlib.colors.LogNorm(vmin=np.min(collision_frequencies),
-                                           vmax=np.max(collision_frequencies))
+
     color_bar = plt.colorbar(matplotlib.cm.ScalarMappable(norm=normalizer, cmap='plasma'), ax=plt.gca())
     color_bar.set_label(r"$\nu_{ei}$" " [Hz]\n(midplane)", rotation=0, labelpad=30)
     # plt.title("Midplane scatter plot")
@@ -347,15 +340,10 @@ def scatter_plot_diagnostics(datasets, diagnostics_to_plot_list, steady_state_ti
 def plot_parallel_inverse_scale_length(datasets, steady_state_times_runs, diagnostic, probes_faces_midplane,
                                        probes_faces_parallel, marker_styles, operation, core_radius, save_directory,
                                        scale_length_mode="linear"):
-    plt.rcParams['figure.figsize'] = 6, 3.5  # (7, 4.5)   # (8.5, 5.5)
+    plt.rcParams['figure.figsize'] = 6, 3.5
 
-    anode_z = portnum_to_z(0).to(u.m).value
-
-    # Get mean core-steady-state e-i collision frequencies for each dataset and store in list
-    collision_frequencies = extract_collision_frequencies(datasets, core_radius, steady_state_times_runs,
-                                                          probes_faces_midplane, operation)
-    collision_frequencies_log_normalized = normalize(np.log(collision_frequencies), 0, 0.9)
-    color_map = matplotlib.colormaps["plasma"](collision_frequencies_log_normalized)
+    color_map, normalizer = get_colormap_normalizer(datasets, core_radius, steady_state_times_runs,
+                                                    probes_faces_midplane, operation=operation)
 
     for i in range(len(datasets)):
         probes_faces = probes_faces_parallel[i]
@@ -393,8 +381,6 @@ def plot_parallel_inverse_scale_length(datasets, steady_state_times_runs, diagno
     plt.title(f"Parallel gradient scale length [m] \n\n{get_title(diagnostic)} ", y=0.9)  # loc='right'
     plt.xlabel("z location [m]")
 
-    normalizer = matplotlib.colors.LogNorm(vmin=np.min(collision_frequencies),
-                                           vmax=np.max(collision_frequencies))
     color_bar = plt.colorbar(matplotlib.cm.ScalarMappable(norm=normalizer, cmap='plasma'), ax=plt.gca())
     color_bar.set_label(r"$\nu_{ei}$" " [Hz]\n(midplane)", rotation=0, labelpad=30)
 
@@ -422,10 +408,8 @@ def plot_grid(datasets, diagnostics_to_plot_list, steady_state_times_runs, probe
         fig, axes = plt.subplots(num_rows, num_cols, sharex='none', sharey='row', layout="constrained")  # sharey=all
         axes_2d = np.atleast_2d(axes)
 
-        collision_frequencies = extract_collision_frequencies(datasets, core_radius, steady_state_times_runs,
-                                                              probes_faces_midplane, operation)
-        collision_frequencies_log_normalized = normalize(np.log(collision_frequencies), 0, 0.9)
-        color_map = matplotlib.colormaps["plasma"](collision_frequencies_log_normalized)
+        color_map, normalizer = get_colormap_normalizer(datasets, core_radius, steady_state_times_runs,
+                                                        probes_faces_midplane, operation=operation)
 
         indices = np.arange(num_rows * (len(datasets) // num_rows)).reshape(num_rows, -1)  # e.g. 1 2 3; 4 5 6
         for row in range(num_rows):  # row of the plot grid
@@ -495,8 +479,7 @@ def plot_grid(datasets, diagnostics_to_plot_list, steady_state_times_runs, probe
                 # ax.legend(title="z [m]")
                 ax.legend(title="Experiment")
                 ax.set_ylim(top=1.05 * max_val)
-        normalizer = matplotlib.colors.LogNorm(vmin=np.min(collision_frequencies),
-                                               vmax=np.max(collision_frequencies))
+
         color_bar = fig.colorbar(matplotlib.cm.ScalarMappable(norm=normalizer, cmap='plasma'),
                                  ax=axes_2d.ravel().tolist())
         color_bar.set_label(r"$\nu_{ei}$" " [Hz]\n(midplane)", rotation=0, labelpad=32)
@@ -551,10 +534,9 @@ def plot_acceleration_vs_pressure_gradient(datasets, steady_state_times_runs, co
                                                for i in range(len(datasets))]
 
     plt.rcParams['figure.figsize'] = (5.5, 3.5)
-    collision_frequencies = extract_collision_frequencies(datasets, core_radius, steady_state_times_runs,
-                                                          probes_faces_midplane, "mean")
-    collision_frequencies_log_normalized = normalize(np.log(collision_frequencies), 0, 0.9)
-    color_map = matplotlib.colormaps["plasma"](collision_frequencies_log_normalized)
+
+    color_map, normalizer = get_colormap_normalizer(datasets, core_radius, steady_state_times_runs,
+                                                    probes_faces_midplane, operation=operation)
 
     pressure_gradients = []
     accelerations = []
@@ -591,9 +573,6 @@ def plot_acceleration_vs_pressure_gradient(datasets, steady_state_times_runs, co
         plt.xlim(left=0, right=1.05 * max_pressure_gradient)
         plt.ylim(bot=min_acceleration - 0.2 * (max_acceleration - min_acceleration), top=0.3 * max_pressure_gradient)
 
-
-    normalizer = matplotlib.colors.LogNorm(vmin=np.min(collision_frequencies),
-                                           vmax=np.max(collision_frequencies))
     color_bar = plt.colorbar(matplotlib.cm.ScalarMappable(norm=normalizer, cmap='plasma'), ax=plt.gca())
     color_bar.set_label(r"$\nu_{ei}$" " [Hz]\n(midplane)", rotation=0, labelpad=30)
 
@@ -683,26 +662,37 @@ def get_title(diagnostic: str) -> str:
     return diagnostic
 
 
-def extract_collision_frequencies(datasets, core_radius, steady_state_times_runs, probe_face_midplane, operation):
+def get_colormap_normalizer(datasets, core_radius, steady_state_times_runs, probe_face_midplane,
+                            diagnostic='nu_ei', operation='mean', map_type='logarithmic'):
     r"""
-    Finds typical core-steady-state electron-ion collision frequencies for each dataset.
+    Returns the normalized color map and Normalizer object for a list of datasets from one diagnostic in the dataset
     :param datasets:
     :param core_radius:
     :param steady_state_times_runs:
     :param probe_face_midplane:
+    :param diagnostic:
     :param operation:
-    :return: tuple of (collision frequencies DataArray, log(collision frequencies) DataArray normalized to [0, 0.9])
+    :param map_type:
+    :return:
     """
+    if map_type != "logarithmic":
+        raise NotImplementedError("Map types other than 'logarithmic' are not currently supported.")  # TODO support
 
-    collision_frequencies = []
+    diagnostic_values = []
     for i in range(len(datasets)):
-        collision_frequencies_mean = core_steady_state(datasets[i]['nu_ei'], core_radius,
-                                                       steady_state_times_runs[i], operation,
-                                                       dims_to_keep=("probe", "face"))
-        collision_frequencies += [collision_frequencies_mean[{"probe": probe_face_midplane[i][0],
-                                                              "face": probe_face_midplane[i][1]}].mean().item()]
-    collision_frequencies = np.array(collision_frequencies)
-    return collision_frequencies
+        diagnostic_value = core_steady_state(datasets[i][diagnostic], core_radius,
+                                             steady_state_times_runs[i], operation,
+                                             dims_to_keep=("probe", "face")
+                                             )[{"probe": probe_face_midplane[i][0],
+                                                "face": probe_face_midplane[i][1]}
+                                               ].mean().item()
+        diagnostic_values += [diagnostic_value]
+    diagnostic_values = np.array(diagnostic_values)
+    diagnostic_values_map_normalized = normalize(np.log(diagnostic_values), 0, 0.9)
+
+    normalizer = matplotlib.colors.LogNorm(vmin=np.min(diagnostic_values),
+                                           vmax=np.max(diagnostic_values))
+    return matplotlib.colormaps["plasma"](diagnostic_values_map_normalized), normalizer
 
 
 def normalize(ndarray, lower=0., upper=1.):
