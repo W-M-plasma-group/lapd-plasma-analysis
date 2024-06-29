@@ -14,10 +14,6 @@ from mach.analysis import get_mach_datasets, get_velocity_datasets
 
 
 """ HDF5 file directory; end path with a slash """                      # TODO user adjust
-# hdf5_folder = "/Users/leomurphy/lapd-data/April_2018/"
-# hdf5_folder = "/Users/leomurphy/lapd-data/March_2022/"
-# hdf5_folder = "/Users/leomurphy/lapd-data/November_2022/"
-# hdf5_folder = "/Users/leomurphy/lapd-data/January_2024/January_2024_all_working/"
 hdf5_folder = "/Users/leomurphy/lapd-data/combined/"
 
 assert hdf5_folder.endswith("/")
@@ -36,10 +32,10 @@ mach_velocity_mode = "append"                                           # not fu
 """ Other user parameters """                                           # TODO user adjust
 # isweep_choice is user choice for probe or linear combination to plot; see isweep_selector in helper.py for more
 # e.g. coefficients are for [[p1f1, p1f2], [p2f1, p2f2]]
-isweep_choices = [[[1, 0], [0, 0]],     # . first combination to plot: 1 * (first face on first probe)
-                  [[0, 0], [1, 0]]]     # .second combination to plot: 1 * (first face on second probe)
-# isweep_choices = [[[1, 0], [-1, 0]]]  # .       combination to plot: 1 * (face 1 on probe 1) - 1 * (face 1 on probe 2)
-bimaxwellian = False                                                 # TODO perform both and store in same NetCDF file?
+isweep_choices = [[[1, 0], [0, 0]],     # . 1st combination to plot: 1 * (first face on first probe)
+                  [[0, 0], [1, 0]]]     # . 2nd combination to plot: 1 * (first face on second probe)
+# isweep_choices = [[[1, 0], [-1, 0]]]  # .     combination to plot: 1 * (face 1 on probe 1) - 1 * (face 1 on probe 2)
+bimaxwellian = False                                                    # TODO do both and store in same NetCDF file?
 core_radius = 21. * u.cm                                                # TODO user can adjust (26 cm in MATLAB code)
 plot_tolerance = np.nan  # 0.25                                         # TODO
 velocity_plot_unit = u.km / u.s         # TODO not yet working          # TODO adjust !
@@ -58,9 +54,9 @@ plot_save_folder = ("/Users/leomurphy/Desktop/wm/Plasma research/Research images
   |||_____'________________________|       V
   (a)    (b)                      (c)
         
-        +z direction (+ports) ==>>
-                  plasma flow ==>> 
-            magnetic field B0 <<==
+        +z direction (+ports) -->>
+                  plasma flow -->> 
+            magnetic field B0 <<--
  
  a) heated LaB6 cathode
  b) grid anode
@@ -71,6 +67,7 @@ if __name__ == "__main__":
 
     # TODO list of hardcoded parameters
     #    (16 ms, 24 ms) for January_2024 steady state period (detect_steady_state_period in diagnostics.py)
+    #    (27 ms, 33 ms) for January_2024 second steady-state period (main.py, below)
 
     print("\n===== Langmuir probe analysis =====")
     datasets, steady_state_times_runs, hdf5_paths = get_langmuir_datasets(
@@ -104,6 +101,7 @@ if __name__ == "__main__":
                                         steady_state_by_runs=steady_state_times_runs, core_rad=core_radius,
                                         tolerance=plot_tolerance, save_directory=plot_save_folder)
 
+    # Plot time profiles
     if ask_yes_or_no("Generate line plot of selected diagnostics over time? (y/n) "):
         for plot_diagnostic in diagnostics_to_plot_list:
             multiplot_linear_diagnostic(datasets, plot_diagnostic, isweep_choices, 'time',
@@ -134,7 +132,7 @@ if __name__ == "__main__":
     available_marker_styles = ('D', 'o', '^', 's')  # markers for Apr_18, Mar_22, Nov_22, Jan_24
     marker_styles_split = [available_marker_styles[get_config_id(dataset.attrs['Exp name'])] for dataset in datasets]
     for i in range(len(datasets)):
-        if datasets[i].attrs['Exp name'] == "January_2024":
+        if datasets[i].attrs['Exp name'] == "January_2024":  # Add copies of Jan24 experiments at end for 2nd steady st.
             datasets_split += [datasets[i]]
             steady_state_times_runs_split += [(27, 33) * u.ms]
             # linestyles_split += ["dotted"]

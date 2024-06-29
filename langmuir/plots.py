@@ -60,7 +60,7 @@ def multiplot_linear_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_dia
     outer_bounds = np.append(outer_indexes, len(outer_values))
 
     visualization.quantity_support()
-    plt.rcParams['figure.figsize'] = (3 + 3 * len(outer_indexes), 4.5 + 0.1 * len(diagnostics_datasets))  # TODO hardcoded
+    plt.rcParams['figure.figsize'] = (3 + 3 * len(outer_indexes), 4.5 + 0.1 * len(diagnostics_datasets))
     fig, axes = plt.subplots(1, len(outer_indexes), sharey="row", sharex="col", layout="constrained")
 
     for outer_index in range(len(outer_unique)):    # gas puff voltage index
@@ -278,7 +278,6 @@ def plot_parallel_diagnostic(datasets, steady_state_times_runs, probes_faces_mid
                                            vmax=np.max(collision_frequencies))
     color_bar = plt.colorbar(matplotlib.cm.ScalarMappable(norm=normalizer, cmap='plasma'), ax=plt.gca())
     color_bar.set_label(r"$\nu_{ei}$" " [Hz]\n(midplane)", rotation=0, labelpad=30)
-    # color_bar.set_label("Midplane electron-ion \ncollision frequency [Hz]", rotation=90, labelpad=10)
     plt.ylim(0, 1.05 * max_diagnostic)  # TODO hardcoded
     plt.tight_layout()
     if save_directory:
@@ -310,10 +309,6 @@ def scatter_plot_diagnostics(datasets, diagnostics_to_plot_list, steady_state_ti
     scatter_points = np.array(diagnostics_points)
     for i in range(len(scatter_points)):
         plt.scatter(scatter_points[i, 0], scatter_points[i, 1], marker=marker_styles[i], color=color_map[i])
-        """
-                    label=get_exp_run_string(datasets[i].attrs)
-                          + f":  {collision_frequencies[i]:.2E} Hz")
-        """
         plt.annotate(get_exp_run_string(datasets[i].attrs),
                      (scatter_points[i, 0], scatter_points[i, 1]), size="small")  # noqa
 
@@ -325,9 +320,8 @@ def scatter_plot_diagnostics(datasets, diagnostics_to_plot_list, steady_state_ti
         pressure_max = np.max(scatter_points[:, 0] * scatter_points[:, 1])
 
         x_curve = np.linspace(x_min, x_max, 100)
-        # pressures_pa = np.linspace(np.sqrt(pressure_min), np.sqrt(pressure_max), 8)[1:-1] ** 2
         pressures_pa = np.arange(1, 5)  # TODO very hardcoded
-        pa_to_ev_m3 = (1 * u.Pa).to(u.eV * u.m ** -3).value * 1 ** -1  # formerly * (3 / 2) ** (-1)
+        pa_to_ev_m3 = (1 * u.Pa).to(u.eV * u.m ** -3).value * 1 ** -1
         for pressure in pressures_pa:
             plt.plot(x_curve, pa_to_ev_m3 * pressure / x_curve, color='#bbbbbb', label=f"{pressure} Pa")
         plt.ylim(0, 1.1 * y_max)
@@ -403,7 +397,6 @@ def plot_parallel_inverse_scale_length(datasets, steady_state_times_runs, diagno
                                            vmax=np.max(collision_frequencies))
     color_bar = plt.colorbar(matplotlib.cm.ScalarMappable(norm=normalizer, cmap='plasma'), ax=plt.gca())
     color_bar.set_label(r"$\nu_{ei}$" " [Hz]\n(midplane)", rotation=0, labelpad=30)
-    # color_bar.set_label("Midplane electron-ion \ncollision frequency [Hz]", rotation=90, labelpad=10)
 
     # plt.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left')
     plt.tight_layout()
@@ -415,23 +408,17 @@ def plot_parallel_inverse_scale_length(datasets, steady_state_times_runs, diagno
 
     plt.show()
 
+def plot_grid(datasets, diagnostics_to_plot_list, steady_state_times_runs, probes_faces_midplane, probe_faces_parallel,
+              operation, core_radius, x_dim, num_rows=2, plot_save_folder=""):
 
-def plot_grid(datasets, diagnostics_to_plot_list, steady_state_times_runs, probes_faces_midplane,
-              probes_faces_parallel, operation, core_radius, x_dim, num_rows=2, plot_save_folder=""):
-    # Split into top plot row and bottom plot row
     num_cols = (len(datasets) - 1) // num_rows + 1
     tolerance = 0.5  # TODO note; set very high to only discard points with nan error bars
     port_marker_styles = {20: 'x', 27: '.', 29: '.', 35: '^', 43: '^'}
     save_directory = plot_save_folder
     x_dims = ['x', 'y', 'time']
     for plot_diagnostic in diagnostics_to_plot_list:
-        """ plot_ab(datasets_split, steady_state_times_runs_split, plot_diagnostic, probes_faces_midplane_split,
-                probes_faces_parallel_split, port_marker_styles, "mean", core_radius)
-            def plot_ab(datasets, steady_state_times_runs, plot_diagnostic,
-                    probes_faces_midplane, probes_faces_parallel,
-                    port_marker_styles, operation, core_radius): """
 
-        plt.rcParams['figure.figsize'] = (1 + 3 * num_cols, 3 * num_rows)  # TODO hardcoded
+        plt.rcParams['figure.figsize'] = (1 + 3 * num_cols, 3 * num_rows)
         fig, axes = plt.subplots(num_rows, num_cols, sharex='none', sharey='row', layout="constrained")  # sharey=all
         axes_2d = np.atleast_2d(axes)
 
@@ -502,10 +489,7 @@ def plot_grid(datasets, diagnostics_to_plot_list, steady_state_times_runs, probe
                     ax.set_xlabel(f"{x_dim} [{da_mean.coords[x_dim].attrs['units']}]")
                     ax.set_ylabel(da_mean.attrs['units'])
 
-                # ax.set_ylim(0, [30, 20][index])  # TODO extremely hardcoded
                 ax.set_ylim(bottom=0)
-                """ax.title.set_text(get_exp_run_string(dataset.attrs)
-                                  + ", run_name " + dataset.attrs['Run name'][:2])"""
 
                 # ax.legend(title=f"\n{attributes[0]} (probe face)", loc="upper center", bbox_to_anchor=(0.5, -0.15), ncol=1)
                 # ax.legend(title="z [m]")
