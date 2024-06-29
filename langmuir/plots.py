@@ -13,6 +13,8 @@ def multiplot_linear_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_dia
                                 steady_state_by_runs=None, core_rad=None, attribute=None, tolerance=np.nan,
                                 save_directory=""):
     r"""
+    Plot multiple profiles (x, y, or time) from different datasets on a row of side-by-side plots.
+    Plots are grouped by gas puff voltage and cathode discharge current.
 
     :param diagnostics_datasets: list of xarray Datasets
     :param plot_diagnostic: string identifying label of desired diagnostics
