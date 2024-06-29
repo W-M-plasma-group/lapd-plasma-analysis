@@ -108,23 +108,6 @@ if __name__ == "__main__":
                                         steady_state_by_runs=steady_state_times_runs, core_rad=core_radius,
                                         save_directory=plot_save_folder)
 
-    # Create indices for preserving order in which datasets were entered
-    # original order of datasets as entered by user
-    datasets_unsorted = datasets.copy()
-    steady_state_times_runs_unsorted = steady_state_times_runs.copy()
-
-    # Calculate list of indices that sort datasets array
-    sort_run_indices = np.array(sorted(np.arange(len(datasets)), key=lambda i: datasets[i].attrs['Run name']))
-    sort_exp_indices = np.array(sorted(np.arange(len(datasets)), key=lambda i: datasets[sort_run_indices[i]
-                                                                                        ].attrs['Exp name']))
-    sort_indices = sort_run_indices[sort_exp_indices]
-    unsort_indices = np.argsort(sort_indices)
-    del sort_run_indices, sort_exp_indices
-
-    # sort by lexicographical order of experiment series name and run name
-    datasets = [datasets[i] for i in sort_indices]
-    steady_state_times_runs = [steady_state_times_runs[i] for i in sort_indices]
-
     # Split two steady state periods for jan_2024 data: (16, 24) and (27, 33) and plot with dotted
     datasets_split = datasets.copy()
     steady_state_times_runs_split = steady_state_times_runs.copy()
@@ -166,12 +149,10 @@ if __name__ == "__main__":
                                                scale_length_mode="exponential")  # 'linear' or 'exponential'
 
     if ask_yes_or_no("Generate grid line plots for selected diagnostics? (y/n) "):
-        time_unit = unit_safe(steady_state_times_runs_split[0])
-        probes_faces_midplane_unsorted = np.array(probes_faces_midplane_split)[unsort_indices]
-        probes_faces_parallel_unsorted = np.array(probes_faces_parallel_split)[unsort_indices]
+        time_unit = unit_safe(steady_state_times_runs[0])
         for x_dim in ("x", "time"):
-            plot_grid(datasets_unsorted, diagnostics_to_plot_list, steady_state_times_runs_unsorted,
-                      probes_faces_midplane_unsorted, probes_faces_parallel_unsorted, "mean", core_radius, x_dim,
+            plot_grid(datasets, diagnostics_to_plot_list, steady_state_times_runs,
+                      probes_faces_midplane, probes_faces_parallel, "mean", core_radius, x_dim,
                       num_rows=1, plot_save_folder=plot_save_folder)
 
     # (UNFINISHED) Shot plot: multiplot line diagnostics at specific time, with x-axis = x pos and curve color = shot #
