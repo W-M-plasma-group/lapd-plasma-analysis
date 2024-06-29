@@ -238,7 +238,6 @@ def plot_parallel_diagnostic(datasets, steady_state_times_runs, probes_faces_mid
     color_map, normalizer = get_colormap_normalizer(datasets, core_radius, steady_state_times_runs,
                                                     probes_faces_midplane, operation=operation)
 
-    diagnostic_units = ""
     max_diagnostic = 0
     for i in range(len(datasets)):
         diagnostic_values = []
@@ -291,14 +290,14 @@ def scatter_plot_diagnostics(datasets, diagnostics_to_plot_list, steady_state_ti
 
     diagnostics_points = []
     for i in range(len(datasets)):
-        diagnostics_point = []
+        diagnostics_ordered_pair = []
         for plot_diagnostic in diagnostics_to_plot_list[:2]:
-            diagnostic_mean = core_steady_state(
-                datasets[i][plot_diagnostic], core_radius, steady_state_times_runs[i], operation,
-                dims_to_keep=("probe", "face"))
-            diagnostics_point += [diagnostic_mean[{"probe": probes_faces_midplane[i][0],
-                                                   "face": probes_faces_midplane[i][1]}].item()]
-        diagnostics_points += [diagnostics_point]
+            diagnostic_value = core_steady_state(datasets[i][plot_diagnostic], core_radius, steady_state_times_runs[i],
+                                                 operation, dims_to_keep=("probe", "face")
+                                                 )[{"probe": probes_faces_midplane[i][0],
+                                                   "face": probes_faces_midplane[i][1]}].item()
+            diagnostics_ordered_pair += [diagnostic_value]
+        diagnostics_points += [diagnostics_ordered_pair]
 
     scatter_points = np.array(diagnostics_points)
     for i in range(len(scatter_points)):
@@ -376,9 +375,8 @@ def plot_parallel_inverse_scale_length(datasets, steady_state_times_runs, diagno
         diagnostic_scale_length_abs = 1 / np.abs(diagnostic_inverse_scale_length)
 
         plt.plot(z, diagnostic_scale_length_abs, marker=marker_styles[i], color=color_map[i],
-                 label=(get_exp_run_string(datasets[i].attrs)
-                        + f":  {collision_frequencies[i]:.2E} Hz"))
-    plt.title(f"Parallel gradient scale length [m] \n\n{get_title(diagnostic)} ", y=0.9)  # loc='right'
+                 label=get_exp_run_string(datasets[i].attrs))
+    plt.title(f"Parallel gradient scale length [m] \n\n{get_title(diagnostic)} ", y=0.88)
     plt.xlabel("z location [m]")
 
     color_bar = plt.colorbar(matplotlib.cm.ScalarMappable(norm=normalizer, cmap='plasma'), ax=plt.gca())
