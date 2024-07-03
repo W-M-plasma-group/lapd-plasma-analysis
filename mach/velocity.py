@@ -77,10 +77,9 @@ def get_mach_numbers(mach_isat_da: xr.DataArray):
         mach_correction_fore = magnetization_factor * np.log(mach_isat_da.sel(face=3) / mach_isat_da.sel(face=6))
         mach_correction_aft = magnetization_factor * np.log(mach_isat_da.sel(face=1) / mach_isat_da.sel(face=4))
 
-        perpendicular_mach_fore = (parallel_mach - mach_correction_fore) * np.cos(angle_fore)
-        perpendicular_mach_aft = (parallel_mach - mach_correction_aft) * np.cos(angle_aft)
-        perpendicular_mach = xr.concat([perpendicular_mach_fore, perpendicular_mach_aft], 'location').mean('location')
-        # print(" * Perpendicular Mach number found ")
+        perpendicular_mach_fore = (parallel_mach - mach_correction_fore) * np.tan(angle_fore)
+        perpendicular_mach_aft = (parallel_mach - mach_correction_aft) * np.tan(angle_aft)
+        perpendicular_mach = (perpendicular_mach_fore + perpendicular_mach_aft) / 2
 
         mach_ds = mach_ds.assign({"M_perp":      perpendicular_mach,            # Perpendicular Mach number
                                   "M_perp_fore": perpendicular_mach_fore,       # Perpendicular fore Mach number
