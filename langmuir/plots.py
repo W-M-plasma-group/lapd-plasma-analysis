@@ -456,7 +456,7 @@ def plot_grid(datasets, diagnostics_to_plot_list, steady_state_times_runs, probe
                     if np.isfinite(da_mean).any():
                         # probe_face_eq_str = probe_face_choice_to_eq_string(probe_face_choices[i], ports, faces)
                         port = ds.coords['port'].item()
-                        z_real = anode_z.to(u.m).value - ds.coords['z'].item() / 100
+                        # z_real = anode_z.to(u.m).value - ds.coords['z'].item() / 100
                         marker_style = port_marker_styles[port]
 
                         # da_mean[~(linear_da_error < tolerance * da_median)] = np.nan  # TODO hardcoded! document!
