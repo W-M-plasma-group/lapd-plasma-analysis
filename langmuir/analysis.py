@@ -12,8 +12,9 @@ from langmuir.interferometry import interferometry_calibration
 from langmuir.plots import get_title
 
 
-def get_langmuir_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder, interferometry_mode, isweep_choices,
-                          core_radius, bimaxwellian, plot_save_directory) -> (list[xr.Dataset], list[tuple], dict, list[np.ndarray]):
+def get_langmuir_datasets(langmuir_nc_folder: str, hdf5_folder: str, interferometry_folder: str,
+                          interferometry_mode, isweep_choices, core_radius: u.Quantity, bimaxwellian: bool,
+                          plot_save_directory: str) -> (list[xr.Dataset], list[tuple], dict, list[np.ndarray]):
 
     # Create folder to save NetCDF files if not yet existing
     netcdf_folder = ensure_directory(langmuir_nc_folder)

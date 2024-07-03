@@ -142,8 +142,8 @@ def multiplot_linear_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_dia
     plt.show()
 
 
-def plot_linear_diagnostic(diagnostics_dataset: xr.Dataset, probe_face_coefficients, diagnostic, plot_type, steady_state,
-                           shot_mode="mean", save_directory="", tolerance=np.nan):
+def plot_linear_diagnostic(diagnostics_dataset: xr.Dataset, probe_face_coefficients, diagnostic: str, plot_type: str,
+                           steady_state, shot_mode="mean", save_directory="", tolerance=np.nan):
     # Plots the given diagnostic(s) from the dataset in the given style
 
     linear_ds_s = []
