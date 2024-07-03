@@ -77,31 +77,20 @@ def get_nominal_gas_puff_3(file):
 
 
 def get_nominal_discharge_12(file):
-    # TODO convert to regex
-    description = str(file.info['run description'])
-
-    dis_ind = description.index("Idis")
-    start_ind = description[dis_ind:].index(next(filter(str.isnumeric, description[dis_ind:]))) + dis_ind
-    end_ind = description[start_ind:].index(next(filter(lambda c: c in ("A", "k", " ", ","), description[start_ind:]))
-                                            ) + start_ind
-    return {"Nominal discharge": float(description[start_ind:end_ind]) * u.A}
+    description = file.info['run description'].lower()
+    current_phrase = re.search("(?<=idis=)[0-9]{4}", description).group(0)  # e.g. search for "7400" right after "Idis="
+    return {"Nominal discharge": float(current_phrase) * u.A}
 
 
 def get_nominal_gas_puff_12(file):
-    # TODO convert to regex
-    description = str(file.info['run description']).lower()
-
-    puff_ind = description.index("puffing")
-    start_ind = description[puff_ind:].index(next(filter(str.isnumeric, description[puff_ind:]))) + puff_ind
-    end_ind = description[start_ind:].index(next(filter(lambda c: c in ("v", " ", ","), description[start_ind:]))
-                                            ) + start_ind
-
-    return {"Nominal gas puff": float(description[start_ind:end_ind]) * u.V}
+    description = file.info['run description'].lower()
+    voltage_phrase = re.search(".*puffing([^0-9]*)([0-9.]*)(?= ?v)", description).group(2)  # eg. "105." after "puffing"
+    return {"Nominal gas puff": float(voltage_phrase) * u.V}
 
 
 def get_nominal_discharge_03(hdf5_file):
     run_name = hdf5_file.info['run name']
-    current_phrase = re.search("[0-9]+k?A", run_name).group(0)  # search for "3500kA" or "5kA", for example
+    current_phrase = re.search("[0-9]+k?A", run_name).group(0)  # search for "3500A" or "5kA", for example
     if "k" in current_phrase:
         current_digit = re.search("[0-9]+", current_phrase).group(0)
         nominal_discharge = float(current_digit) * 1000
