@@ -15,6 +15,7 @@ from mach.analysis import get_mach_datasets, get_velocity_datasets
 
 """ HDF5 file directory; end path with a slash """                      # TODO user adjust
 hdf5_folder = "/Users/leomurphy/lapd-data/combined/"
+# hdf5_folder = "/Users/leomurphy/lapd-data/April_2018/"
 
 assert hdf5_folder.endswith("/")
 """ Langmuir & Mach NetCDF directories; end path with a slash """       # TODO user adjust

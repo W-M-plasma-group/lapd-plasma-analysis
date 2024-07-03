@@ -43,7 +43,7 @@ def get_run_name(file):
 
 
 def get_exp_name(file):
-    return{"Exp name": file.info['exp name']}
+    return {"Exp name": file.info['exp name']}
 
 
 def get_discharge(file):
@@ -70,10 +70,10 @@ def get_nominal_magnetic_field(file):
 
 def get_nominal_gas_puff_3(file):
     run_name = file.info['run name']
-    current_phrase = re.search("[0-9]+V", run_name).group(0)  # search for "95V", for example
-    nominal_gas_puff = float(re.search("[0-9]+", current_phrase).group(0))
+    voltage_phrase = re.search("[0-9]+V", run_name).group(0)  # search for "95V", for example
+    nominal_gas_puff_voltage = float(re.search("[0-9]+", voltage_phrase).group(0))
 
-    return {"Nominal gas puff": np.round(nominal_gas_puff, 0) * u.V}
+    return {"Nominal gas puff": np.round(nominal_gas_puff_voltage, 0) * u.V}
 
 
 def get_nominal_discharge_12(file):
