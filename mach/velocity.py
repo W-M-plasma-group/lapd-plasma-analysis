@@ -9,7 +9,35 @@ from plasmapy.particles import particle_mass
 def get_mach_numbers(mach_isat_da: xr.DataArray):
     r"""
     Returns Dataset of Mach numbers at each position and time increment.
-    Dimensions are (probe, face, x, y, shot, Mach time (e.g. 243172 time coordinates!))
+    Dimensions are (probe, face, x, y, shot, time).
+    Note that Mach probes have much higher time resolution than the Langmuir measurement frequency.
+
+    Mathematics
+    ----------
+
+    By C. Perks and by "Mach probes" (Chung 2012), the parallel Mach number :math:`M_z` is given by
+
+    .. math::
+        M_z = M_c \ln(R_1)
+    where :math:`M_c` is a magnetization factor :math:`= 1/K` in Chung 2012,
+    and :math:`R_1` is the ratio of upstream ion saturation current to downstream ion saturation current.
+
+    By the same sources, using a Gundestrup probe that measures the ion saturation current in multiple directions,
+    the perpendicular Mach number :math:`M_\perp` may be calculated as
+
+    .. math::
+        M_\perp = M_c \ln(R_1 / R_2) / \cot(\alpha) \\
+
+        \ \ \ \ \ \ = (M_c \ln(R_1)  - M_c \ln(R_2)) \cdot \tan(\alpha)
+
+        \ \ \ \ \ \ = (M_z - M_c \ln(R_2)) \cdot \tan(\alpha)
+    where :math:`R_2` is the ratio of more-upstream ion saturation current to more-downstream ion saturation current
+    for probe faces lying along an axis at an angle :math:`\alpha` from perpendicular to the flow;
+    for example, :math:`\alpha = \pi/2` for a perfect upstream-downstream probe face alignment.
+    This model is valid when :math:`\pi/6 < \alpha < 5 \pi/6`.
+
+    In this function, the perpendicular Mach number is found as the average of two estimates for :math:`M_\perp`
+    based on probe face axis alignment offsets of :math:`\pi/4` and :math:`3\pi/4` from horizontal.
 
     Parameters
     ----------
@@ -82,10 +110,25 @@ def get_velocity(mach_ds: xr.Dataset, electron_temperature_da: xr.DataArray, ion
     Returns Dataset of flow velocity at each position and time.
     Dimensions are (probe, face, x, y, shot, time (matching Langmuir plateaus))
 
+    Mathematics
+    ----------
+    From MATLAB code by C. Perks:
+    "Note that :math:`M=v/C_s` where :math:`C_s = \sqrt{(T_e+T_i)/M_i}`, but we will assume that :math:`T_i \sim 1` eV".
+    A supporting 1 eV estimate for LAPD ion temperature was found on the LAPD BAPSF website.
+
+    Parameters
+    ----------
     :param mach_ds:
     :param electron_temperature_da:
     :param ion_type:
     :return:
+    """
+
+    """
+    Electron temperature DataArray will have dimensions
+        probe               (additional coordinates: port, z),
+        face, x, y, shot,
+        time                (additional coordinates: plateau (1-based))
     """
 
     ion_mass = particle_mass(ion_type)
@@ -94,7 +137,6 @@ def get_velocity(mach_ds: xr.Dataset, electron_temperature_da: xr.DataArray, ion
 
     sound_speed = np.sqrt((electron_temperature_da + ion_adiabatic_index * ion_temperature.to(u.eV).value) / ion_mass)  # .sortby("probe")
     sound_speed *= np.sqrt(1 * u.eV / u.kg).to(velocity_unit).value  # convert speed from sqrt(eV/kg) to [velocity unit]
-    # MATLAB note: "Note that M=v/C_s where C_s = sqrt((T_e+T_i)/M_i), but we will assume that T_i~1ev"
 
     crunched_mach_ds = crunch_data(mach_ds, "time", sound_speed.coords['time'])
     crunched_mach_ds.coords['time'] = sound_speed.coords['time']  # Ensure time has units in new dataset
