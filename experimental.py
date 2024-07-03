@@ -14,7 +14,7 @@ def get_exp_params(hdf5_path):
                             get_discharge,
                             get_gas_pressure,
                             get_magnetic_field]
-    # recall: 0 = April_2018, 1 = March_2022, 2 = November_2022, 3 = January_2024
+    # From configurations.py: 0 = April_2018, 1 = March_2022, 2 = November_2022, 3 = January_2024
     exp_params_functions_0 = [get_nominal_discharge_03,
                               get_nominal_pressure_0]
     exp_params_functions_12 = [get_nominal_discharge_12,
@@ -100,7 +100,6 @@ def get_nominal_gas_puff_12(file):
 
 
 def get_nominal_discharge_03(hdf5_file):
-    # uh oh, regular expressions here
     run_name = hdf5_file.info['run name']
     current_phrase = re.search("[0-9]+k?A", run_name).group(0)  # search for "3500kA" or "5kA", for example
     if "k" in current_phrase:
@@ -113,7 +112,6 @@ def get_nominal_discharge_03(hdf5_file):
 
 
 def get_nominal_pressure_0(hdf5_file):
-
     run_name = hdf5_file.info['run name']
     pressure_phrase = re.search("[0-9]+(?=press)", run_name).group(0)
     nominal_pressure = float(pressure_phrase) * 1E-6

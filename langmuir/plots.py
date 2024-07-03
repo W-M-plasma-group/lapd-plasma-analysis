@@ -268,7 +268,7 @@ def plot_parallel_diagnostic(datasets, steady_state_times_runs, probes_faces_mid
 
         plt.errorbar(zs, diagnostic_values, yerr=diagnostic_errors, marker=marker_styles[i],
                      color=color_map[i], linestyle='none')
-    plt.title(f"{get_title(diagnostic)} [{get_diagnostic_keys_units()[diagnostic]}] ", y=0.9, loc='right')  # ({operation})
+    plt.title(f"{get_title(diagnostic)} [{get_diagnostic_keys_units()[diagnostic]}] ", y=0.9, loc='right')
     plt.xlabel("z location [m]")
 
     color_bar = plt.colorbar(matplotlib.cm.ScalarMappable(norm=normalizer, cmap='plasma'), ax=plt.gca())
@@ -710,7 +710,8 @@ def probe_face_choice_to_eq_string(probe_face_coefficient, ports, faces):
 
 def get_exp_run_string(attrs, mode="long"):
     if mode == "short":
-        series_number = ("April_2018", "March_2022", "November_2022", "January_2024").index(attrs['Exp name']) # TODO hc
+        # TODO hardcoded
+        series_number = ("April_2018", "March_2022", "November_2022", "January_2024").index(attrs['Exp name'])
         return f"{series_number}-{attrs['Run name'][:2]}"
     else:
         return f"{attrs['Exp name'][:3]} {attrs['Exp name'][-2:]} #{attrs['Run name'][:2]}"

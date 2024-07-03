@@ -105,6 +105,5 @@ def print_mach_file_choices(hdf5_folder, mach_nc_folder, mach_mode, isweep_choic
 
     print("Current HDF5 directory path:           \t", repr(hdf5_folder),
           "\nCurrent Mach NetCDF directory path:  \t", repr(mach_nc_folder),
-          # "\nLinear combinations of isweep sources:   \t", repr(isweep_choices),
           "\nThese can be changed in main.py.")
     input("Enter any key to continue: ")

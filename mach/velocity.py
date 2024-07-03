@@ -59,34 +59,18 @@ def get_mach_numbers(mach_isat_da: xr.DataArray):
 
     """  # noqa
 
-    """diagnostics_ds = xr.Dataset({key: xr.DataArray(data=templates[key],
-                                                   dims=['probe', 'face', 'x', 'y', 'shot', 'time'],
-                                                   coords=(('probe', np.arange(num_probe)),
-                                                           ('face', faces),
-                                                           ('x', x, {"units": str(u.cm)}),
-                                                           ('y', y, {"units": str(u.cm)}),
-                                                           ('shot', np.arange(num_shots)),
-                                                           ('time', ramp_times.to(u.ms).value, {"units": str(u.ms)}))
-                                                   ).assign_coords({'plateau': ('time', np.arange(num_plateaus) + 1),
-                                                                    'port': ('probe', ports),
-                                                                    'z':    ('probe', port_zs, {"units": str(u.cm)})}
-                                                                   ).assign_attrs({"units": keys_units[key]})
-                                 for key in keys_units.keys()})"""
-
-    """CONSTANTS AND DESCRIPTIONS ARE TAKEN FROM MATLAB CODE WRITTEN BY CONOR PERKS"""
-    # Mach probe calculation constants
-    magnetization_factor = 0.5  # Mag. factor value from Hutchinson's derivation incorporating diamagnetic drift
-    angle_fore = np.pi / 4 * u.rad  # [rad] Angle the face in fore direction makes with B-field
-    angle_aft = np.pi / 4 * u.rad  # [rad] Angle the face in aft direction makes with B-field
+    """ CONSTANTS AND DESCRIPTIONS ARE TAKEN FROM MATLAB CODE WRITTEN BY CONOR PERKS
+        Additional information can be found in, among other sources, 'Mach probes' (Chung 2012) """
+    magnetization_factor = 0.5          # Mag. factor value from Hutchinson's derivation incorporating diamagnetic drift
+    angle_fore = np.pi / 4 * u.rad      # [rad] Angle the face plane in fore direction makes with B-field (pi/2 head-on)
+    angle_aft = np.pi / 4 * u.rad       # [rad] Angle the face plane in aft direction makes with B-field (pi/2 head-on)
 
     print("Calculating Mach numbers...")
 
     """Parallel Mach number"""
     parallel_mach = magnetization_factor * np.log(
         mach_isat_da.sel(face=2) / mach_isat_da.sel(face=5))  # .sortby("probe")
-    # print(" * Parallel Mach number found ")
-
-    mach_ds = xr.Dataset({"M_para": parallel_mach})  # "Parallel Mach number"
+    mach_ds = xr.Dataset({"M_para": parallel_mach})                             # Parallel Mach number
 
     """Perpendicular Mach number"""
     if np.isin(np.array([1, 3, 4, 6]), mach_isat_da.face).all():
@@ -98,9 +82,9 @@ def get_mach_numbers(mach_isat_da: xr.DataArray):
         perpendicular_mach = xr.concat([perpendicular_mach_fore, perpendicular_mach_aft], 'location').mean('location')
         # print(" * Perpendicular Mach number found ")
 
-        mach_ds = mach_ds.assign({"M_perp":      perpendicular_mach,            # "Perpendicular Mach number"
-                                  "M_perp_fore": perpendicular_mach_fore,       # "Perpendicular fore Mach number"
-                                  "M_perp_aft":  perpendicular_mach_aft})       # "Perpendicular aft Mach number"
+        mach_ds = mach_ds.assign({"M_perp":      perpendicular_mach,            # Perpendicular Mach number
+                                  "M_perp_fore": perpendicular_mach_fore,       # Perpendicular fore Mach number
+                                  "M_perp_aft":  perpendicular_mach_aft})       # Perpendicular aft Mach number
 
     return mach_ds
 
@@ -145,15 +129,15 @@ def get_velocity(mach_ds: xr.Dataset, electron_temperature_da: xr.DataArray, ion
         sound_speed.swap_dims({"probe": "port"}), method="nearest", tolerance=3
     ).swap_dims({"port": "probe"})
 
-    # print(" * Generating parallel velocity profiles...")
-    parallel_velocity = crunched_mach_ds['M_para'] * sound_speed            # "Parallel Mach number"
+    # Parallel velocity
+    parallel_velocity = crunched_mach_ds['M_para'] * sound_speed
     parallel_velocity.attrs['units'] = str(velocity_unit)
-    velocity = xr.Dataset({"v_para": parallel_velocity})                    # "Parallel velocity"
+    velocity = xr.Dataset({"v_para": parallel_velocity})
 
-    if "M_perp" in crunched_mach_ds:                                        # "Perpendicular Mach number"
-        # print(" * Generating perpendicular velocity profiles...")
-        perpendicular_velocity = crunched_mach_ds['M_perp'] * sound_speed   # "Perpendicular Mach number"
+    # Perpendicular velocity
+    if "M_perp" in crunched_mach_ds:
+        perpendicular_velocity = crunched_mach_ds['M_perp'] * sound_speed
         perpendicular_velocity.attrs['units'] = str(velocity_unit)
-        velocity = velocity.assign({"v_perp": perpendicular_velocity})      # Perpendicular velocity
+        velocity = velocity.assign({"v_perp": perpendicular_velocity})
 
     return velocity
