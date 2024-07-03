@@ -13,6 +13,8 @@ def multiplot_linear_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_dia
                                 steady_state_by_runs=None, core_rad=None, attribute=None, tolerance=np.nan,
                                 save_directory=""):
     r"""
+    Plot multiple profiles (x, y, or time) from different datasets on a row of side-by-side plots.
+    Plots are grouped by gas puff voltage and cathode discharge current.
 
     :param diagnostics_datasets: list of xarray Datasets
     :param plot_diagnostic: string identifying label of desired diagnostics
@@ -58,7 +60,7 @@ def multiplot_linear_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_dia
     outer_bounds = np.append(outer_indexes, len(outer_values))
 
     visualization.quantity_support()
-    plt.rcParams['figure.figsize'] = (3 + 3 * len(outer_indexes), 4.5 + 0.1 * len(diagnostics_datasets))  # TODO hardcoded
+    plt.rcParams['figure.figsize'] = (3 + 3 * len(outer_indexes), 4.5 + 0.1 * len(diagnostics_datasets))
     fig, axes = plt.subplots(1, len(outer_indexes), sharey="row", sharex="col", layout="constrained")
 
     for outer_index in range(len(outer_unique)):    # gas puff voltage index
@@ -140,8 +142,8 @@ def multiplot_linear_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_dia
     plt.show()
 
 
-def plot_linear_diagnostic(diagnostics_dataset: xr.Dataset, probe_face_coefficients, diagnostic, plot_type, steady_state,
-                           shot_mode="mean", save_directory="", tolerance=np.nan):
+def plot_linear_diagnostic(diagnostics_dataset: xr.Dataset, probe_face_coefficients, diagnostic: str, plot_type: str,
+                           steady_state, shot_mode="mean", save_directory="", tolerance=np.nan):
     # Plots the given diagnostic(s) from the dataset in the given style
 
     linear_ds_s = []
@@ -233,12 +235,9 @@ def plot_parallel_diagnostic(datasets, steady_state_times_runs, probes_faces_mid
                              save_directory=""):
     plt.rcParams['figure.figsize'] = (6.5, 3.5)
 
-    collision_frequencies = extract_collision_frequencies(datasets, core_radius, steady_state_times_runs,
-                                                          probes_faces_midplane, operation)
-    collision_frequencies_log_normalized = normalize(np.log(collision_frequencies), 0, 0.9)
-    color_map = matplotlib.colormaps["plasma"](collision_frequencies_log_normalized)
+    color_map, normalizer = get_colormap_normalizer(datasets, core_radius, steady_state_times_runs,
+                                                    probes_faces_midplane, operation=operation)
 
-    diagnostic_units = ""
     max_diagnostic = 0
     for i in range(len(datasets)):
         diagnostic_values = []
@@ -269,14 +268,11 @@ def plot_parallel_diagnostic(datasets, steady_state_times_runs, probes_faces_mid
 
         plt.errorbar(zs, diagnostic_values, yerr=diagnostic_errors, marker=marker_styles[i],
                      color=color_map[i], linestyle='none')
-    plt.title(f"{get_title(diagnostic)} [{get_diagnostic_keys_units()[diagnostic]}] ", y=0.9, loc='right')  # ({operation})
+    plt.title(f"{get_title(diagnostic)} [{get_diagnostic_keys_units()[diagnostic]}] ", y=0.9, loc='right')
     plt.xlabel("z location [m]")
-    # plt.ylabel(f"[{diagnostic_units}]", rotation=0, labelpad=25)   # {get_title(diagnostic)}
-    normalizer = matplotlib.colors.LogNorm(vmin=np.min(collision_frequencies),
-                                           vmax=np.max(collision_frequencies))
+
     color_bar = plt.colorbar(matplotlib.cm.ScalarMappable(norm=normalizer, cmap='plasma'), ax=plt.gca())
     color_bar.set_label(r"$\nu_{ei}$" " [Hz]\n(midplane)", rotation=0, labelpad=30)
-    # color_bar.set_label("Midplane electron-ion \ncollision frequency [Hz]", rotation=90, labelpad=10)
     plt.ylim(0, 1.05 * max_diagnostic)  # TODO hardcoded
     plt.tight_layout()
     if save_directory:
@@ -289,29 +285,23 @@ def scatter_plot_diagnostics(datasets, diagnostics_to_plot_list, steady_state_ti
                              save_directory=""):
     plt.rcParams['figure.figsize'] = (6, 4)
 
-    collision_frequencies = extract_collision_frequencies(datasets, core_radius, steady_state_times_runs,
-                                                          probes_faces_midplane, operation)
-    collision_frequencies_log_normalized = normalize(np.log(collision_frequencies), 0, 0.9)
-    color_map = matplotlib.colormaps["plasma"](collision_frequencies_log_normalized)
+    color_map, normalizer = get_colormap_normalizer(datasets, core_radius, steady_state_times_runs,
+                                                    probes_faces_midplane, operation=operation)
 
     diagnostics_points = []
     for i in range(len(datasets)):
-        diagnostics_point = []
+        diagnostics_ordered_pair = []
         for plot_diagnostic in diagnostics_to_plot_list[:2]:
-            diagnostic_mean = core_steady_state(
-                datasets[i][plot_diagnostic], core_radius, steady_state_times_runs[i], operation,
-                dims_to_keep=("probe", "face"))
-            diagnostics_point += [diagnostic_mean[{"probe": probes_faces_midplane[i][0],
-                                                   "face": probes_faces_midplane[i][1]}].item()]
-        diagnostics_points += [diagnostics_point]
+            diagnostic_value = core_steady_state(datasets[i][plot_diagnostic], core_radius, steady_state_times_runs[i],
+                                                 operation, dims_to_keep=("probe", "face")
+                                                 )[{"probe": probes_faces_midplane[i][0],
+                                                   "face": probes_faces_midplane[i][1]}].item()
+            diagnostics_ordered_pair += [diagnostic_value]
+        diagnostics_points += [diagnostics_ordered_pair]
 
     scatter_points = np.array(diagnostics_points)
     for i in range(len(scatter_points)):
         plt.scatter(scatter_points[i, 0], scatter_points[i, 1], marker=marker_styles[i], color=color_map[i])
-        """
-                    label=get_exp_run_string(datasets[i].attrs)
-                          + f":  {collision_frequencies[i]:.2E} Hz")
-        """
         plt.annotate(get_exp_run_string(datasets[i].attrs),
                      (scatter_points[i, 0], scatter_points[i, 1]), size="small")  # noqa
 
@@ -323,9 +313,8 @@ def scatter_plot_diagnostics(datasets, diagnostics_to_plot_list, steady_state_ti
         pressure_max = np.max(scatter_points[:, 0] * scatter_points[:, 1])
 
         x_curve = np.linspace(x_min, x_max, 100)
-        # pressures_pa = np.linspace(np.sqrt(pressure_min), np.sqrt(pressure_max), 8)[1:-1] ** 2
         pressures_pa = np.arange(1, 5)  # TODO very hardcoded
-        pa_to_ev_m3 = (1 * u.Pa).to(u.eV * u.m ** -3).value * 1 ** -1  # formerly * (3 / 2) ** (-1)
+        pa_to_ev_m3 = (1 * u.Pa).to(u.eV * u.m ** -3).value * 1 ** -1
         for pressure in pressures_pa:
             plt.plot(x_curve, pa_to_ev_m3 * pressure / x_curve, color='#bbbbbb', label=f"{pressure} Pa")
         plt.ylim(0, 1.1 * y_max)
@@ -336,8 +325,7 @@ def scatter_plot_diagnostics(datasets, diagnostics_to_plot_list, steady_state_ti
     plt.ylabel(f"{get_title(diagnostics_to_plot_list[1])} [{get_diagnostic_keys_units()[diagnostics_to_plot_list[1]]}]")
     # plt.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left')
     plt.legend()
-    normalizer = matplotlib.colors.LogNorm(vmin=np.min(collision_frequencies),
-                                           vmax=np.max(collision_frequencies))
+
     color_bar = plt.colorbar(matplotlib.cm.ScalarMappable(norm=normalizer, cmap='plasma'), ax=plt.gca())
     color_bar.set_label(r"$\nu_{ei}$" " [Hz]\n(midplane)", rotation=0, labelpad=30)
     # plt.title("Midplane scatter plot")
@@ -351,15 +339,10 @@ def scatter_plot_diagnostics(datasets, diagnostics_to_plot_list, steady_state_ti
 def plot_parallel_inverse_scale_length(datasets, steady_state_times_runs, diagnostic, probes_faces_midplane,
                                        probes_faces_parallel, marker_styles, operation, core_radius, save_directory,
                                        scale_length_mode="linear"):
-    plt.rcParams['figure.figsize'] = 6, 3.5  # (7, 4.5)   # (8.5, 5.5)
+    plt.rcParams['figure.figsize'] = 6, 3.5
 
-    anode_z = portnum_to_z(0).to(u.m).value
-
-    # Get mean core-steady-state e-i collision frequencies for each dataset and store in list
-    collision_frequencies = extract_collision_frequencies(datasets, core_radius, steady_state_times_runs,
-                                                          probes_faces_midplane, operation)
-    collision_frequencies_log_normalized = normalize(np.log(collision_frequencies), 0, 0.9)
-    color_map = matplotlib.colormaps["plasma"](collision_frequencies_log_normalized)
+    color_map, normalizer = get_colormap_normalizer(datasets, core_radius, steady_state_times_runs,
+                                                    probes_faces_midplane, operation=operation)
 
     for i in range(len(datasets)):
         probes_faces = probes_faces_parallel[i]
@@ -371,10 +354,10 @@ def plot_parallel_inverse_scale_length(datasets, steady_state_times_runs, diagno
                                                "face": probes_faces[0][1]}].item()
         diagnostic_value_1 = diagnostic_means[{"probe": probes_faces[1][0],
                                                "face": probes_faces[1][1]}].item()
-        z1 = anode_z - diagnostic_means[{"probe": probes_faces[0][0],
-                                         "face": probes_faces[0][1]}].coords['z'].item() / 100  # converts cm to m
-        z0 = anode_z - diagnostic_means[{"probe": probes_faces[1][0],
-                                         "face": probes_faces[1][1]}].coords['z'].item() / 100  # converts cm to m
+        z1 = anode_z.to(u.m).value - diagnostic_means[{"probe": probes_faces[0][0],
+                                                       "face": probes_faces[0][1]}].coords['z'].item() / 100  # cm -> m
+        z0 = anode_z.to(u.m).value - diagnostic_means[{"probe": probes_faces[1][0],
+                                                       "face": probes_faces[1][1]}].coords['z'].item() / 100  # cm -> m
         z = 0.5 * (z1 + z0)
 
         if scale_length_mode == "linear":
@@ -392,16 +375,12 @@ def plot_parallel_inverse_scale_length(datasets, steady_state_times_runs, diagno
         diagnostic_scale_length_abs = 1 / np.abs(diagnostic_inverse_scale_length)
 
         plt.plot(z, diagnostic_scale_length_abs, marker=marker_styles[i], color=color_map[i],
-                 label=(get_exp_run_string(datasets[i].attrs)
-                        + f":  {collision_frequencies[i]:.2E} Hz"))
-    plt.title(f"Parallel gradient scale length [m] \n\n{get_title(diagnostic)} ", y=0.9)  # loc='right'
+                 label=get_exp_run_string(datasets[i].attrs))
+    plt.title(f"Parallel gradient scale length [m] \n\n{get_title(diagnostic)} ", y=0.88)
     plt.xlabel("z location [m]")
 
-    normalizer = matplotlib.colors.LogNorm(vmin=np.min(collision_frequencies),
-                                           vmax=np.max(collision_frequencies))
     color_bar = plt.colorbar(matplotlib.cm.ScalarMappable(norm=normalizer, cmap='plasma'), ax=plt.gca())
     color_bar.set_label(r"$\nu_{ei}$" " [Hz]\n(midplane)", rotation=0, labelpad=30)
-    # color_bar.set_label("Midplane electron-ion \ncollision frequency [Hz]", rotation=90, labelpad=10)
 
     # plt.legend(bbox_to_anchor=(1.05, 1.0), loc='upper left')
     plt.tight_layout()
@@ -411,32 +390,23 @@ def plot_parallel_inverse_scale_length(datasets, steady_state_times_runs, diagno
         plt.savefig(f"{save_directory}parallel_gradient_scale_length_plot_{diagnostic}.pdf")
     plt.show()
 
-    plt.show()
 
+def plot_grid(datasets, diagnostics_to_plot_list, steady_state_times_runs, probes_faces_midplane, probe_faces_parallel,
+              operation, core_radius, x_dim, num_rows=2, plot_save_folder=""):
 
-def plot_grid(datasets, diagnostics_to_plot_list, steady_state_times_runs, probes_faces_midplane,
-              probes_faces_parallel, operation, core_radius, x_dim, num_rows=2, plot_save_folder=""):
-    # Split into top plot row and bottom plot row
     num_cols = (len(datasets) - 1) // num_rows + 1
     tolerance = 0.5  # TODO note; set very high to only discard points with nan error bars
     port_marker_styles = {20: 'x', 27: '.', 29: '.', 35: '^', 43: '^'}
     save_directory = plot_save_folder
     x_dims = ['x', 'y', 'time']
     for plot_diagnostic in diagnostics_to_plot_list:
-        """ plot_ab(datasets_split, steady_state_times_runs_split, plot_diagnostic, probes_faces_midplane_split,
-                probes_faces_parallel_split, port_marker_styles, "mean", core_radius)
-            def plot_ab(datasets, steady_state_times_runs, plot_diagnostic,
-                    probes_faces_midplane, probes_faces_parallel,
-                    port_marker_styles, operation, core_radius): """
 
-        plt.rcParams['figure.figsize'] = (1 + 3 * num_cols, 3 * num_rows)  # TODO hardcoded
+        plt.rcParams['figure.figsize'] = (1 + 3 * num_cols, 3 * num_rows)
         fig, axes = plt.subplots(num_rows, num_cols, sharex='none', sharey='row', layout="constrained")  # sharey=all
         axes_2d = np.atleast_2d(axes)
 
-        collision_frequencies = extract_collision_frequencies(datasets, core_radius, steady_state_times_runs,
-                                                              probes_faces_midplane, operation)
-        collision_frequencies_log_normalized = normalize(np.log(collision_frequencies), 0, 0.9)
-        color_map = matplotlib.colormaps["plasma"](collision_frequencies_log_normalized)
+        color_map, normalizer = get_colormap_normalizer(datasets, core_radius, steady_state_times_runs,
+                                                        probes_faces_midplane, operation=operation)
 
         indices = np.arange(num_rows * (len(datasets) // num_rows)).reshape(num_rows, -1)  # e.g. 1 2 3; 4 5 6
         for row in range(num_rows):  # row of the plot grid
@@ -486,7 +456,7 @@ def plot_grid(datasets, diagnostics_to_plot_list, steady_state_times_runs, probe
                     if np.isfinite(da_mean).any():
                         # probe_face_eq_str = probe_face_choice_to_eq_string(probe_face_choices[i], ports, faces)
                         port = ds.coords['port'].item()
-                        z_real = anode_z.to(u.m).value - ds.coords['z'].item() / 100
+                        # z_real = anode_z.to(u.m).value - ds.coords['z'].item() / 100
                         marker_style = port_marker_styles[port]
 
                         # da_mean[~(linear_da_error < tolerance * da_median)] = np.nan  # TODO hardcoded! document!
@@ -500,17 +470,13 @@ def plot_grid(datasets, diagnostics_to_plot_list, steady_state_times_runs, probe
                     ax.set_xlabel(f"{x_dim} [{da_mean.coords[x_dim].attrs['units']}]")
                     ax.set_ylabel(da_mean.attrs['units'])
 
-                # ax.set_ylim(0, [30, 20][index])  # TODO extremely hardcoded
                 ax.set_ylim(bottom=0)
-                """ax.title.set_text(get_exp_run_string(dataset.attrs)
-                                  + ", run_name " + dataset.attrs['Run name'][:2])"""
 
                 # ax.legend(title=f"\n{attributes[0]} (probe face)", loc="upper center", bbox_to_anchor=(0.5, -0.15), ncol=1)
                 # ax.legend(title="z [m]")
                 ax.legend(title="Experiment")
                 ax.set_ylim(top=1.05 * max_val)
-        normalizer = matplotlib.colors.LogNorm(vmin=np.min(collision_frequencies),
-                                               vmax=np.max(collision_frequencies))
+
         color_bar = fig.colorbar(matplotlib.cm.ScalarMappable(norm=normalizer, cmap='plasma'),
                                  ax=axes_2d.ravel().tolist())
         color_bar.set_label(r"$\nu_{ei}$" " [Hz]\n(midplane)", rotation=0, labelpad=32)
@@ -565,10 +531,9 @@ def plot_acceleration_vs_pressure_gradient(datasets, steady_state_times_runs, co
                                                for i in range(len(datasets))]
 
     plt.rcParams['figure.figsize'] = (5.5, 3.5)
-    collision_frequencies = extract_collision_frequencies(datasets, core_radius, steady_state_times_runs,
-                                                          probes_faces_midplane, "mean")
-    collision_frequencies_log_normalized = normalize(np.log(collision_frequencies), 0, 0.9)
-    color_map = matplotlib.colormaps["plasma"](collision_frequencies_log_normalized)
+
+    color_map, normalizer = get_colormap_normalizer(datasets, core_radius, steady_state_times_runs,
+                                                    probes_faces_midplane, operation=operation)
 
     pressure_gradients = []
     accelerations = []
@@ -603,11 +568,8 @@ def plot_acceleration_vs_pressure_gradient(datasets, steady_state_times_runs, co
 
         plt.legend(loc='upper right', bbox_to_anchor=(1.0, 0.84))
         plt.xlim(left=0, right=1.05 * max_pressure_gradient)
-        plt.ylim(bot=min_acceleration - 0.2 * (max_acceleration - min_acceleration), top=0.3 * max_pressure_gradient)
+        plt.ylim(bottom=min_acceleration - 0.2 * (max_acceleration - min_acceleration), top=0.3 * max_pressure_gradient)
 
-
-    normalizer = matplotlib.colors.LogNorm(vmin=np.min(collision_frequencies),
-                                           vmax=np.max(collision_frequencies))
     color_bar = plt.colorbar(matplotlib.cm.ScalarMappable(norm=normalizer, cmap='plasma'), ax=plt.gca())
     color_bar.set_label(r"$\nu_{ei}$" " [Hz]\n(midplane)", rotation=0, labelpad=30)
 
@@ -617,6 +579,7 @@ def plot_acceleration_vs_pressure_gradient(datasets, steady_state_times_runs, co
     if plot_save_folder:
         plt.savefig(f"{plot_save_folder}parallel_acceleration_vs_parallel_pressure_gradient"
                     f"{'_with_expectation' if with_expectation else ''}.pdf")
+    plt.show()
 
 
 def get_valid_linear_dimension(diagnostics_dataset_sizes):
@@ -697,26 +660,37 @@ def get_title(diagnostic: str) -> str:
     return diagnostic
 
 
-def extract_collision_frequencies(datasets, core_radius, steady_state_times_runs, probe_face_midplane, operation):
+def get_colormap_normalizer(datasets, core_radius, steady_state_times_runs, probe_face_midplane,
+                            diagnostic='nu_ei', operation='mean', map_type='logarithmic'):
     r"""
-    Finds typical core-steady-state electron-ion collision frequencies for each dataset.
+    Returns the normalized color map and Normalizer object for a list of datasets from one diagnostic in the dataset
     :param datasets:
     :param core_radius:
     :param steady_state_times_runs:
     :param probe_face_midplane:
+    :param diagnostic:
     :param operation:
-    :return: tuple of (collision frequencies DataArray, log(collision frequencies) DataArray normalized to [0, 0.9])
+    :param map_type:
+    :return:
     """
+    if map_type != "logarithmic":
+        raise NotImplementedError("Map types other than 'logarithmic' are not currently supported.")  # TODO support
 
-    collision_frequencies = []
+    diagnostic_values = []
     for i in range(len(datasets)):
-        collision_frequencies_mean = core_steady_state(datasets[i]['nu_ei'], core_radius,
-                                                       steady_state_times_runs[i], operation,
-                                                       dims_to_keep=("probe", "face"))
-        collision_frequencies += [collision_frequencies_mean[{"probe": probe_face_midplane[i][0],
-                                                              "face": probe_face_midplane[i][1]}].mean().item()]
-    collision_frequencies = np.array(collision_frequencies)
-    return collision_frequencies
+        diagnostic_value = core_steady_state(datasets[i][diagnostic], core_radius,
+                                             steady_state_times_runs[i], operation,
+                                             dims_to_keep=("probe", "face")
+                                             )[{"probe": probe_face_midplane[i][0],
+                                                "face": probe_face_midplane[i][1]}
+                                               ].mean().item()
+        diagnostic_values += [diagnostic_value]
+    diagnostic_values = np.array(diagnostic_values)
+    diagnostic_values_map_normalized = normalize(np.log(diagnostic_values), 0, 0.9)
+
+    normalizer = matplotlib.colors.LogNorm(vmin=np.min(diagnostic_values),
+                                           vmax=np.max(diagnostic_values))
+    return matplotlib.colormaps["plasma"](diagnostic_values_map_normalized), normalizer
 
 
 def normalize(ndarray, lower=0., upper=1.):
@@ -736,7 +710,8 @@ def probe_face_choice_to_eq_string(probe_face_coefficient, ports, faces):
 
 def get_exp_run_string(attrs, mode="long"):
     if mode == "short":
-        series_number = ("April_2018", "March_2022", "November_2022", "January_2024").index(attrs['Exp name']) # TODO hc
+        # TODO hardcoded
+        series_number = ("April_2018", "March_2022", "November_2022", "January_2024").index(attrs['Exp name'])
         return f"{series_number}-{attrs['Run name'][:2]}"
     else:
         return f"{attrs['Exp name'][:3]} {attrs['Exp name'][-2:]} #{attrs['Run name'][:2]}"

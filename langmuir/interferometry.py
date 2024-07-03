@@ -122,10 +122,6 @@ def itfm_calib_56ghz(langmuir_da, itfm, spatial_dimensions) -> xr.DataArray:
     # Find index of interferometry collapse; at point with most negative slope
     itfm_collapse_time = itfm_da.differentiate('time').idxmin('time')
 
-    # Find average step in density (n_e) time coordinate by dividing total time elapsed by number of time measurements
-    density_time_coord = langmuir_da.coords['time']
-    dt = (density_time_coord[-1] - density_time_coord[0]) / len(density_time_coord)  # time step for density time coord.
-
     # DENSITY LINE INTEGRALS #
     # ______________________ #
 

@@ -5,13 +5,22 @@ import xarray as xr
 
 
 def choose_multiple_list(choices, name, null_action=None):
+    r"""
+    Allow user to choose multiple items from a list.
+    Each choice is printed and labeled with a letter. Inputting the string "abc", for example,
+    would select the first, second, and third options in the list.
+    :param choices: List of options (list of strings)
+    :param name: Name in the form of a noun, e.g. "file" or "action" (string)
+    :param null_action: Optional string to inform user what will be done if no options are input (string)
+    :return: List of indices of the selected choices (list of integers)
+    """
     if len(choices) > 52:
         warnings.warn("More than 52 " + name + "s found. Only the first 52 are displayed.")
     print(*["  " + num_to_chr(i) + ": " + choices[i] for i in range(len(choices[:52]))], sep="\n")
     prompt = "Input a string of letters to select the corresponding " + name + "s"
     if null_action is not None:
         prompt += ", \n\tor the empty string to " + null_action
-    prompt += ": "
+    prompt += " (e.g. 'abc'): "
     selection_str = input(prompt)
 
     if selection_str == "" and null_action is not None:
@@ -23,6 +32,12 @@ def choose_multiple_list(choices, name, null_action=None):
 
 
 def ask_yes_or_no(prompt):
+    r"""
+    Asks user to input 'y' or 'n' in response to a prompt, then returns the corresponding bool.
+    Repeats prompt until given valid input.
+    :param prompt: String posed as a yes-or-no question. Consider ending with ' (y/n) '
+    :return:
+    """
     response = ""
     while response not in ("y", "n"):
         response = input(prompt).lower()
@@ -48,10 +63,14 @@ def num_to_chr(num):
         raise ValueError("Cannot convert number " + str(num) + " to char")
 
 
-# Ensure that the file path contains a Dataset
-def check_netcdf(filename):
+def check_netcdf(file_path):
+    r"""
+    Checks if the given path leads to a valid NetCDF file.
+    :param file_path: path (string)
+    :return: bool
+    """
     try:
-        xr.open_dataset(filename)
+        xr.open_dataset(file_path)
     except FileNotFoundError:
         return False
     return True
@@ -104,6 +123,9 @@ def ensure_directory(directory_path: str):
 def make_path(folder: str, name: str, ext: str) -> str:
     r"""
     Generates an absolute file path from a folder, a filename (not a path), and an extension.
+    :param folder:
+    :param name:
+    :param ext:
     :return:
     """
     # path, extension = os.path.splitext(name)

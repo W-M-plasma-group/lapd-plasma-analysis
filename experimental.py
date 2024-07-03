@@ -14,7 +14,7 @@ def get_exp_params(hdf5_path):
                             get_discharge,
                             get_gas_pressure,
                             get_magnetic_field]
-    # recall: 0 = April_2018, 1 = March_2022, 2 = November_2022, 3 = January_2024
+    # From configurations.py: 0 = April_2018, 1 = March_2022, 2 = November_2022, 3 = January_2024
     exp_params_functions_0 = [get_nominal_discharge_03,
                               get_nominal_pressure_0]
     exp_params_functions_12 = [get_nominal_discharge_12,
@@ -43,7 +43,7 @@ def get_run_name(file):
 
 
 def get_exp_name(file):
-    return{"Exp name": file.info['exp name']}
+    return {"Exp name": file.info['exp name']}
 
 
 def get_discharge(file):
@@ -70,39 +70,27 @@ def get_nominal_magnetic_field(file):
 
 def get_nominal_gas_puff_3(file):
     run_name = file.info['run name']
-    current_phrase = re.search("[0-9]+V", run_name).group(0)  # search for "95V", for example
-    nominal_gas_puff = float(re.search("[0-9]+", current_phrase).group(0))
+    voltage_phrase = re.search("[0-9]+V", run_name).group(0)  # search for "95V", for example
+    nominal_gas_puff_voltage = float(re.search("[0-9]+", voltage_phrase).group(0))
 
-    return {"Nominal gas puff": np.round(nominal_gas_puff, 0) * u.V}
+    return {"Nominal gas puff": np.round(nominal_gas_puff_voltage, 0) * u.V}
 
 
 def get_nominal_discharge_12(file):
-    # TODO convert to regex
-    description = str(file.info['run description'])
-
-    dis_ind = description.index("Idis")
-    start_ind = description[dis_ind:].index(next(filter(str.isnumeric, description[dis_ind:]))) + dis_ind
-    end_ind = description[start_ind:].index(next(filter(lambda c: c in ("A", "k", " ", ","), description[start_ind:]))
-                                            ) + start_ind
-    return {"Nominal discharge": float(description[start_ind:end_ind]) * u.A}
+    description = file.info['run description'].lower()
+    current_phrase = re.search("(?<=idis=)[0-9]{4}", description).group(0)  # e.g. search for "7400" right after "Idis="
+    return {"Nominal discharge": float(current_phrase) * u.A}
 
 
 def get_nominal_gas_puff_12(file):
-    # TODO convert to regex
-    description = str(file.info['run description']).lower()
-
-    puff_ind = description.index("puffing")
-    start_ind = description[puff_ind:].index(next(filter(str.isnumeric, description[puff_ind:]))) + puff_ind
-    end_ind = description[start_ind:].index(next(filter(lambda c: c in ("v", " ", ","), description[start_ind:]))
-                                            ) + start_ind
-
-    return {"Nominal gas puff": float(description[start_ind:end_ind]) * u.V}
+    description = file.info['run description'].lower()
+    voltage_phrase = re.search(".*puffing([^0-9]*)([0-9.]*)(?= ?v)", description).group(2)  # eg. "105." after "puffing"
+    return {"Nominal gas puff": float(voltage_phrase) * u.V}
 
 
 def get_nominal_discharge_03(hdf5_file):
-    # uh oh, regular expressions here
     run_name = hdf5_file.info['run name']
-    current_phrase = re.search("[0-9]+k?A", run_name).group(0)  # search for "3500kA" or "5kA", for example
+    current_phrase = re.search("[0-9]+k?A", run_name).group(0)  # search for "3500A" or "5kA", for example
     if "k" in current_phrase:
         current_digit = re.search("[0-9]+", current_phrase).group(0)
         nominal_discharge = float(current_digit) * 1000
@@ -113,7 +101,6 @@ def get_nominal_discharge_03(hdf5_file):
 
 
 def get_nominal_pressure_0(hdf5_file):
-
     run_name = hdf5_file.info['run name']
     pressure_phrase = re.search("[0-9]+(?=press)", run_name).group(0)
     nominal_pressure = float(pressure_phrase) * 1E-6

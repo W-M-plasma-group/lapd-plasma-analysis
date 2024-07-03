@@ -14,11 +14,8 @@ from mach.analysis import get_mach_datasets, get_velocity_datasets
 
 
 """ HDF5 file directory; end path with a slash """                      # TODO user adjust
-# hdf5_folder = "/Users/leomurphy/lapd-data/April_2018/"
-# hdf5_folder = "/Users/leomurphy/lapd-data/March_2022/"
-# hdf5_folder = "/Users/leomurphy/lapd-data/November_2022/"
-# hdf5_folder = "/Users/leomurphy/lapd-data/January_2024/January_2024_all_working/"
 hdf5_folder = "/Users/leomurphy/lapd-data/combined/"
+# hdf5_folder = "/Users/leomurphy/lapd-data/April_2018/"
 
 assert hdf5_folder.endswith("/")
 """ Langmuir & Mach NetCDF directories; end path with a slash """       # TODO user adjust
@@ -36,10 +33,10 @@ mach_velocity_mode = "append"                                           # not fu
 """ Other user parameters """                                           # TODO user adjust
 # isweep_choice is user choice for probe or linear combination to plot; see isweep_selector in helper.py for more
 # e.g. coefficients are for [[p1f1, p1f2], [p2f1, p2f2]]
-isweep_choices = [[[1, 0], [0, 0]],     # . first combination to plot: 1 * (first face on first probe)
-                  [[0, 0], [1, 0]]]     # .second combination to plot: 1 * (first face on second probe)
-# isweep_choices = [[[1, 0], [-1, 0]]]  # .       combination to plot: 1 * (face 1 on probe 1) - 1 * (face 1 on probe 2)
-bimaxwellian = False                                                 # TODO perform both and store in same NetCDF file?
+isweep_choices = [[[1, 0], [0, 0]],     # . 1st combination to plot: 1 * (first face on first probe)
+                  [[0, 0], [1, 0]]]     # . 2nd combination to plot: 1 * (first face on second probe)
+# isweep_choices = [[[1, 0], [-1, 0]]]  # .     combination to plot: 1 * (face 1 on probe 1) - 1 * (face 1 on probe 2)
+bimaxwellian = False                                                    # TODO do both and store in same NetCDF file?
 core_radius = 21. * u.cm                                                # TODO user can adjust (26 cm in MATLAB code)
 plot_tolerance = np.nan  # 0.25                                         # TODO
 velocity_plot_unit = u.km / u.s         # TODO not yet working          # TODO adjust !
@@ -58,9 +55,9 @@ plot_save_folder = ("/Users/leomurphy/Desktop/wm/Plasma research/Research images
   |||_____'________________________|       V
   (a)    (b)                      (c)
         
-        +z direction (+ports) ==>>
-                  plasma flow ==>> 
-            magnetic field B0 <<==
+        +z direction (+ports) -->>
+                  plasma flow -->> 
+            magnetic field B0 <<--
  
  a) heated LaB6 cathode
  b) grid anode
@@ -71,6 +68,10 @@ if __name__ == "__main__":
 
     # TODO list of hardcoded parameters
     #    (16 ms, 24 ms) for January_2024 steady state period (detect_steady_state_period in diagnostics.py)
+    #    (27 ms, 33 ms) for January_2024 second steady-state period (main.py, below)
+
+    # TODO make table linking variable name to LaTeX code, e.g. "nu_ei" --> "\nu_{ei}",
+    #    to make it possible to change colorbar label on plots when diagnostic variable is changed
 
     print("\n===== Langmuir probe analysis =====")
     datasets, steady_state_times_runs, hdf5_paths = get_langmuir_datasets(
@@ -104,76 +105,55 @@ if __name__ == "__main__":
                                         steady_state_by_runs=steady_state_times_runs, core_rad=core_radius,
                                         tolerance=plot_tolerance, save_directory=plot_save_folder)
 
+    # Plot time profiles
     if ask_yes_or_no("Generate line plot of selected diagnostics over time? (y/n) "):
         for plot_diagnostic in diagnostics_to_plot_list:
             multiplot_linear_diagnostic(datasets, plot_diagnostic, isweep_choices, 'time',
                                         steady_state_by_runs=steady_state_times_runs, core_rad=core_radius,
                                         save_directory=plot_save_folder)
 
-    # Create indices for preserving order in which datasets were entered
-    # original order of datasets as entered by user
-    datasets_unsorted = datasets.copy()
-    steady_state_times_runs_unsorted = steady_state_times_runs.copy()
-
-    # Calculate list of indices that sort datasets array
-    sort_run_indices = np.array(sorted(np.arange(len(datasets)), key=lambda i: datasets[i].attrs['Run name']))
-    sort_exp_indices = np.array(sorted(np.arange(len(datasets)), key=lambda i: datasets[sort_run_indices[i]
-                                                                                        ].attrs['Exp name']))
-    sort_indices = sort_run_indices[sort_exp_indices]
-    unsort_indices = np.argsort(sort_indices)
-    del sort_run_indices, sort_exp_indices
-
-    # sort by lexicographical order of experiment series name and run name
-    datasets = [datasets[i] for i in sort_indices]
-    steady_state_times_runs = [steady_state_times_runs[i] for i in sort_indices]
-
     # Split two steady state periods for jan_2024 data: (16, 24) and (27, 33) and plot with dotted
-    datasets_split = datasets.copy()
-    steady_state_times_runs_split = steady_state_times_runs.copy()
-    # linestyles_split = ["solid"] * len(datasets)
     available_marker_styles = ('D', 'o', '^', 's')  # markers for Apr_18, Mar_22, Nov_22, Jan_24
-    marker_styles_split = [available_marker_styles[get_config_id(dataset.attrs['Exp name'])] for dataset in datasets]
+    marker_styles = [available_marker_styles[get_config_id(dataset.attrs['Exp name'])] for dataset in datasets]
+    datasets_split = datasets.copy()
     for i in range(len(datasets)):
-        if datasets[i].attrs['Exp name'] == "January_2024":
+        if datasets[i].attrs['Exp name'] == "January_2024":  # Add copies of Jan24 experiments at end for 2nd steady st.
             datasets_split += [datasets[i]]
-            steady_state_times_runs_split += [(27, 33) * u.ms]
-            # linestyles_split += ["dotted"]
-            marker_styles_split += ['x']
-    # marker_styles_split = ['o' if style == 'solid' else 'x' for style in linestyles_split]
+            steady_state_times_runs += [(27, 33) * u.ms]
+            marker_styles += ['x']
 
-    # List that identifies probes and faces for 1) midplane and 2) low-z / high-z
-    probes_faces_midplane_split = [(1, 0) if dataset.attrs['Exp name'] == "January_2024" else (0, 0)
-                                   for dataset in datasets_split]
-    probes_faces_parallel_split = [((0, 0), (1, 0)) for dataset in datasets_split]
-    # format: ((low-z probe, low-z face), (high-z probe, high-z face)) for ds in ...
-    # above: selects first (0th) probe's first (0th) face & second (1th) probe's first (0th) face
+    # List that identifies probes and faces for 1) low-z/high-z and 2) midplane
+    probes_faces_parallel = [((0, 0), (1, 0)) for dataset in datasets_split]
+    probes_faces_midplane = [(1, 0) if dataset.attrs['Exp name'] == "January_2024" else (0, 0)
+                             for dataset in datasets_split]
+    # format:  (probe,   face),  (probe,   face), ...; each tuple specifies one probe-face combination
+    #    e.g.  (probe 1, face 0) for January 2024 midplane probe-face tuple
 
-    if ask_yes_or_no(f"Generate parallel plot of selected diagnostics? (y/n) "):  # plot of {parallel_diagnostics[key]}
-        for plot_diagnostic in diagnostics_to_plot_list:  # for key in parallel_diagnostics:
-            plot_parallel_diagnostic(datasets_split, steady_state_times_runs_split,
-                                     probes_faces_midplane_split, probes_faces_parallel_split,
-                                     marker_styles_split, diagnostic=plot_diagnostic, operation="mean",
+    if ask_yes_or_no(f"Generate parallel plot of selected diagnostics? (y/n) "):
+        for plot_diagnostic in diagnostics_to_plot_list:
+            plot_parallel_diagnostic(datasets_split, steady_state_times_runs,
+                                     probes_faces_midplane, probes_faces_parallel,
+                                     marker_styles, diagnostic=plot_diagnostic, operation="mean",
                                      core_radius=core_radius, save_directory=plot_save_folder)
 
-    if ask_yes_or_no("Generate scatter plot of first two selected diagnostics? (y/n) "):
-        scatter_plot_diagnostics(datasets_split, diagnostics_to_plot_list, steady_state_times_runs_split,
-                                 probes_faces_midplane_split, marker_styles_split, operation="mean",
+    at_least_two_diagnostics = (len(diagnostics_to_plot_list) >= 2)
+    if at_least_two_diagnostics and ask_yes_or_no("Generate scatter plot of first two selected diagnostics? (y/n) "):
+        scatter_plot_diagnostics(datasets_split, diagnostics_to_plot_list, steady_state_times_runs,
+                                 probes_faces_midplane, marker_styles, operation="mean",
                                  core_radius=core_radius, save_directory=plot_save_folder)
 
     if ask_yes_or_no("Generate plot of gradient scale length by position for selected diagnostics? (y/n) "):
         for plot_diagnostic in diagnostics_to_plot_list:
-            plot_parallel_inverse_scale_length(datasets_split, steady_state_times_runs_split, plot_diagnostic,
-                                               probes_faces_midplane_split, probes_faces_parallel_split,
-                                               marker_styles_split, "mean", core_radius, plot_save_folder,
+            plot_parallel_inverse_scale_length(datasets_split, steady_state_times_runs, plot_diagnostic,
+                                               probes_faces_midplane, probes_faces_parallel,
+                                               marker_styles, "mean", core_radius, plot_save_folder,
                                                scale_length_mode="exponential")  # 'linear' or 'exponential'
 
     if ask_yes_or_no("Generate grid line plots for selected diagnostics? (y/n) "):
-        time_unit = unit_safe(steady_state_times_runs_split[0])
-        probes_faces_midplane_unsorted = np.array(probes_faces_midplane_split)[unsort_indices]
-        probes_faces_parallel_unsorted = np.array(probes_faces_parallel_split)[unsort_indices]
+        time_unit = unit_safe(steady_state_times_runs[0])
         for x_dim in ("x", "time"):
-            plot_grid(datasets_unsorted, diagnostics_to_plot_list, steady_state_times_runs_unsorted,
-                      probes_faces_midplane_unsorted, probes_faces_parallel_unsorted, "mean", core_radius, x_dim,
+            plot_grid(datasets, diagnostics_to_plot_list, steady_state_times_runs,
+                      probes_faces_midplane, probes_faces_parallel, "mean", core_radius, x_dim,
                       num_rows=1, plot_save_folder=plot_save_folder)
 
     # (UNFINISHED) Shot plot: multiplot line diagnostics at specific time, with x-axis = x pos and curve color = shot #
@@ -212,7 +192,7 @@ if __name__ == "__main__":
                     z = (anode_z - mach_ds.coords['z'][probe].item() * u.cm).to(u.m).value
                     da = mach_ds.isel(probe=probe)[variable].mean(dim='shot', keep_attrs=True)
                     core_steady_state_profile = core_steady_state(da_input=da,
-                                                                  steady_state_times=steady_state_times_runs_split[i],
+                                                                  steady_state_times=steady_state_times_runs[i],
                                                                   operation="mean",
                                                                   dims_to_keep=['x']  # , 'time']
                                                                   ).squeeze().plot(x='x', label=f"z = {z:.2f} m")
@@ -228,22 +208,22 @@ if __name__ == "__main__":
 
     if ask_yes_or_no("Plot parallel plasma acceleration term versus parallel pressure gradient? (y/n) "):
         plot_acceleration_vs_pressure_gradient(datasets, steady_state_times_runs, core_radius,
-                                               probes_faces_midplane_split, marker_styles_split, "mean",
+                                               probes_faces_midplane, marker_styles, "mean",
                                                plot_save_folder, with_expectation=False)
 
     if ask_yes_or_no("Plot parallel plasma acceleration term versus parallel pressure gradient "
                      "with predicted trend lines? (y/n) "):
         plot_acceleration_vs_pressure_gradient(datasets, steady_state_times_runs, core_radius,
-                                               probes_faces_midplane_split, marker_styles_split, "mean",
+                                               probes_faces_midplane, marker_styles, "mean",
                                                plot_save_folder, with_expectation=True, offset=-2.7e7)
 
     if ask_yes_or_no("Print run parameters and diagnostics? (y/n) "):
         print(f"Run ID \t\t\t T_e \t\t n_i_OML \t\t\t P_from_n_i_OML \t\t nu_ei \t\t\t v_para ")
         for i in range(len(datasets_split)):
-            probes_faces = probes_faces_parallel_split[i]
             dataset = datasets_split[i]
+            probes_faces = probes_faces_parallel[i]
 
-            core_steady_state_args = core_radius, steady_state_times_runs_split[i], "mean"
+            core_steady_state_args = core_radius, steady_state_times_runs[i], "mean"
             density = []
             pressure = []
             temperature = []

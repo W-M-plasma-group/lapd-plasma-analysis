@@ -22,9 +22,8 @@ def get_neutral_density(gas_pressure):
     return neutral_density.to(u.m ** -3)
 
 
-def get_neutral_ratio(electron_density, experimental_parameters, steady_state_times, operation="median"):
+def get_neutral_ratio(electron_density, steady_state_times, operation="median"):
 
-    length = 16.5 * u.m
     # RADIAL/AREAL CODE #
     # _________________ #
 
