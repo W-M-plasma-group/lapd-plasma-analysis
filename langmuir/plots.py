@@ -694,7 +694,10 @@ def get_colormap_normalizer(datasets, core_radius, steady_state_times_runs, prob
 
 
 def normalize(ndarray, lower=0., upper=1.):
-    return lower + (upper - lower) * (ndarray - ndarray.min()) / (ndarray.max() - ndarray.min())
+    if ndarray.max() == ndarray.min():
+        return 0 * ndarray
+    else:
+        return lower + (upper - lower) * (ndarray - ndarray.min()) / (ndarray.max() - ndarray.min())
 
 
 def probe_face_choice_to_eq_string(probe_face_coefficient, ports, faces):
