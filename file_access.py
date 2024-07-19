@@ -12,16 +12,16 @@ def choose_multiple_list(choices, name, null_action=None):
 
     Parameters
     ----------
-    choices : Iterable of :obj:`str`
+    choices : Iterable of `str`
         List of options that may be selected.
-    name : :obj:`str`
+    name : `str`
         Name for each choice in the form of a noun, e.g. "file" or "action".
-    null_action : :obj:`str`, optional
+    null_action : :`str`, optional
         Message to inform user what will be done if no options are input.
 
     Returns
     -------
-    list of :obj:`int`
+    list of `int`
         List of integer indices representing the selected choices.
     """
 

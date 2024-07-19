@@ -23,6 +23,7 @@ extensions = [
     'sphinx.ext.napoleon'
     ]
 
+default_role = ':any:'
 templates_path = ['_templates']
 exclude_patterns = []
 
