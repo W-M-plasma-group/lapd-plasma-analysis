@@ -4,7 +4,7 @@ import warnings
 import xarray as xr
 
 
-def choose_multiple_list(choices: list[str], name, null_action=None):
+def choose_multiple_list(choices, name, null_action=None):
     """
     Allow the user to choose multiple items from a list via console input.
     Each choice is printed and labeled with a letter. Inputting the string "abc", for example,
@@ -12,16 +12,16 @@ def choose_multiple_list(choices: list[str], name, null_action=None):
 
     Parameters
     ----------
-    choices : list of str
+    choices : Iterable of :obj:`str`
         List of options that may be selected.
-    name : str
+    name : :obj:`str`
         Name for each choice in the form of a noun, e.g. "file" or "action".
-    null_action : str, optional
+    null_action : :obj:`str`, optional
         Message to inform user what will be done if no options are input.
 
     Returns
     -------
-    list of int
+    list of :obj:`int`
         List of integer indices representing the selected choices.
     """
 

@@ -1,7 +1,7 @@
 """
 The lapd-plasma-analysis repository was written by Leo Murphy and Michael Campagna
 based on code written in MATLAB by Conor Perks (MIT) and using the PlasmaPy and
-bapsflib libraries. Comments are added inline. Separate documentation is not yet complete.
+bapsflib libraries. Comments are added inline. Separate documentation is under construction.
 """
 
 from file_access import ask_yes_or_no
