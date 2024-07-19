@@ -12,9 +12,36 @@ from langmuir.interferometry import interferometry_calibration
 from langmuir.plots import get_title
 
 
-def get_langmuir_datasets(langmuir_nc_folder: str, hdf5_folder: str, interferometry_folder: str,
-                          interferometry_mode, isweep_choices, core_radius: u.Quantity, bimaxwellian: bool,
-                          plot_save_directory: str) -> (list[xr.Dataset], list[tuple], dict, list[np.ndarray]):
+def get_langmuir_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder, interferometry_mode,
+                          isweep_choices, core_radius, bimaxwellian, plot_save_directory):
+    r"""
+
+    Parameters
+    ----------
+    langmuir_nc_folder : :obj:`str`
+        Path to folder storing Langmuir probe diagnostic data NetCDF files.
+    hdf5_folder : :obj:`str`
+        Path to folder storing LAPD experiment HDF5 files.
+    interferometry_folder :
+        Path to folder storing interferometry data. If interferometry data is stored in the HDF5 files,
+        then this should be equal to `hdf5_folder`.
+    interferometry_mode : {'skip', 'append', 'overwrite'}
+    isweep_choices
+        (WIP; see main.py and helper.py)
+    core_radius : `astropy.units.Quantity`
+    bimaxwellian : `bool`
+    plot_save_directory : `str`
+
+    Returns
+    -------
+    datasets : list of `xarray.Dataset`
+        List of Langmuir diagnostic datasets.
+    steady_state_times_runs
+        List of ordered pairs (tuples?) of `astropy.unit.Quantity` objects indicating the beginning and end time
+         of the steady-state period.
+    hdf5_paths
+        List of paths to HDF5 files opened. Can be None if NetCDF files used.
+    """
 
     # Create folder to save NetCDF files if not yet existing
     netcdf_folder = ensure_directory(langmuir_nc_folder)
@@ -25,7 +52,7 @@ def get_langmuir_datasets(langmuir_nc_folder: str, hdf5_folder: str, interferome
     # Ask user to choose either NetCDF files or HDF5 files, then create datasets from them
     datasets, hdf5_paths = load_datasets(hdf5_folder, netcdf_folder, bimaxwellian, plot_save_directory)
     if datasets is None:
-        return None, None, None, None
+        return None, None, None
 
     steady_state_times_runs = [detect_steady_state_times(dataset, core_radius) for dataset in datasets]
 
