@@ -7,6 +7,23 @@ from langmuir.configurations import get_config_id
 
 
 def get_exp_params(hdf5_path):
+    r"""
+    Returns a dictionary of important LAPD experiment run parameters and their values.
+    For function names ending in a number, the number/numbers represent the configuration IDs
+    for which the function is valid. For example, `get_nominal_discharge_03` is valid
+    for Series 0 (April 2018) and Series 3 (January 2024) experiments.
+
+    Parameters
+    ----------
+    hdf5_path: `str`
+        Path to HDF5 file of LAPD experimental data.
+
+    Returns
+    -------
+    exp_params_names_values: `dict`
+        Dictionary that maps parameter names (str) to their values (`astropy.units.Quantity`)
+
+    """
 
     # The user can define these experimental control parameter functions
     exp_params_functions = [get_run_name,
@@ -39,10 +56,16 @@ def get_exp_params(hdf5_path):
 
 
 def get_run_name(file):
+    r"""
+    Get run name of HDF5 file object, e.g. "01_line_valves90V_5000A"
+    """
     return {"Run name": file.info['run name']}
 
 
 def get_exp_name(file):
+    r"""
+    Get name of experiment series of HDF5 file object, e.g. "November_2022"
+    """
     return {"Exp name": file.info['exp name']}
 
 
