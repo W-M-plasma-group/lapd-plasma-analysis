@@ -48,9 +48,10 @@ def get_isweep_vsweep(filename, vsweep_bc, isweep_metadatas, voltage_gain, orien
     vsweep = vsweep.reshape(num_positions,              shots_per_position, signal_length)
     isweep = isweep.reshape((num_isweep, num_positions, shots_per_position, signal_length))
 
-    scale_shape = [num_isweep] + [1 for _ in range(len(isweep.shape) - 1)]
-    resistances = np.reshape(isweep_metadatas['resistance'], scale_shape)
-    gains = np.reshape(isweep_metadatas['gain'],             scale_shape)
+    # Add length-one dimensions to the end of resistances and gains to match the isweep array
+    scale_slices = [slice(0, num_isweep)] + [None for _ in range(len(isweep.shape) - 1)]
+    resistances = isweep_metadatas['resistance'][*scale_slices]
+    gains = isweep_metadatas['gain'][*scale_slices]
 
     # Convert to real units (not abstract)
     bias = vsweep * voltage_gain * u.V
