@@ -1,7 +1,7 @@
 import numpy as np
 import astropy.units as u
 
-from langmuir.configurations import get_ports_receptacles
+from lapd_plasma_analysis.langmuir.configurations import get_ports_receptacles
 
 
 def get_mach_config(hdf5_path, config_id):

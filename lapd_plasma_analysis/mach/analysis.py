@@ -1,17 +1,16 @@
 import numpy as np
 import xarray as xr
-import astropy.units as u
 
-from experimental import get_exp_params, get_config_id
-from file_access import search_folder, choose_multiple_list, ensure_directory
+from lapd_plasma_analysis.experimental import get_exp_params, get_config_id
+from lapd_plasma_analysis.file_access import search_folder, choose_multiple_list, ensure_directory
 
-from mach.getMachIsat import get_mach_isat
-from mach.velocity import get_mach_numbers, get_velocity
-from mach.configurations import get_mach_config
+from lapd_plasma_analysis.langmuir.plots import get_exp_run_string
+from lapd_plasma_analysis.langmuir.analysis import save_datasets_nc
+from lapd_plasma_analysis.langmuir.configurations import get_ion
 
-from langmuir.plots import get_exp_run_string
-from langmuir.analysis import save_datasets_nc
-from langmuir.configurations import get_ion
+from lapd_plasma_analysis.mach.getMachIsat import get_mach_isat
+from lapd_plasma_analysis.mach.velocity import get_mach_numbers, get_velocity
+from lapd_plasma_analysis.mach.configurations import get_mach_config
 
 
 def get_mach_datasets(mach_nc_folder, hdf5_folder, lang_datasets, hdf5_selected_paths, mach_mode):

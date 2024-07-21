@@ -5,7 +5,7 @@ from tqdm import tqdm
 from plasmapy.formulary.collisions import Coulomb_logarithm
 from plasmapy.formulary.collisions.frequencies import MaxwellianCollisionFrequencies
 
-from langmuir.helper import *
+from lapd_plasma_analysis.langmuir.helper import *
 
 
 def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, langmuir_configs, ion_type, bimaxwellian=False):

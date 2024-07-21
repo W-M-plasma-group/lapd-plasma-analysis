@@ -1,15 +1,16 @@
-from file_access import *
-from langmuir.helper import *
-from langmuir.configurations import *
-from experimental import get_exp_params
-from langmuir.getIVsweep import get_isweep_vsweep
-from langmuir.characterization import characterize_sweep_array
-from langmuir.preview import preview_raw_sweep, preview_characteristics
-from langmuir.diagnostics import (langmuir_diagnostics, detect_steady_state_times, get_pressure,
-                                  get_electron_ion_collision_frequencies)
-from langmuir.neutrals import get_neutral_density
-from langmuir.interferometry import interferometry_calibration
-from langmuir.plots import get_title
+from lapd_plasma_analysis.file_access import *
+from lapd_plasma_analysis.experimental import get_exp_params
+
+from lapd_plasma_analysis.langmuir.helper import *
+from lapd_plasma_analysis.langmuir.configurations import *
+from lapd_plasma_analysis.langmuir.getIVsweep import get_isweep_vsweep
+from lapd_plasma_analysis.langmuir.characterization import characterize_sweep_array
+from lapd_plasma_analysis.langmuir.preview import preview_raw_sweep, preview_characteristics
+from lapd_plasma_analysis.langmuir.diagnostics import (langmuir_diagnostics, detect_steady_state_times, get_pressure,
+                                                       get_electron_ion_collision_frequencies)
+from lapd_plasma_analysis.langmuir.neutrals import get_neutral_density
+from lapd_plasma_analysis.langmuir.interferometry import interferometry_calibration
+from lapd_plasma_analysis.langmuir.plots import get_title
 
 
 def get_langmuir_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder, interferometry_mode,

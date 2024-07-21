@@ -1,9 +1,9 @@
 import numpy as np
 import astropy.units as u
 import re
-
 from bapsflib import lapd
-from langmuir.configurations import get_config_id
+
+from lapd_plasma_analysis.langmuir.configurations import get_config_id
 
 
 def get_exp_params(hdf5_path):

@@ -4,7 +4,7 @@ import astropy.units as u
 from bapsflib import lapd
 from bapsflib.lapd.tools import portnum_to_z
 
-from langmuir.getIVsweep import get_shot_positions
+from lapd_plasma_analysis.langmuir.getIVsweep import get_shot_positions
 
 # Note: This code is based on getIVsweep.py in the lapd-plasma-analysis repository.
 # TODO merge into getIVsweep.py ?

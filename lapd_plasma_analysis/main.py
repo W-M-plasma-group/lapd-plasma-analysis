@@ -4,13 +4,13 @@ based on code written in MATLAB by Conor Perks (MIT) and using the PlasmaPy and
 bapsflib libraries. Comments are added inline. Separate documentation is under construction.
 """
 
-from file_access import ask_yes_or_no
+from lapd_plasma_analysis.file_access import ask_yes_or_no
 
-from langmuir.configurations import get_config_id
-from langmuir.analysis import get_langmuir_datasets, get_diagnostics_to_plot, save_datasets_nc
-from langmuir.plots import *
+from lapd_plasma_analysis.langmuir.configurations import get_config_id
+from lapd_plasma_analysis.langmuir.analysis import (get_langmuir_datasets, get_diagnostics_to_plot, save_datasets_nc)
+from lapd_plasma_analysis.langmuir.plots import *
 
-from mach.analysis import get_mach_datasets, get_velocity_datasets
+from lapd_plasma_analysis.mach.analysis import get_mach_datasets, get_velocity_datasets
 
 
 """ HDF5 file directory; end path with a slash """                      # TODO user adjust
