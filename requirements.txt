@@ -1,4 +1,0 @@
-plasmapy
-bapsflib
-bottleneck
-sphinx-rtd-theme
