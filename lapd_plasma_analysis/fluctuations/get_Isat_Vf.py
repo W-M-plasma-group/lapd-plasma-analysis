@@ -10,14 +10,31 @@ def get_isweep_vsweep(filename, vsweep_bc, isweep_metadatas, voltage_gain, orien
 
     Parameters
     ----------
-    :param filename: file path of HDF5 file from LAPD
-    :param vsweep_bc: board and channel number of vsweep data in HDF5 file
-    :param isweep_metadatas: structured array of board, channel, receptacle, port, face, resistance, and area
-    for each isweep signal
-    :param voltage_gain: numerical value of scaling constant for getting real bias voltages from abstract vsweep data
-    :param orientation: +1 or -1, depending on if Isweep should be inverted before analysis
-    :return: bias, currents, positions, dt: v_sweep array, i_sweeps array, position array, and timestep amount
+    filename : `str`
+        File path of HDF5 file from LAPD
+    vsweep_bc : `tuple` of `int`
+        Board and channel number of vsweep data in HDF5 file
+    isweep_metadatas
+        Structured array of board, channel, receptacle, port, face, resistance, and area for each isweep signal
+    voltage_gain : `float` or `int`
+        Numerical value of scaling constant for getting real bias voltages from abstract vsweep data
+    orientation : {-1, 1}
+        +1 or -1, depending on if Isweep should be inverted before analysis
+
+    Returns
+    -------
+    bias : `astropy.units.Quantity`
+        v_sweep array
+    currents : `astropy.units.Quantity`
+        i_sweep array
+    positions
+        array of positions
+    dt : `astropy.units.Quantity`
+        Timestep amount
+
     """
+
+    return
 
     with lapd.File(filename) as lapd_file:
         isweep_bcs = np.atleast_1d(isweep_metadatas[['board', 'channel']])

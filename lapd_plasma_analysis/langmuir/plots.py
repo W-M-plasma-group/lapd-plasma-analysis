@@ -2,8 +2,8 @@ from warnings import warn
 
 from astropy import visualization
 
-from langmuir.helper import *
-from langmuir.configurations import get_ion
+from lapd_plasma_analysis.langmuir.helper import *
+from lapd_plasma_analysis.langmuir.configurations import get_ion
 
 # matplotlib.use('TkAgg')
 # matplotlib.use('QtAgg')

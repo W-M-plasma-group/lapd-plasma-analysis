@@ -1,9 +1,9 @@
 import numpy as np
 import xarray as xr
 import astropy.units as u
-
-from langmuir.helper import crunch_data, ion_temperature
 from plasmapy.particles import particle_mass
+
+from lapd_plasma_analysis.langmuir.helper import crunch_data, ion_temperature
 
 
 def get_mach_numbers(mach_isat_da: xr.DataArray):
@@ -12,13 +12,24 @@ def get_mach_numbers(mach_isat_da: xr.DataArray):
     Dimensions are (probe, face, x, y, shot, time).
     Note that Mach probes have much higher time resolution than the Langmuir measurement frequency.
 
-    Mathematics
+    Parameters
     ----------
+    mach_isat_da : `xr.DataArray`
+        DataArray containing saturation current data
 
+    Returns
+    -------
+    `xr.DataArray`
+        Mach numbers for
+
+    Notes
+    -----
     By C. Perks and by "Mach probes" (Chung 2012), the parallel Mach number :math:`M_z` is given by
 
     .. math::
+
         M_z = M_c \ln(R_1)
+
     where :math:`M_c` is a magnetization factor :math:`= 1/K` in Chung 2012,
     and :math:`R_1` is the ratio of upstream ion saturation current to downstream ion saturation current.
 
@@ -26,11 +37,13 @@ def get_mach_numbers(mach_isat_da: xr.DataArray):
     the perpendicular Mach number :math:`M_\perp` may be calculated as
 
     .. math::
+
         M_\perp = M_c \ln(R_1 / R_2) / \cot(\alpha) \\
 
         \ \ \ \ \ \ = (M_c \ln(R_1)  - M_c \ln(R_2)) \cdot \tan(\alpha)
 
         \ \ \ \ \ \ = (M_z - M_c \ln(R_2)) \cdot \tan(\alpha)
+
     where :math:`R_2` is the ratio of more-upstream ion saturation current to more-downstream ion saturation current
     for probe faces lying along an axis at an angle :math:`\alpha` from perpendicular to the flow;
     for example, :math:`\alpha = \pi/2` for a perfect upstream-downstream probe face alignment.
@@ -39,11 +52,9 @@ def get_mach_numbers(mach_isat_da: xr.DataArray):
     In this function, the perpendicular Mach number is found as the average of two estimates for :math:`M_\perp`
     based on probe face axis alignment offsets of :math:`\pi/4` and :math:`3\pi/4` from horizontal.
 
-    Parameters
-    ----------
-    :param mach_isat_da:
-    :return:
     """
+
+    # ASCII diagram of Mach probe below
 
     """
 
@@ -93,24 +104,33 @@ def get_velocity(mach_ds: xr.Dataset, electron_temperature_da: xr.DataArray, ion
     Returns Dataset of flow velocity at each position and time.
     Dimensions are (probe, face, x, y, shot, time (matching Langmuir plateaus))
 
-    Mathematics
-    ----------
+    Notes
+    -----
     From MATLAB code by C. Perks:
     "Note that :math:`M=v/C_s` where :math:`C_s = \sqrt{(T_e+T_i)/M_i}`, but we will assume that :math:`T_i \sim 1` eV".
     A supporting 1 eV estimate for LAPD ion temperature was found on the LAPD BAPSF website.
 
     Parameters
     ----------
-    :param mach_ds:
-    :param electron_temperature_da:
-    :param ion_type:
-    :return:
+    mach_ds : `xr.Dataset`
+        param
+    electron_temperature_da : `xr.DataArray`
+        param
+    ion_type : str
+        param
+
+    Returns
+    -------
+    `xr.Dataset`
+        Dataset containing parallel and, if applicable, perpendicular velocity data
     """
+
+    # description of electron temperature DataArray dimensions below
 
     """
     Electron temperature DataArray will have dimensions
         probe               (additional coordinates: port, z),
-        face, x, y, shot,
+        face,   x,  y,  shot,
         time                (additional coordinates: plateau (1-based))
     """
 

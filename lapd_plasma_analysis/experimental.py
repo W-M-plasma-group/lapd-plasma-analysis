@@ -9,9 +9,6 @@ from lapd_plasma_analysis.langmuir.configurations import get_config_id
 def get_exp_params(hdf5_path):
     r"""
     Returns a dictionary of important LAPD experiment run parameters and their values.
-    For function names ending in a number, the number/numbers represent the configuration IDs
-    for which the function is valid. For example, `get_nominal_discharge_03` is valid
-    for Series 0 (April 2018) and Series 3 (January 2024) experiments.
 
     Parameters
     ----------

@@ -15,29 +15,34 @@ from lapd_plasma_analysis.langmuir.plots import get_title
 
 def get_langmuir_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder, interferometry_mode,
                           isweep_choices, core_radius, bimaxwellian, plot_save_directory):
-    r"""
+    """
+    Retrieves (# todo)
 
     Parameters
     ----------
-    langmuir_nc_folder : :obj:`str`
+    langmuir_nc_folder : `str`
         Path to folder storing Langmuir probe diagnostic data NetCDF files.
-    hdf5_folder : :obj:`str`
+    hdf5_folder : `str`
         Path to folder storing LAPD experiment HDF5 files.
-    interferometry_folder :
+    interferometry_folder : `str`
         Path to folder storing interferometry data. If interferometry data is stored in the HDF5 files,
         then this should be equal to `hdf5_folder`.
     interferometry_mode : {'skip', 'append', 'overwrite'}
+        Mode for (WIP # todo)
     isweep_choices
-        (WIP; see main.py and helper.py)
+        (WIP # todo; see main.py and helper.py)
     core_radius : `astropy.units.Quantity`
+        Radius
     bimaxwellian : `bool`
+        True if
     plot_save_directory : `str`
+        Path
 
     Returns
     -------
     datasets : list of `xarray.Dataset`
         List of Langmuir diagnostic datasets.
-    steady_state_times_runs
+    steady_state_times_runs : list of `astropy.unit.Quantity`
         List of ordered pairs (tuples?) of `astropy.unit.Quantity` objects indicating the beginning and end time
          of the steady-state period.
     hdf5_paths

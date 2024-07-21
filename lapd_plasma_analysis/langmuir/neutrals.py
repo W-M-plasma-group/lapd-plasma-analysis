@@ -1,8 +1,6 @@
-import matplotlib.pyplot as plt
-import astropy.units as u
 import astropy.constants as const
 
-from langmuir.helper import core_steady_state
+from lapd_plasma_analysis.langmuir.helper import *
 
 
 def get_neutral_density(gas_pressure):

@@ -70,11 +70,14 @@ def probe_face_selector(ds, vectors):
     r"""
     Select an isweep signal, linear combination of isweep signals, or multiple such linear combinations from a
     diagnostic dataset. For example, on a dataset with two isweep signals (e.g. from 2 different probes or probe faces),
-        [1,  0] would return the data from the first isweep signal (listed first in configurations.py)
-        [1, -1] would return the parallel difference (first-listed minus second-listed)
-        [[1, 0], [1, -1]] would return a list containing both of the above
+    - [1,  0] would return the data from the first isweep signal (listed first in configurations.py)
+    - [1, -1] would return the parallel difference (first-listed minus second-listed)
+    - [[1, 0], [1, -1]] would return a list containing both of the above
     When multiple datasets are returned, they are placed on separate contour plots, but
     the same line plot with different line styles.
+
+    Parameters
+    ----------
     :param ds: The Dataset of Langmuir data to select from
     :param vectors: "3D" nested list of linear combination of isweep signals to compute
     :return: Dataset containing data from the selected isweep signal or combination of isweep signals

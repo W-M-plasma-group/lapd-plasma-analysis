@@ -1,4 +1,4 @@
-from langmuir.helper import *
+from lapd_plasma_analysis.langmuir.helper import *
 
 
 def preview_characteristics(characteristics_array, positions, ramp_times, langmuir_configs, exp_params_dict,

@@ -12,8 +12,7 @@ def get_isweep_vsweep(filename, vsweep_bc, isweep_metadatas, voltage_gain, orien
     ----------
     :param filename: file path of HDF5 file from LAPD
     :param vsweep_bc: board and channel number of vsweep data in HDF5 file
-    :param isweep_metadatas: structured array of board, channel, receptacle, port, face, resistance, and area
-    for each isweep signal
+    :param isweep_metadatas: structured array of board, channel, receptacle, port, face, resistance, and area for each isweep signal
     :param voltage_gain: numerical value of scaling constant for getting real bias voltages from abstract vsweep data
     :param orientation: +1 or -1, depending on if Isweep should be inverted before analysis
     :return: bias, currents, positions, dt: v_sweep array, i_sweeps array, position array, and timestep amount
