@@ -12,7 +12,7 @@ from lapd_plasma_analysis.langmuir.configurations import get_ion
 def multiplot_linear_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagnostic, probe_face_choices, x_dim='x',
                                 steady_state_by_runs=None, core_rad=None, attribute=None, tolerance=np.nan,
                                 save_directory=""):
-    r"""
+    """
     Plot multiple profiles (x, y, or time) from different datasets on a row of side-by-side plots.
     Plots are grouped by gas puff voltage and cathode discharge current.
 
@@ -491,21 +491,30 @@ def plot_acceleration_vs_pressure_gradient(datasets, steady_state_times_runs, co
                                            probes_faces_midplane, marker_styles_split,
                                            operation="mean", plot_save_folder="", with_expectation=False,
                                            offset=-2.7e7):
-    r"""
+    """
     Plot the parallel acceleration versus the scaled parallel pressure gradient.
 
-    :param datasets: list of datasets to plot
-    :param steady_state_times_runs: list of Quantities indicating the start and end times of the steady-state period
-    for each dataset
-    :param core_radius: Quantity, length of radius of core region
-    :param probes_faces_midplane: list of (probe, face) tuples indicating the midplane of each dataset
-    :param marker_styles_split:
-    :param operation:
-    :param plot_save_folder:
-    :param with_expectation: bool. If true, add three lines to the plot for visualization purposes:
-    the equality line, predicted by MHD; the zero-acceleration line; and the equality line shifted by a constant offset.
-    :param offset: float or int. The offset applied to the equality line in the third line plotted above
-    :return:
+    Parameters
+    ----------
+    datasets: `list` of `xarray.Dataset`
+        list of datasets to plot
+    steady_state_times_runs: `list` of `astropy.units.Quantity`
+        List of Quantities indicating the start and end times of the steady-state period for each dataset.
+    core_radius: `astropy.units.Quantity`
+        Length of radius of core region
+    probes_faces_midplane: `list`
+        List of (probe, face) tuples indicating the midplane of each dataset
+    operation: {'mean', 'median'}
+        Operation to perform on core steady-state data to summarize.
+    plot_save_folder: `str`
+        Path to folder to save plot
+    with_expectation: `bool`
+        If True, add three lines to the plot for visualization purposes -
+        - the equality line, predicted by MHD;
+        - the zero-acceleration line; and
+        - the equality line shifted by a constant offset.
+    offset: `float` or `int`
+        The offset applied to the equality line in the third line plotted above
     """
 
     z_distances = [((anode_z - dataset['z'].isel(probe=1).item() * u.cm)
@@ -662,7 +671,7 @@ def get_title(diagnostic: str) -> str:
 
 def get_colormap_normalizer(datasets, core_radius, steady_state_times_runs, probe_face_midplane,
                             diagnostic='nu_ei', operation='mean', map_type='logarithmic'):
-    r"""
+    """
     Returns the normalized color map and Normalizer object for a list of datasets from one diagnostic in the dataset
     :param datasets:
     :param core_radius:

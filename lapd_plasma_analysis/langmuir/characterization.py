@@ -8,7 +8,7 @@ from lapd_plasma_analysis.langmuir.helper import *
 
 
 def characterize_sweep_array(bias, currents, dt):
-    r"""
+    """
     Function that processes bias and current data into a DataArray of distinct Characteristics.
     Takes in bias and current arrays, smooths them, divides them into separate ramp sections, 
     and creates a Characteristic object for each ramp at each unique x,y position.
@@ -34,7 +34,7 @@ def characterize_sweep_array(bias, currents, dt):
 
 
 def smooth_array(raw_array, margin: int, method: str = "median") -> np.ndarray:
-    r"""
+    """
     Smooth an array using a moving mean or median applied over a window.
     :param raw_array:
     :param margin:
@@ -55,7 +55,7 @@ def smooth_array(raw_array, margin: int, method: str = "median") -> np.ndarray:
 
 
 def isolate_plateaus(bias, margin=0):
-    r"""
+    """
     Find indices corresponding to the beginning and end of every bias ramp.
 
     Parameters

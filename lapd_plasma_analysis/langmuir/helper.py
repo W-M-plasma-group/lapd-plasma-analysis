@@ -6,6 +6,7 @@ from bapsflib.lapd.tools import portnum_to_z
 
 import matplotlib
 from matplotlib import pyplot as plt
+
 matplotlib.rcParams['figure.dpi'] = 300
 plt.rcParams['figure.dpi'] = 300
 
@@ -67,7 +68,7 @@ def get_diagnostic_keys_units(probe_area=1.*u.mm**2, ion_type="He-4+", bimaxwell
 
 
 def probe_face_selector(ds, vectors):
-    r"""
+    """
     Select an isweep signal, linear combination of isweep signals, or multiple such linear combinations from a
     diagnostic dataset. For example, on a dataset with two isweep signals (e.g. from 2 different probes or probe faces),
     - [1,  0] would return the data from the first isweep signal (listed first in configurations.py)
@@ -106,8 +107,11 @@ def array_lookup(array, value):
 
 def core_steady_state(da_input: xr.DataArray, core_rad=None, steady_state_times=None, operation=None,
                       dims_to_keep: list | tuple = (None,)) -> xr.DataArray:
-    r"""
+    """
+    Text
 
+    Parameters
+    ----------
     :param da_input: xarray DataArray with x and y dimensions
     :param core_rad: (optional) astropy Quantity convertible to centimeters giving radius of core
     :param steady_state_times: (optional) tuple or list giving indices of start and end of steady-state period
@@ -149,12 +153,7 @@ def core_steady_state(da_input: xr.DataArray, core_rad=None, steady_state_times=
 def crunch_data(source_data: xr.DataArray | xr.Dataset,
                 source_coord_name: str,
                 destination_coord_da: xr.DataArray):
-    # "Crunch" interferometry data into the density data timescale by averaging all interferometry measurements
-    #     into a "bucket" around the closest matching density time coordinate (within half a time step)
-    #     [inter. ]   (*   *) (*) (*   *) (*) (*   *)   <-- average together all (grouped together) measurements
-    #     [density]   |__o__|__o__|__o__|__o__|__o__|   <-- measurements grouped by closest density measurement "o"
-    # Take the mean of all interferometry measurements in the same "bucket" to match timescales
-    r"""
+    """
     Group data along a specified dimension into bins determined by a destination coordinate and a step size,
     then return the mean of each bin with the dimensions and coordinates of the destination coordinate.
 
@@ -165,6 +164,12 @@ def crunch_data(source_data: xr.DataArray | xr.Dataset,
     :param destination_coord_da: xarray DataArray, used as coordinate
     :return:
     """
+
+    # "Crunch" interferometry data into the density data timescale by averaging all interferometry measurements
+    # into a "bucket" around the closest matching density time coordinate (within half a time step)
+    # [inter. ]   (*   *) (*) (*   *) (*) (*   *)   <-- average together all (grouped together) measurements
+    # [density]   |__o__|__o__|__o__|__o__|__o__|   <-- measurements grouped by closest density measurement "o"
+    # Take the mean of all interferometry measurements in the same "bucket" to match timescales
 
     step = (destination_coord_da[-1] - destination_coord_da[0]) / len(destination_coord_da)
     # Group input data "source_da" along the dimension specified by "source_coord_name"

@@ -5,7 +5,7 @@ from warnings import warn
 
 
 def get_isweep_vsweep(filename, vsweep_bc, isweep_metadatas, voltage_gain, orientation):
-    r"""
+    """
     Reads all sweep data (V-sweep and I-sweep) from HDF5 file Langmuir code.
 
     Parameters

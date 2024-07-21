@@ -7,7 +7,7 @@ from lapd_plasma_analysis.langmuir.configurations import get_config_id
 
 
 def get_exp_params(hdf5_path):
-    r"""
+    """
     Returns a dictionary of important LAPD experiment run parameters and their values.
 
     Parameters
@@ -53,14 +53,14 @@ def get_exp_params(hdf5_path):
 
 
 def get_run_name(file):
-    r"""
+    """
     Get run name of HDF5 file object, e.g. "01_line_valves90V_5000A"
     """
     return {"Run name": file.info['run name']}
 
 
 def get_exp_name(file):
-    r"""
+    """
     Get name of experiment series of HDF5 file object, e.g. "November_2022"
     """
     return {"Exp name": file.info['exp name']}

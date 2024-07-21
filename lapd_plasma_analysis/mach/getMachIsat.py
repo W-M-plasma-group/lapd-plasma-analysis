@@ -11,7 +11,7 @@ from lapd_plasma_analysis.langmuir.getIVsweep import get_shot_positions
 
 
 def get_mach_isat(filename, mach_configs):
-    r"""
+    """
 
     :param filename:
     :param mach_configs:

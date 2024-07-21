@@ -9,7 +9,7 @@ from lapd_plasma_analysis.langmuir.helper import *
 
 
 def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, langmuir_configs, ion_type, bimaxwellian=False):
-    r"""
+    """
     Performs plasma diagnostics on a DataArray of Characteristic objects and returns the diagnostics as a Dataset.
 
     Parameters
@@ -132,7 +132,7 @@ def filter_characteristic(characteristic) -> bool:
 
 
 def get_pressure(density, temperature):
-    r"""Calculate electron pressure from temperature and calibrated density"""
+    """Calculate electron pressure from temperature and calibrated density"""
     pressure_unit = u.Pa
     pressure = 1 * temperature * density * (1. * u.eV * u.m ** -3).to(pressure_unit)  # 3 / 2 replaced by 1
     return pressure.assign_attrs({'units': str(pressure_unit)})
@@ -156,7 +156,7 @@ def get_electron_ion_collision_frequencies(lang_ds: xr.Dataset, ion_type="He-4+"
 
 
 def detect_steady_state_times(langmuir_dataset: xr.Dataset, core_rad):
-    r"""Return start and end times for the steady-state period (where density is ~constant in time)"""
+    """Return start and end times for the steady-state period (where density is ~constant in time)"""
     # TODO very hardcoded!
     exp_name = langmuir_dataset.attrs['Exp name']
     if "january" in exp_name.lower():

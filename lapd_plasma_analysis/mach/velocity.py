@@ -7,7 +7,7 @@ from lapd_plasma_analysis.langmuir.helper import crunch_data, ion_temperature
 
 
 def get_mach_numbers(mach_isat_da: xr.DataArray):
-    r"""
+    """
     Returns Dataset of Mach numbers at each position and time increment.
     Dimensions are (probe, face, x, y, shot, time).
     Note that Mach probes have much higher time resolution than the Langmuir measurement frequency.
@@ -99,8 +99,8 @@ def get_mach_numbers(mach_isat_da: xr.DataArray):
     return mach_ds
 
 
-def get_velocity(mach_ds: xr.Dataset, electron_temperature_da: xr.DataArray, ion_type: str):
-    r"""
+def get_velocity(mach_ds: xr.Dataset, electron_temperature_da: xr.DataArray, ion_type):
+    """
     Returns Dataset of flow velocity at each position and time.
     Dimensions are (probe, face, x, y, shot, time (matching Langmuir plateaus))
 

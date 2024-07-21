@@ -85,7 +85,7 @@ def interferometry_calibration(density_da: xr.DataArray,
 
 
 def itfm_calib_56ghz(langmuir_da, itfm, spatial_dimensions) -> xr.DataArray:
-    r"""
+    """
     Calibrates density data from sweep probe to measurements from interferometry probe.
 
     Parameters
