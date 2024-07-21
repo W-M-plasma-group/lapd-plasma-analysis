@@ -12,6 +12,7 @@ from lapd_plasma_analysis.langmuir.plots import *
 
 from lapd_plasma_analysis.mach.analysis import get_mach_datasets, get_velocity_datasets
 
+from lapd_plasma_analysis.fluctuations.get_Isat_Vf import get_isat_vf
 
 
 # HDF5 file directory; end path with a slash                            # TODO user adjust
@@ -261,6 +262,9 @@ if __name__ == "__main__":
                   f"{pressure[0]:5.2f} {pressure[1]:5.2f} \t "
                   f"{collision_frequency[0]:.2e} {collision_frequency[1]:.2e} \t"
                   f"{parallel_velocity[0]:.2e} {parallel_velocity[1]:.2e} \t")
+
+    get_isat_vf(1)  # TODO remove
+
 
 # TODO Not all MATLAB code has been transferred (e.g. ExB)
 # QUESTION: can we calibrate both Langmuir probes using an interferometry ratio depending only on one of them? (NO)
