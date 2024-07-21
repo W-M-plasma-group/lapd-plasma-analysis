@@ -1,3 +1,10 @@
+"""
+Contains functions for extracting run parameters for LAPD experiments from LAPD HDF5 files.
+For function names ending in a number, the number/numbers represent the configuration IDs
+for which the function is valid. For example, `get_nominal_discharge_03` is valid
+for Series 0 (April 2018) and Series 3 (January 2024) experiments.
+"""
+
 import numpy as np
 import astropy.units as u
 import re

@@ -267,7 +267,7 @@ def itfm_file_search_288ghz(run_str: str, folder_path: str):
 
 
 def itfm_calib_jan_2024(lang_da, itfm, spatial_dimensions) -> xr.DataArray:
-    r"""
+    """
     Calibrates density data from sweep probe to measurements from interferometry probe.
 
     Parameters

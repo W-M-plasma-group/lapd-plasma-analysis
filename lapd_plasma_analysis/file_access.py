@@ -1,3 +1,7 @@
+"""
+Provide functions to access files, to load NetCDF files, and to allow user selection of options from a list.
+"""
+
 import os
 import warnings
 import xarray as xr
@@ -48,12 +52,12 @@ def ask_yes_or_no(prompt):
 
     Parameters
     ----------
-    prompt : str
+    prompt : `str`
         Message to user posed as a yes-or-no question. Consider ending with ' (y/n) ', including spaces.
 
     Returns
     -------
-    bool
+    `bool`
         True or False value representing user's choice of 'y' or 'n'.
     """
 
@@ -83,7 +87,7 @@ def num_to_chr(num):
 
 
 def check_netcdf(file_path):
-    r"""
+    """
     Checks if the given path leads to a valid NetCDF file.
 
     Parameters
@@ -113,7 +117,7 @@ def write_netcdf(dataset, path):
 
 
 def search_folder(directory, ext, limit=None) -> list[str]:
-    r"""Searches the given directory and all subdirectories for files of a desired extension,
+    """Searches the given directory and all subdirectories for files of a desired extension,
     stopping when it reaches 'limit' number of file paths."""
     ext = ext if ext.startswith(".") else "." + ext
     paths_found = []
@@ -127,7 +131,7 @@ def search_folder(directory, ext, limit=None) -> list[str]:
 
 
 def ensure_directory(directory_path: str):
-    r"""
+    """
     Ensures that the path to the directory of saved NetCDF files is properly formatted
     and creates the directory if it does not currently exist.
     """
@@ -147,16 +151,16 @@ def ensure_directory(directory_path: str):
 
 
 def make_path(folder, name, ext):
-    r"""
+    """
     Generates an absolute file path from a folder, a filename (not a path), and an extension.
 
     Parameters
     ----------
-    folder : str
+    folder : `str`
         Path indicating parent folder of file.
-    name : str
+    name : `str`
         Name of file, with no extension.
-    ext : str
+    ext : `str`
         Extension of file, e.g. ".pdf"; leading period is optional.
     """
     # path, extension = os.path.splitext(name)
