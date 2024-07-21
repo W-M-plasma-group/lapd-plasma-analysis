@@ -1,0 +1,7 @@
+plasmapy
+xarray
+numpy
+bapsflib
+bottleneck
+sphinx-rtd-theme
+numpydoc
