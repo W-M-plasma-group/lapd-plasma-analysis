@@ -25,7 +25,8 @@ extensions = ['sphinx.ext.autodoc',
               'numpydoc',
               ]
 
-default_role = ':any:'
+autosummary_generate = True  # Turn on sphinx.ext.autosummary
+
 templates_path = ['_templates']
 exclude_patterns = []
 
