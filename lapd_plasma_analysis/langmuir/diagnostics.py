@@ -137,7 +137,6 @@ def filter_characteristic(characteristic) -> bool:
     if np.max(bias[current < 0]) > 0 * u.V:
         return False
 
-    # reject characteristic if
     return True
 
 

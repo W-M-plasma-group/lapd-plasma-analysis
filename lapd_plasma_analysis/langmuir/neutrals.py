@@ -25,8 +25,6 @@ def get_neutral_ratio(electron_density, steady_state_times, operation="median"):
     # RADIAL/AREAL CODE #
     # _________________ #
 
-    # plateau = electron_density.coords['plateau']  # rename variables for comprehensibility
-
     steady_state_electron_density = core_steady_state(electron_density, steady_state_times=steady_state_times,
                                                       operation=operation,
                                                       dims_to_keep=["probe", "face", "x", "y", "shot"])

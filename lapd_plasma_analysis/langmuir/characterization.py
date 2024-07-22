@@ -80,7 +80,7 @@ def isolate_plateaus(bias, margin=0):
     bias_axes_to_average = tuple(np.arange(bias.ndim)[:-1])
     bias_avg = np.mean(bias, axis=bias_axes_to_average)  # mean of bias across all positions and shots, preserving time
 
-    # Report on how dissimilar the vsweep biases are and if they can be averaged together safely?
+    # todo Report on how dissimilar the vsweep biases are and if they can be averaged together safely?
 
     # Initial fit to guess number of peaks
     min_plateau_width = 500  # change as necessary
@@ -89,7 +89,7 @@ def isolate_plateaus(bias, margin=0):
 
     # Second fit to find maximum bias frames
     peak_frames, peak_properties = find_peaks(bias_avg, height=0, distance=guess_plateau_spacing // 2,
-                                              width=min_plateau_width, rel_height=0.97)  # TODO 0.97 may be hardcoded
+                                              width=min_plateau_width, rel_height=0.97)  # TODO 0.97 is hardcoded
 
     return np.stack((peak_properties['left_ips'].astype(int) + margin // 2, peak_frames - margin // 2), axis=-1)
 

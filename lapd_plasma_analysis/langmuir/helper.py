@@ -17,22 +17,24 @@ ion_temperature = 1 * u.eV
 def value_safe(quantity_or_scalar):
     """ Get value of quantity or scalar, depending on type, without raising an error. """
     try:
-        val = quantity_or_scalar.value  # input is a quantity with dimension and value
+        val = quantity_or_scalar.value      # input is a quantity with dimension and value
     except AttributeError:
-        val = quantity_or_scalar  # input is a dimensionless scalar with no value
+        val = quantity_or_scalar            # input is a dimensionless scalar with no 'value' attribute
     return val
 
 
 def unit_safe(quantity_or_scalar):
     """ Get unit of quantity or scalar, if it exists, without raising an error. """
     try:
-        unit = quantity_or_scalar.unit
+        unit = quantity_or_scalar.unit      # input is a quantity with dimension and value
     except AttributeError:
-        unit = None  # The input data is dimensionless
+        unit = None                         # The input data is dimensionless
     return unit
 
 
 def unpack_bimaxwellian(diagnostics):
+    """ "Unpack" two-element temperature ('T_e') value from a plasmapy diagnostics dictionary
+    and replace with one-element cold temperature, hot temperature, and average temperature values. """
     t_e_cold, t_e_hot = diagnostics['T_e']
     hot_frac = diagnostics['hot_fraction']
     t_e_avg = reduce_bimaxwellian_temperature([t_e_cold, t_e_hot], hot_frac)
