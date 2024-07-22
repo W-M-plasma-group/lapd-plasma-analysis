@@ -1,5 +1,5 @@
 """
-Test - get_Isat_VF.py file docstring
+Under construction. Not usable.
 """
 
 import numpy as np
@@ -10,6 +10,9 @@ from warnings import warn
 
 def get_isat_vf(filename, vsweep_bc, isweep_metadatas, voltage_gain, orientation):
     """
+    (Note: this function is a copy of the get_isweep_vsweep function from langmuir/getIVsweep.py.
+    It will be revised later. The rest of this docstring is inaccurate.)
+
     Reads all sweep data (V-sweep and I-sweep) from HDF5 file Langmuir code.
 
     Parameters
@@ -37,8 +40,6 @@ def get_isat_vf(filename, vsweep_bc, isweep_metadatas, voltage_gain, orientation
         Timestep amount
 
     """
-
-    return
 
     with lapd.File(filename) as lapd_file:
         isweep_bcs = np.atleast_1d(isweep_metadatas[['board', 'channel']])
