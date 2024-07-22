@@ -115,8 +115,8 @@ def array_lookup(array, value):
     return np.argmin(np.abs(array - value))
 
 
-def core_steady_state(da_input: xr.DataArray, core_rad=None, steady_state_times=None, operation=None,
-                      dims_to_keep: list | tuple = (None,)) -> xr.DataArray:
+def core_steady_state(da_input, core_rad=None, steady_state_times=None, operation=None,
+                      dims_to_keep=(None,)):
     """
     Isolates the core region, steady-state period, or both of a diagnostic data array,
     and optionally performs a mean or median over one or more dimensions.
@@ -178,9 +178,7 @@ def core_steady_state(da_input: xr.DataArray, core_rad=None, steady_state_times=
                          f"when acceptable are None, 'mean', 'std', and 'std_error'")
 
 
-def crunch_data(source_data: xr.DataArray | xr.Dataset,
-                source_coord_name: str,
-                destination_coord_da: xr.DataArray):
+def crunch_data(source_data, source_coord_name, destination_coord_da):
     """
     Group data along a specified dimension into bins determined by a destination coordinate and a step size,
     then return the mean of each bin with the dimensions and coordinates of the destination coordinate.
