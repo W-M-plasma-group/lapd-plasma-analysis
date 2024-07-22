@@ -154,8 +154,8 @@ def core_steady_state(da_input, core_rad=None, steady_state_times=None, operatio
                                      np.abs(da.coords['y']) < core_rad.to(u.cm).value), drop=True)
     if steady_state_times is not None:
         steady_state_times_ms = steady_state_times.to(u.Unit(da.coords['time'].attrs['units'])).value
-        da = da.where(np.logical_and(da.time >= steady_state_times_ms[0],
-                                     da.time <= steady_state_times_ms[1]), drop=True)
+        da = da.where(np.logical_and(da.coords['time'] >= steady_state_times_ms[0],
+                                     da.coords['time'] <= steady_state_times_ms[1]), drop=True)
 
     dims_to_reduce = [dim for dim in da.dims if dim not in dims_to_keep]
     if operation is None:

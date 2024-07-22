@@ -10,9 +10,11 @@ Welcome! This is an extremely rudimentary documentation page for the lapd-plasma
 This page was auto-generated from in-code docstrings.
 Click around and have fun. Return to this page using the "home" icon in the top left.
 
+This project can be found on GitHub `here <https://github.com/W-M-plasma-group/lapd-plasma-analysis>`_.
+
 .. toctree::
    :maxdepth: 3
-   :caption: Contents:
+   :caption: Contents
 
    modules
    example
