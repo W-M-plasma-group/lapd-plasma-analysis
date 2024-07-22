@@ -49,9 +49,9 @@ mach_velocity_mode = "append"                                           # not fu
 isweep_choices = [[[1, 0], [0, 0]],     # . 1st combination to plot: 1 * (first face on first probe)
                   [[0, 0], [1, 0]]]     # . 2nd combination to plot: 1 * (first face on second probe)
 # isweep_choices = [[[1, 0], [-1, 0]]]  # .     combination to plot: 1 * (face 1 on probe 1) - 1 * (face 1 on probe 2)
-bimaxwellian = False                                                    # TODO do both and store in same NetCDF file?
+bimaxwellian = False
 core_radius = 21. * u.cm                                                # TODO user can adjust (26 cm in MATLAB code)
-plot_tolerance = np.nan  # 0.25                                         # TODO
+plot_tolerance = np.nan  # 0.25                                         # TODO user can adjust
 velocity_plot_unit = u.km / u.s         # TODO not yet working          # TODO adjust
 
 
@@ -87,6 +87,7 @@ if __name__ == "__main__":
 
     # TODO make table linking variable name to LaTeX code, e.g. "nu_ei" --> "\nu_{ei}",
     #    to make it possible to change colorbar label on plots when diagnostic variable is changed
+    # TODO do both non-bimaxwellian and bimaxwellian analysis and store in same NetCDF file?
 
     print("\n===== Langmuir probe analysis =====")
     print_user_file_choices(hdf5_folder, langmuir_nc_folder, interferometry_folder, interferometry_mode, isweep_choices)
