@@ -14,13 +14,23 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, langmuir_
 
     Parameters
     ----------
-    :param characteristic_arrays: list of 3D NumPy arrays of Characteristics (dims: position #, shot, plateau)
-    :param positions: list of coordinates for position of each shot
-    :param ramp_times: list of time-based Quantities corresponding to time of each shot (peak vsweep)
-    :param langmuir_configs:
-    :param ion_type: string corresponding to a Particle
-    :param bimaxwellian: boolean
-    :return: Dataset object containing diagnostic values at each position
+    characteristic_arrays : `numpy.ndarray` of `plasmapy.diagnostics.langmuir.Characteristic`
+        4D NumPy array of Characteristics (dims: isweep, position #, shot, plateau) (WIP)
+    positions : `list` of coordinates for position of each shot
+        (WIP)
+    ramp_times : `list` of `astropy.units.Quantity`
+        Time-based Quantities corresponding to time of each shot (peak vsweep) (WIP)
+    langmuir_configs
+        (WIP)
+    ion_type : `string`
+        String corresponding to a PlasmaPy Particle name.
+    bimaxwellian : `boolean`
+        Specifies whether to assume a bimaxwellian plasma during plasmapy Langmuir analysis.
+
+    Returns
+    -------
+    `xarray.Dataset`
+        Dataset containing diagnostic values at each position
     """
 
     x = np.unique(positions[:, 0])
@@ -127,12 +137,25 @@ def filter_characteristic(characteristic) -> bool:
     if np.max(bias[current < 0]) > 0 * u.V:
         return False
 
-    # reject characteristic if
     return True
 
 
 def get_pressure(density, temperature):
-    """Calculate electron pressure from temperature and calibrated density"""
+    """
+    Calculate pressure from temperature and density values of choice.
+
+    Parameters
+    ----------
+    density : `astropy.units.Quantity`
+        Quantity representing species number density.
+    temperature : `astropy.units.Quantity`
+        Quantity representing species temperature.
+
+    Returns
+    -------
+    `astropy.units.Quantity`
+        Quantity representing thermal/fluid pressure.
+    """
     pressure_unit = u.Pa
     pressure = 1 * temperature * density * (1. * u.eV * u.m ** -3).to(pressure_unit)  # 3 / 2 replaced by 1
     return pressure.assign_attrs({'units': str(pressure_unit)})
@@ -156,7 +179,22 @@ def get_electron_ion_collision_frequencies(lang_ds: xr.Dataset, ion_type="He-4+"
 
 
 def detect_steady_state_times(langmuir_dataset: xr.Dataset, core_rad):
-    """Return start and end times for the steady-state period (where density is ~constant in time)"""
+    """
+    Return start and end times for the steady-state period (where density is ~constant in time) (WIP).
+
+    Parameters
+    ----------
+    langmuir_dataset : `xarray.Dataset`
+        (WIP)
+    core_rad : `astropy.units.Quantity`
+        (WIP)
+
+    Returns
+    -------
+    `astropy.units.Quantity`
+        Two-element Quantity representing estimate beginning and end times of steady-state period, inclusive.
+    """
+
     # TODO very hardcoded!
     exp_name = langmuir_dataset.attrs['Exp name']
     if "january" in exp_name.lower():
@@ -189,7 +227,7 @@ def diagnose_char(characteristic, probe_area, ion_type, bimaxwellian, indices=No
 
 
 def debug_char(characteristic, error_str, *pos):
-    # A debug function to plot plateaus that cause errors
+    """ A debug function to plot plateaus that cause errors. """
     # TODO update the below core-checker
     # if 5 < pos[-1] < 13 and 0.3 < pos[-2] / 71 < 0.7:  # max(characteristic.current) > 20 * u.mA
     #      pass
@@ -199,6 +237,7 @@ def debug_char(characteristic, error_str, *pos):
     plt.show()
 
 
-def crop_value(diagnostic, minimum, maximum):  # discard diagnostic values (e.g. T_e) outside specified range
+def crop_value(diagnostic, minimum, maximum):
+    """ Discard diagnostic values (e.g. T_e) outside a specified range. """
     value = value_safe(diagnostic)
     return value if minimum <= value <= maximum else np.nan

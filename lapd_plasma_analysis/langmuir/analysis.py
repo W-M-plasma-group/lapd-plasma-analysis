@@ -14,9 +14,11 @@ from lapd_plasma_analysis.langmuir.plots import get_title
 
 
 def get_langmuir_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder, interferometry_mode,
-                          isweep_choices, core_radius, bimaxwellian, plot_save_directory):
+                          core_radius, bimaxwellian, plot_save_directory):
     """
-    Retrieves (# todo)
+    Retrieve datasets of Langmuir probe diagnostic data from LAPD experiments.
+    Also returns the steady-state time period of each dataset
+    and, if applicable, a list of the HDF5 file paths chosen by the user.
 
     Parameters
     ----------
@@ -28,15 +30,18 @@ def get_langmuir_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder
         Path to folder storing interferometry data. If interferometry data is stored in the HDF5 files,
         then this should be equal to `hdf5_folder`.
     interferometry_mode : {'skip', 'append', 'overwrite'}
-        Mode for (WIP # todo)
-    isweep_choices
-        (WIP # todo; see main.py and helper.py)
+        Mode for handling interferometry data.
+        - 'skip' skips all interferometry calibration calculations.
+        - 'append' performs interferometry calibration only on datasets that do not already have calibrated densities.
+        - 'overwrite' recalculates calibrated densities for all datasets.
     core_radius : `astropy.units.Quantity`
-        Radius
+        Radius of core region, or region with high, stable densities. Used to calculate steady-state period
+        and in interferometry calibration.
     bimaxwellian : `bool`
-        True if
+        Specifies if plasmapy Langmuir diagnostics functions should assume a bimaxwellian plasma
+        (i.e. mixed hot and cold electrons).
     plot_save_directory : `str`
-        Path
+        Path to directory for saving plots, including sweep voltage, current, and curve preview plots.
 
     Returns
     -------
@@ -47,13 +52,14 @@ def get_langmuir_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder
          of the steady-state period.
     hdf5_paths
         List of paths to HDF5 files opened. Can be None if NetCDF files used.
+
+    See Also
+    --------
+    load_datasets : creates `xarray.Dataset` datasets used in this function
     """
 
     # Create folder to save NetCDF files if not yet existing
     netcdf_folder = ensure_directory(langmuir_nc_folder)
-
-    # Display user file parameters
-    print_file_choices(hdf5_folder, langmuir_nc_folder, interferometry_folder, interferometry_mode, isweep_choices)
 
     # Ask user to choose either NetCDF files or HDF5 files, then create datasets from them
     datasets, hdf5_paths = load_datasets(hdf5_folder, netcdf_folder, bimaxwellian, plot_save_directory)
@@ -103,7 +109,7 @@ def get_langmuir_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder
     return datasets, steady_state_times_runs, hdf5_paths
 
 
-def print_file_choices(hdf5_folder, lang_nc_folder, interferometry_folder, interferometry_mode, isweep_choices):
+def print_user_file_choices(hdf5_folder, lang_nc_folder, interferometry_folder, interferometry_mode, isweep_choices):
     interferometry_mode_actions = ({"skip": "skipped",
                                     "append": "added to uncalibrated datasets only",
                                     "overwrite": "recalculated for all datasets"})
@@ -119,6 +125,9 @@ def print_file_choices(hdf5_folder, lang_nc_folder, interferometry_folder, inter
 
 
 def load_datasets(hdf5_folder, lang_nc_folder, bimaxwellian, plot_save_directory):
+    """
+    Load Langmuir datasets from NetCDF files or generate them from HDF5 files.
+    """
 
     print("\nThe following Langmuir NetCDF files were found in the NetCDF folder (specified in main.py): ")
     nc_paths = sorted(search_folder(lang_nc_folder, 'nc', limit=52))
@@ -197,6 +206,7 @@ def load_datasets(hdf5_folder, lang_nc_folder, bimaxwellian, plot_save_directory
 
 def interferometry_calibrate_datasets(datasets, density_diagnostic, interferometry_folder, interferometry_mode,
                                       core_radius, steady_state_times):
+    """ Perform interferometry calibration on Langmuir diagnostic datasets. """
     # datasets[i].attrs = exp params
     calibrated_density_diagnostic = density_diagnostic + '_cal'
     print(f"{get_title(density_diagnostic)} mean steady-state interferometry calibration factors")
@@ -223,7 +233,7 @@ def interferometry_calibrate_datasets(datasets, density_diagnostic, interferomet
 
 
 def get_diagnostics_to_plot(diagnostic_name_dict):
-    # Ask users for list of diagnostics to plot
+    """ Ask users for a list of diagnostics to plot. """
     print("The following diagnostics are available to plot: ")
     diagnostics_sort_indices = np.argsort(list(diagnostic_name_dict.values()))
     diagnostics_to_plot_ints = choose_multiple_list(
@@ -234,6 +244,7 @@ def get_diagnostics_to_plot(diagnostic_name_dict):
 
 
 def save_datasets_nc(datasets: list[xr.Dataset], nc_folder, prefix="lang", bimaxwellian=False):
+    """ Save a list of Langmuir diagnostic datasets to NetCDF files. """
     for i in range(len(datasets)):
         ds_save_name = get_dataset_save_name(datasets[i].attrs, prefix, bimaxwellian)
         ds_save_path = make_path(nc_folder, ds_save_name, "nc")
@@ -241,5 +252,6 @@ def save_datasets_nc(datasets: list[xr.Dataset], nc_folder, prefix="lang", bimax
 
 
 def get_dataset_save_name(attrs, prefix, bimaxwellian=False):
+    """ Create a descriptive file name to save Langmuir diagnostic datasets as NetCDF (.nc) files. """
     return (prefix + attrs['Exp name'][:3] + attrs['Exp name'][-2:] + "_"
             + attrs['Run name'] + ("_bimax" if bimaxwellian else ""))

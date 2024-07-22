@@ -10,12 +10,20 @@ def get_isweep_vsweep(filename, vsweep_bc, isweep_metadatas, voltage_gain, orien
 
     Parameters
     ----------
-    :param filename: file path of HDF5 file from LAPD
-    :param vsweep_bc: board and channel number of vsweep data in HDF5 file
-    :param isweep_metadatas: structured array of board, channel, receptacle, port, face, resistance, and area for each isweep signal
-    :param voltage_gain: numerical value of scaling constant for getting real bias voltages from abstract vsweep data
-    :param orientation: +1 or -1, depending on if Isweep should be inverted before analysis
-    :return: bias, currents, positions, dt: v_sweep array, i_sweeps array, position array, and timestep amount
+    filename : `str`
+        file path of HDF5 file from LAPD (WIP)
+    vsweep_bc : `tuple` or `list`
+        board and channel number of vsweep data in HDF5 file (WIP)
+    isweep_metadatas : `numpy.ndarray`
+        structured array of board, channel, receptacle, port, face, resistance, and area for each isweep signal (WIP)
+    voltage_gain : `float`
+        Numerical value of scaling constant for calculating real bias voltages from abstract vsweep data.
+    orientation : {+1, -1}
+        +1 or -1, depending on if Isweep should be inverted before analysis (WIP)
+
+    Returns
+    -------
+    bias, currents, positions, dt: v_sweep array, i_sweeps array, position array, and timestep amount (WIP)
     """
 
     with lapd.File(filename) as lapd_file:
@@ -74,6 +82,7 @@ def get_isweep_vsweep(filename, vsweep_bc, isweep_metadatas, voltage_gain, orien
 
 
 def get_shot_positions(isweep_motor_data):
+    """ (WIP) """
     num_shots = len(isweep_motor_data['shotnum'])
     shot_positions = np.round(isweep_motor_data['xyz'], 1)
 

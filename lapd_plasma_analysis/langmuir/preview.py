@@ -3,6 +3,25 @@ from lapd_plasma_analysis.langmuir.helper import *
 
 def preview_characteristics(characteristics_array, positions, ramp_times, langmuir_configs, exp_params_dict,
                             diagnostics=False, ion=None, bimaxwellian=False, plot_save_directory=""):
+    """
+    WIP
+
+    Parameters
+    ----------
+    characteristics_array
+    positions
+    ramp_times
+    langmuir_configs
+    exp_params_dict
+    diagnostics
+    ion
+    bimaxwellian
+    plot_save_directory
+
+    Returns
+    -------
+
+    """
     ports_faces = langmuir_configs[['port', 'face']]
     areas = langmuir_configs['area']
     plt.rcParams['figure.figsize'] = (6, 4)
@@ -87,6 +106,23 @@ def preview_characteristics(characteristics_array, positions, ramp_times, langmu
 
 
 def preview_raw_sweep(bias, currents, positions, ports_faces, exp_params_dict, dt, plot_save_directory=""):
+    """
+    WIP
+
+    Parameters
+    ----------
+    bias
+    currents
+    positions
+    ports_faces
+    exp_params_dict
+    dt
+    plot_save_directory
+
+    Returns
+    -------
+
+    """
     plt.rcParams['figure.figsize'] = (8, 3)  # 40, 4 but decrease dpi!
 
     x = np.unique(positions[:, 0])

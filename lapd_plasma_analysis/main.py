@@ -7,12 +7,11 @@ bapsflib libraries. Comments are added inline. Separate documentation is under c
 from lapd_plasma_analysis.file_access import ask_yes_or_no
 
 from lapd_plasma_analysis.langmuir.configurations import get_config_id
-from lapd_plasma_analysis.langmuir.analysis import (get_langmuir_datasets, get_diagnostics_to_plot, save_datasets_nc)
+from lapd_plasma_analysis.langmuir.analysis import (get_langmuir_datasets, get_diagnostics_to_plot, save_datasets_nc,
+                                                    print_user_file_choices)
 from lapd_plasma_analysis.langmuir.plots import *
 
 from lapd_plasma_analysis.mach.analysis import get_mach_datasets, get_velocity_datasets
-
-from lapd_plasma_analysis.fluctuations.get_Isat_Vf import get_isat_vf
 
 
 # HDF5 file directory; end path with a slash                            # TODO user adjust
@@ -50,9 +49,9 @@ mach_velocity_mode = "append"                                           # not fu
 isweep_choices = [[[1, 0], [0, 0]],     # . 1st combination to plot: 1 * (first face on first probe)
                   [[0, 0], [1, 0]]]     # . 2nd combination to plot: 1 * (first face on second probe)
 # isweep_choices = [[[1, 0], [-1, 0]]]  # .     combination to plot: 1 * (face 1 on probe 1) - 1 * (face 1 on probe 2)
-bimaxwellian = False                                                    # TODO do both and store in same NetCDF file?
+bimaxwellian = False
 core_radius = 21. * u.cm                                                # TODO user can adjust (26 cm in MATLAB code)
-plot_tolerance = np.nan  # 0.25                                         # TODO
+plot_tolerance = np.nan  # 0.25                                         # TODO user can adjust
 velocity_plot_unit = u.km / u.s         # TODO not yet working          # TODO adjust
 
 
@@ -88,8 +87,10 @@ if __name__ == "__main__":
 
     # TODO make table linking variable name to LaTeX code, e.g. "nu_ei" --> "\nu_{ei}",
     #    to make it possible to change colorbar label on plots when diagnostic variable is changed
+    # TODO do both non-bimaxwellian and bimaxwellian analysis and store in same NetCDF file?
 
     print("\n===== Langmuir probe analysis =====")
+    print_user_file_choices(hdf5_folder, langmuir_nc_folder, interferometry_folder, interferometry_mode, isweep_choices)
     datasets, steady_state_times_runs, hdf5_paths = get_langmuir_datasets(
         langmuir_nc_folder, hdf5_folder, interferometry_folder, interferometry_mode,
         isweep_choices, core_radius, bimaxwellian, plot_save_folder)
@@ -262,8 +263,6 @@ if __name__ == "__main__":
                   f"{pressure[0]:5.2f} {pressure[1]:5.2f} \t "
                   f"{collision_frequency[0]:.2e} {collision_frequency[1]:.2e} \t"
                   f"{parallel_velocity[0]:.2e} {parallel_velocity[1]:.2e} \t")
-
-    get_isat_vf(1)  # TODO remove
 
 
 # TODO Not all MATLAB code has been transferred (e.g. ExB)

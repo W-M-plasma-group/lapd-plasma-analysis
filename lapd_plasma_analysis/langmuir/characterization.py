@@ -15,10 +15,19 @@ def characterize_sweep_array(bias, currents, dt):
 
     Parameters
     ----------
-    :param bias: array, units of voltage
-    :param currents: array, units of current
-    :param dt: float, units of time
-    :return: 2D array of Characteristic objects by shot number and plateau number
+    bias : `astropy.units.Quantity`
+        Array with units of voltage, representing Langmuir probe voltage over time, with dimensions of
+        position, shot, and frame (within a sweep).
+    currents : `astropy.units.Quantity`
+        Array with units of currents, representing Langmuir probe voltage over time, with dimensions of
+        isweep (probe/face combination), position, shot, and frame (within a sweep).
+    dt : `astropy.units.Quantity`
+        Timestep in units of time between individual "frames" of sweep voltage/current measurement within a single shot.
+
+    Returns
+    -------
+    `numpy.ndarray`
+        4D array of Characteristic objects with isweep, location, shot, and ramp number dimensions.
     """
 
     bias, currents = ensure_sweep_units(bias, currents)
@@ -35,11 +44,7 @@ def characterize_sweep_array(bias, currents, dt):
 
 def smooth_array(raw_array, margin: int, method: str = "median") -> np.ndarray:
     """
-    Smooth an array using a moving mean or median applied over a window.
-    :param raw_array:
-    :param margin:
-    :param method:
-    :return:
+    Smooth an array by a rolling window mean or median (function not currently used).
     """
 
     array = raw_array.copy()
@@ -60,16 +65,22 @@ def isolate_plateaus(bias, margin=0):
 
     Parameters
     ----------
-    :param bias:
-    :param margin:
-    :return: num_plateaus-by-2 array; start indices in first column, end indices in second
+    bias : `astropy.units.Quantity`
+        Quantity array containing Langmuir probe applied voltages, with final dimension representing frames (time).
+    margin : `int`, default=0
+        Rolling window margin width, in number of frames, used to smooth bias and current.
+
+    Returns
+    -------
+    `numpy.ndarray`
+        num_plateaus-by-2 array; start indices in first column, end indices in second
     """
 
     # Assume strictly that all plateaus start and end at the same time after the start of the shot as in any other shot
     bias_axes_to_average = tuple(np.arange(bias.ndim)[:-1])
     bias_avg = np.mean(bias, axis=bias_axes_to_average)  # mean of bias across all positions and shots, preserving time
 
-    # Report on how dissimilar the vsweep biases are and if they can be averaged together safely?
+    # todo Report on how dissimilar the vsweep biases are and if they can be averaged together safely?
 
     # Initial fit to guess number of peaks
     min_plateau_width = 500  # change as necessary
@@ -78,7 +89,7 @@ def isolate_plateaus(bias, margin=0):
 
     # Second fit to find maximum bias frames
     peak_frames, peak_properties = find_peaks(bias_avg, height=0, distance=guess_plateau_spacing // 2,
-                                              width=min_plateau_width, rel_height=0.97)  # TODO 0.97 may be hardcoded
+                                              width=min_plateau_width, rel_height=0.97)  # TODO 0.97 is hardcoded
 
     return np.stack((peak_properties['left_ips'].astype(int) + margin // 2, peak_frames - margin // 2), axis=-1)
 
@@ -104,7 +115,7 @@ def ensure_sweep_units(bias, current):
 
 
 def characteristic_array(bias, currents, ramp_bounds):
-    # 4D: num_isweep * unique_position * shot * plateau_num
+    """ Returns 4D array of characteristics: num_isweep * unique_position * shot * plateau_num """
     # "currents" has "isweep" dimension in front; may have size 1
 
     ramp_slices = np.array([slice(ramp[0], ramp[1]) for ramp in ramp_bounds])

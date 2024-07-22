@@ -1,3 +1,7 @@
+""" File containing functions for calibrating Langmuir probe density measurements
+using interferometer data, using known interferometer configurations in certain experiment series.
+For brevity, "interferometry" is abbreviated as "itfm" throughout this file. """
+
 import numpy as np
 import xarray as xr
 import pandas as pd
@@ -13,13 +17,28 @@ from lapd_plasma_analysis.langmuir.helper import *
 from lapd_plasma_analysis.langmuir.configurations import get_config_id
 
 
-# "interferometry" is abbreviated as "itfm" throughout
-def interferometry_calibration(density_da: xr.DataArray,
-                               exp_attrs: dict,
-                               itfm_folder: str,              # path to either HDF5 or text folder
-                               steady_state: tuple,           # in ms
-                               core_radius: u.Quantity = 26. * u.cm,
-                               ) -> xr.DataArray:
+def interferometry_calibration(density_da, exp_attrs, itfm_folder, steady_state, core_radius=26. * u.cm):
+    """
+    WIP
+
+    Parameters
+    ----------
+    density_da : `xarray.DataArray`
+        WIP
+    exp_attrs : `dict`
+        WIP; output of [other function]
+    itfm_folder : `str`
+        WIP; path to either HDF5 or text folder
+    steady_state : `astropy.units.Quantity`
+        WIP
+    core_radius : `astropy.units.Quantity`
+        WIP
+
+    Returns
+    -------
+    `xarray.DataArray`
+        WIP
+    """
 
     itfm_id = get_config_id(exp_attrs['Exp name'])
 
@@ -90,11 +109,17 @@ def itfm_calib_56ghz(langmuir_da, itfm, spatial_dimensions) -> xr.DataArray:
 
     Parameters
     ----------
-    :param langmuir_da: DataArray of n_e in cm^-3, core region only
-    :param itfm: structured array of interferometry data and metadata from HDF5 file
-    :param spatial_dimensions: list of spatial dimensions of density data, e.g. ('x', 'y')
+    langmuir_da : `xarray.DataArray`
+        Diagnostic array of n_e in cm^-3, core region only (WIP)
+    itfm : `numpy.ndarray`
+        WIP; structured array of interferometry data and metadata from HDF5 file
+    spatial_dimensions : `list` of `str`
+        WIP; list of spatial dimensions of density data, e.g. ('x', 'y')
 
-    :return: DataArray of dimensionless scale factors for density data
+    Returns
+    -------
+    `xarray.DataArray`
+        WIP; of dimensionless scale factors for density data
     """
 
     # INTERFEROMETRY DATA #
@@ -272,11 +297,17 @@ def itfm_calib_jan_2024(lang_da, itfm, spatial_dimensions) -> xr.DataArray:
 
     Parameters
     ----------
-    :param lang_da: DataArray of n_e in cm^-3, core region only
-    :param itfm: structured array of interferometry data and metadata from HDF5 file
-    :param spatial_dimensions: list of spatial dimensions of density data, e.g. ('x', 'y')
+    lang_da : `xarray.DataArray`
+        WIP; of n_e in cm^-3, core region only
+    itfm : `numpy.ndarray`
+        WIP; structured array of interferometry data and metadata from HDF5 file
+    spatial_dimensions : `list` of `str`
+        WIP; list of spatial dimensions of density data, e.g. ('x', 'y')
 
-    :return: DataArray of dimensionless scale factors for density data
+    Returns
+    -------
+    `xarray.DataArray`
+        WIP; of dimensionless scale factors for density data
     """
 
     # INTERFEROMETRY DATA #
