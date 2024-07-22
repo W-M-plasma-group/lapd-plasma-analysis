@@ -14,7 +14,7 @@ from lapd_plasma_analysis.langmuir.plots import get_title
 
 
 def get_langmuir_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder, interferometry_mode,
-                          isweep_choices, core_radius, bimaxwellian, plot_save_directory):
+                          core_radius, bimaxwellian, plot_save_directory):
     """
     Retrieves (# todo)
 
@@ -51,9 +51,6 @@ def get_langmuir_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder
 
     # Create folder to save NetCDF files if not yet existing
     netcdf_folder = ensure_directory(langmuir_nc_folder)
-
-    # Display user file parameters
-    print_file_choices(hdf5_folder, langmuir_nc_folder, interferometry_folder, interferometry_mode, isweep_choices)
 
     # Ask user to choose either NetCDF files or HDF5 files, then create datasets from them
     datasets, hdf5_paths = load_datasets(hdf5_folder, netcdf_folder, bimaxwellian, plot_save_directory)

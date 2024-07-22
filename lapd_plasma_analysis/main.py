@@ -7,7 +7,8 @@ bapsflib libraries. Comments are added inline. Separate documentation is under c
 from lapd_plasma_analysis.file_access import ask_yes_or_no
 
 from lapd_plasma_analysis.langmuir.configurations import get_config_id
-from lapd_plasma_analysis.langmuir.analysis import (get_langmuir_datasets, get_diagnostics_to_plot, save_datasets_nc)
+from lapd_plasma_analysis.langmuir.analysis import (get_langmuir_datasets, get_diagnostics_to_plot, save_datasets_nc,
+                                                    print_user_file_choices)
 from lapd_plasma_analysis.langmuir.plots import *
 
 from lapd_plasma_analysis.mach.analysis import get_mach_datasets, get_velocity_datasets
@@ -90,6 +91,7 @@ if __name__ == "__main__":
     #    to make it possible to change colorbar label on plots when diagnostic variable is changed
 
     print("\n===== Langmuir probe analysis =====")
+    print_user_file_choices(hdf5_folder, langmuir_nc_folder, interferometry_folder, interferometry_mode, isweep_choices)
     datasets, steady_state_times_runs, hdf5_paths = get_langmuir_datasets(
         langmuir_nc_folder, hdf5_folder, interferometry_folder, interferometry_mode,
         isweep_choices, core_radius, bimaxwellian, plot_save_folder)
