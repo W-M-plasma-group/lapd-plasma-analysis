@@ -4,6 +4,7 @@ import astropy.units as u
 
 
 def get_config_id(exp_name):
+    """ Return a positive integer "configuration ID" representing an experiment's series name (e.g. "January_2024")."""
     valid_configs = ["April_2018", "March_2022", "November_2022", "January_2024"]
 
     try:
@@ -15,7 +16,8 @@ def get_config_id(exp_name):
                                   + "configs or, if you like, you can manually update configurations.py.")
 
 
-def get_vsweep_bc(config_id):  # return (board, channel) for vsweep data
+def get_vsweep_bc(config_id):
+    """ Return (board, channel) for vsweep data. """
     vsweep_bcs = [(1, 3),   # April_2018
                   (1, 1),   # March_2022
                   (1, 1),   # November_2022
@@ -30,6 +32,7 @@ def get_voltage_gain(config_id):
 
 
 def get_langmuir_config(hdf5_path, config_id):
+    """ Return hardcoded configuration and probe setup data for an experiment."""
 
     # each list in tuple corresponds to an experiment series;
     # each tuple in list corresponds to configuration data for a single probe used in those experiments
@@ -66,12 +69,15 @@ def get_langmuir_config(hdf5_path, config_id):
 
 
 def get_ports_receptacles(hdf5_path):
+    """ Returns a map between port numbers and 6K Compumotor receptacles based on HDF5 file data. """
     with lapd.File(hdf5_path) as fi:
         configs = fi.controls['6K Compumotor'].configs
         return {configs[probe]['probe']['port']: configs[probe]['receptacle'] for probe in configs}
 
 
 def get_ion(run_name: str):
+    """ Extract ion type (singly-ionized Helium-4 or singly-ionized Hydrogen) from the metadata name of an experiment.
+     May be prone to typos in experiment name. """
     if "h2" in run_name.lower():
         print("Assuming fully dissociated hydrogen (H+)")
         return "H+"
@@ -80,6 +86,6 @@ def get_ion(run_name: str):
 
 
 def get_orientation(config_id):
-    # Return 1 if data is stored with I_es positive and I_is negative (no need to invert),
-    #  or return -1 if is stored with I_es negative and I_is positive (need to invert)
+    """ Return 1 if data is stored with I_es positive and I_is negative (no need to invert),
+    or return -1 if is stored with I_es negative and I_is positive (need to invert) """
     return (-1, 1, 1, -1)[config_id]

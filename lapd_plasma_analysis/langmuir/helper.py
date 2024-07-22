@@ -14,8 +14,8 @@ anode_z = portnum_to_z(0).to(u.m)
 ion_temperature = 1 * u.eV
 
 
-def value_safe(quantity_or_scalar):  # Get value of quantity or scalar, depending on type
-
+def value_safe(quantity_or_scalar):
+    """ Get value of quantity or scalar, depending on type, without raising an error. """
     try:
         val = quantity_or_scalar.value  # input is a quantity with dimension and value
     except AttributeError:
@@ -23,8 +23,8 @@ def value_safe(quantity_or_scalar):  # Get value of quantity or scalar, dependin
     return val
 
 
-def unit_safe(quantity_or_scalar):  # Get unit of quantity or scalar, if possible
-
+def unit_safe(quantity_or_scalar):
+    """ Get unit of quantity or scalar, if it exists, without raising an error. """
     try:
         unit = quantity_or_scalar.unit
     except AttributeError:
@@ -43,7 +43,8 @@ def unpack_bimaxwellian(diagnostics):
 
 
 def get_diagnostic_keys_units(probe_area=1.*u.mm**2, ion_type="He-4+", bimaxwellian=False):
-    # Perform diagnostic on some sample data to get all diagnostic names and units as dictionary of strings
+    """ Perform diagnostic on sample data to get all diagnostic names and units as dictionary of strings,
+     then add additional names and units. """
 
     bias = np.linspace(-20, 20, 200) * u.V
     current = ((1 + np.exp(-bias.value / 2)) ** (-1) - 0.1) * u.A
@@ -71,17 +72,23 @@ def probe_face_selector(ds, vectors):
     """
     Select an isweep signal, linear combination of isweep signals, or multiple such linear combinations from a
     diagnostic dataset. For example, on a dataset with two isweep signals (e.g. from 2 different probes or probe faces),
-    - [1,  0] would return the data from the first isweep signal (listed first in configurations.py)
-    - [1, -1] would return the parallel difference (first-listed minus second-listed)
-    - [[1, 0], [1, -1]] would return a list containing both of the above
+        - [1,  0] would return the data from the first isweep signal (listed first in configurations.py)
+        - [1, -1] would return the parallel difference (first-listed minus second-listed)
+        - [[1, 0], [1, -1]] would return a list containing both of the above
     When multiple datasets are returned, they are placed on separate contour plots, but
     the same line plot with different line styles.
 
     Parameters
     ----------
-    :param ds: The Dataset of Langmuir data to select from
-    :param vectors: "3D" nested list of linear combination of isweep signals to compute
-    :return: Dataset containing data from the selected isweep signal or combination of isweep signals
+    ds : `xarray.Dataset`
+        The Langmuir diagnostic dataset to select one or more probe-face linear combinations from.
+    vectors : `list` of `list` of `list`
+        "3D" nested list of linear combination of isweep signals to compute (WIP)
+
+    Returns
+    -------
+    `list` of `xarray.Dataset`
+        List of datasets containing data from the selected isweep signal or combination of isweep signals (WIP)
     """
 
     manual_attrs = ds.attrs  # TODO raise xarray issue about losing attrs even with xr.set_options(keep_attrs=True):
@@ -102,22 +109,41 @@ def probe_face_selector(ds, vectors):
 
 
 def array_lookup(array, value):
+    """ Returns the index of the `array` element closest to a given `value`. """
     return np.argmin(np.abs(array - value))
 
 
 def core_steady_state(da_input: xr.DataArray, core_rad=None, steady_state_times=None, operation=None,
                       dims_to_keep: list | tuple = (None,)) -> xr.DataArray:
     """
-    Text
+    Isolates the core region, steady-state period, or both of a diagnostic data array,
+    and optionally performs a mean or median over one or more dimensions.
 
     Parameters
     ----------
-    :param da_input: xarray DataArray with x and y dimensions
-    :param core_rad: (optional) astropy Quantity convertible to centimeters giving radius of core
-    :param steady_state_times: (optional) tuple or list giving indices of start and end of steady-state period
-    :param operation: (optional) Operation to perform on core/steady_state data
-    :param dims_to_keep: (optional) optional list of dimensions not to calculate mean across
-    :return: DataArray with dimensions dims_to_keep
+    da_input : `xarray.DataArray`
+        Diagnostic data array with at least 'x', 'y', and 'time' coordinates.
+    core_rad : `astropy.units.Quantity`, optional
+        Distance quantity giving radius of LAPD plasma core region.
+    steady_state_times : `astropy.units.Quantity`, optional
+       Two-element quantity giving start and end times of steady-state period, inclusive.
+    operation : {"mean", "median", "std", "std_error"}, optional
+        Operation to perform on core/steady_state data on all dimensions but those specified in `dims_to_keep`.
+             - "mean" calculates the mean diagnostic value in the core/steady-state region.
+             - "median" calculates the median diagnostic value in the core/steady-state region.
+             - "std" calculates the standard deviation of the diagnostic values in the core/steady-state region.
+             - "std_error" calculates the unbiased standard error, or 95% confidence interval radius, of the (hypothetical) mean
+              of each value in the array that would result if a mean were performed over all dimensions
+              not specified in `dims_to_keep`. NaN values are removed from the degrees of freedom of the standard error.
+    dims_to_keep: `list` or `tuple`, default=(None,)
+        List or tuple of dimension names not to calculate statistics across, or None to leave all dimensions intact.
+        If not None, the resulting array will have only the dimensions given by `dims_to_keep`.
+
+    Returns
+    -------
+    `xarray.DataArray`
+        Diagnostic array with dimensions given by `dims_to_keep`. May be core or steady-state data only,
+        and may have had statistics performed to collapse out all dimensions except those in `dims_to_keep`.
     """
 
     da = da_input.copy()
@@ -159,10 +185,16 @@ def crunch_data(source_data: xr.DataArray | xr.Dataset,
 
     Parameters
     ----------
-    :param source_data: DataArray containing data to bin and average
-    :param source_coord_name: string, dimension in data_array; used to bin data
-    :param destination_coord_da: xarray DataArray, used as coordinate
-    :return:
+    source_data : `xarray.DataArray` or `xarray.Dataset`
+        containing data to bin and average (WIP)
+    source_coord_name : `str`
+        string, dimension in data_array; used to bin data (WIP)
+    destination_coord_da : `xarray.DataArray`
+        used as coordinate (WIP)
+
+    Returns
+    ------
+
     """
 
     # "Crunch" interferometry data into the density data timescale by averaging all interferometry measurements

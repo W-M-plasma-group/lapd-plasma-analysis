@@ -14,18 +14,33 @@ def multiplot_linear_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_dia
                                 save_directory=""):
     """
     Plot multiple profiles (x, y, or time) from different datasets on a row of side-by-side plots.
-    Plots are grouped by gas puff voltage and cathode discharge current.
+    Plots are grouped by gas puff voltage and cathode discharge current. (WIP)
 
-    :param diagnostics_datasets: list of xarray Datasets
-    :param plot_diagnostic: string identifying label of desired diagnostics
-    :param probe_face_choices:
-    :param x_dim:
-    :param steady_state_by_runs:
-    :param core_rad:
-    :param attribute:
-    :param tolerance:
-    :param save_directory:
-    :return:
+    Parameters
+    ----------
+    diagnostics_datasets : `list` of `xarray.Dataset`
+        WIP
+    plot_diagnostic : `string`
+        WIP; identifying label of desired diagnostics
+    probe_face_choices
+        WIP
+    x_dim : `str`
+        WIP
+    steady_state_by_runs : _
+        WIP
+    core_rad : _
+        WIP
+    attribute : _
+        WIP
+    tolerance : _
+        WIP
+    save_directory : _
+        WIP
+
+    Returns
+    -------
+    _
+        WIP
     """
     # TODO generalize steady_state_by_runs, add curve_dimension to control what different colors represent
 
@@ -144,7 +159,7 @@ def multiplot_linear_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_dia
 
 def plot_linear_diagnostic(diagnostics_dataset: xr.Dataset, probe_face_coefficients, diagnostic: str, plot_type: str,
                            steady_state, shot_mode="mean", save_directory="", tolerance=np.nan):
-    # Plots the given diagnostic(s) from the dataset in the given style
+    """ Plots the given diagnostic(s) from the dataset in the given style. """
 
     linear_ds_s = []
     linear_dimensions = []
@@ -496,24 +511,24 @@ def plot_acceleration_vs_pressure_gradient(datasets, steady_state_times_runs, co
 
     Parameters
     ----------
-    datasets: `list` of `xarray.Dataset`
+    datasets : `list` of `xarray.Dataset`
         list of datasets to plot
-    steady_state_times_runs: `list` of `astropy.units.Quantity`
+    steady_state_times_runs : `list` of `astropy.units.Quantity`
         List of Quantities indicating the start and end times of the steady-state period for each dataset.
-    core_radius: `astropy.units.Quantity`
+    core_radius : `astropy.units.Quantity`
         Length of radius of core region
-    probes_faces_midplane: `list`
+    probes_faces_midplane : `list`
         List of (probe, face) tuples indicating the midplane of each dataset
-    operation: {'mean', 'median'}
+    operation : {'mean', 'median'}
         Operation to perform on core steady-state data to summarize.
-    plot_save_folder: `str`
+    plot_save_folder : `str`
         Path to folder to save plot
-    with_expectation: `bool`
+    with_expectation : `bool`
         If True, add three lines to the plot for visualization purposes -
         - the equality line, predicted by MHD;
         - the zero-acceleration line; and
         - the equality line shifted by a constant offset.
-    offset: `float` or `int`
+    offset : `float` or `int`
         The offset applied to the equality line in the third line plotted above
     """
 
@@ -672,15 +687,20 @@ def get_title(diagnostic: str) -> str:
 def get_colormap_normalizer(datasets, core_radius, steady_state_times_runs, probe_face_midplane,
                             diagnostic='nu_ei', operation='mean', map_type='logarithmic'):
     """
-    Returns the normalized color map and Normalizer object for a list of datasets from one diagnostic in the dataset
-    :param datasets:
-    :param core_radius:
-    :param steady_state_times_runs:
-    :param probe_face_midplane:
-    :param diagnostic:
-    :param operation:
-    :param map_type:
-    :return:
+    Returns the normalized color map and Normalizer object for a list of datasets from one diagnostic in the dataset WIP
+
+    Parameters
+    ----------
+    datasets:
+    core_radius:
+    steady_state_times_runs:
+    probe_face_midplane:
+    diagnostic:
+    operation:
+    map_type:
+
+    Returns
+    -------
     """
     if map_type != "logarithmic":
         raise NotImplementedError("Map types other than 'logarithmic' are not currently supported.")  # TODO support
