@@ -131,12 +131,13 @@ def core_steady_state(da_input, core_rad=None, steady_state_times=None, operatio
        Two-element quantity giving start and end times of steady-state period, inclusive.
     operation : {"mean", "median", "std", "std_error"}, optional
         Operation to perform on core/steady_state data on all dimensions but those specified in `dims_to_keep`.
-             - "mean" calculates the mean diagnostic value in the core/steady-state region.
-             - "median" calculates the median diagnostic value in the core/steady-state region.
-             - "std" calculates the standard deviation of the diagnostic values in the core/steady-state region.
-             - "std_error" calculates the unbiased standard error, or 95% confidence interval radius, of the (hypothetical) mean
-              of each value in the array that would result if a mean were performed over all dimensions
-              not specified in `dims_to_keep`. NaN values are removed from the degrees of freedom of the standard error.
+          - "mean" calculates the mean diagnostic value in the core/steady-state region.
+          - "median" calculates the median diagnostic value in the core/steady-state region.
+          - "std" calculates the standard deviation of the diagnostic values in the core/steady-state region.
+          - "std_error" calculates the unbiased standard error, or 95% confidence interval radius,
+            of the (hypothetical) mean of each value in the array that would result
+            if a mean were performed over all dimensions not specified in `dims_to_keep`.
+            NaN values are removed from the degrees of freedom of the standard error.
     dims_to_keep: `list` or `tuple`, default=(None,)
         List or tuple of dimension names not to calculate statistics across, or None to leave all dimensions intact.
         If not None, the resulting array will have only the dimensions given by `dims_to_keep`.

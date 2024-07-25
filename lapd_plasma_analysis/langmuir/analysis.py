@@ -154,7 +154,7 @@ def load_datasets(hdf5_folder, lang_nc_folder, bimaxwellian, plot_save_directory
         datasets = []
         for hdf5_path in hdf5_chosen_list:
 
-            print("\nOpening file", repr(hdf5_path), "...")
+            print(f"\nOpening file {repr(hdf5_path)} ...")
 
             exp_params_dict = get_exp_params(hdf5_path)  # list of experimental parameters
 

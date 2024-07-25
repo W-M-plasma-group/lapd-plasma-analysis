@@ -16,8 +16,8 @@ from lapd_plasma_analysis.mach.analysis import get_mach_datasets, get_velocity_d
 
 # HDF5 file directory; end path with a slash                            # TODO user adjust
 # ----------------------------------------------------------------------------------------
-# hdf5_folder = "/Users/leomurphy/lapd-data/combined/"
-hdf5_folder = "/Users/leomurphy/lapd-data/November_2022/"
+hdf5_folder = "/Users/leomurphy/lapd-data/combined/"
+# hdf5_folder = "/Users/leomurphy/lapd-data/November_2022/"
 # hdf5_folder = "/Users/leomurphy/lapd-data/April_2018/"
 
 assert hdf5_folder.endswith("/")
