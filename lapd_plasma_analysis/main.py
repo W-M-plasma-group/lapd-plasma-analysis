@@ -16,8 +16,8 @@ from lapd_plasma_analysis.mach.analysis import get_mach_datasets, get_velocity_d
 
 # HDF5 file directory; end path with a slash                            # TODO user adjust
 # ----------------------------------------------------------------------------------------
-# hdf5_folder = "/Users/leomurphy/lapd-data/combined/"
-hdf5_folder = "/Users/leomurphy/lapd-data/November_2022/"
+hdf5_folder = "/Users/leomurphy/lapd-data/combined/"
+# hdf5_folder = "/Users/leomurphy/lapd-data/November_2022/"
 # hdf5_folder = "/Users/leomurphy/lapd-data/April_2018/"
 
 assert hdf5_folder.endswith("/")
@@ -93,7 +93,7 @@ if __name__ == "__main__":
     print_user_file_choices(hdf5_folder, langmuir_nc_folder, interferometry_folder, interferometry_mode, isweep_choices)
     datasets, steady_state_times_runs, hdf5_paths = get_langmuir_datasets(
         langmuir_nc_folder, hdf5_folder, interferometry_folder, interferometry_mode,
-        isweep_choices, core_radius, bimaxwellian, plot_save_folder)
+        core_radius, bimaxwellian, plot_save_folder)
 
     print("\n===== Mach probe analysis =====")
     mach_datasets = get_mach_datasets(mach_nc_folder, hdf5_folder, datasets, hdf5_paths, mach_velocity_mode)

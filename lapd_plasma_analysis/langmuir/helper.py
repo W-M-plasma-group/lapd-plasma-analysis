@@ -72,25 +72,45 @@ def get_diagnostic_keys_units(probe_area=1.*u.mm**2, ion_type="He-4+", bimaxwell
 
 def probe_face_selector(ds, vectors):
     """
-    Select an isweep signal, linear combination of isweep signals, or multiple such linear combinations from a
-    diagnostic dataset. For example, on a dataset with two isweep signals (e.g. from 2 different probes or probe faces),
-        - [1,  0] would return the data from the first isweep signal (listed first in configurations.py)
-        - [1, -1] would return the parallel difference (first-listed minus second-listed)
-        - [[1, 0], [1, -1]] would return a list containing both of the above
-    When multiple datasets are returned, they are placed on separate contour plots, but
-    the same line plot with different line styles.
+    Specify a linear combination of diagnostic data from different isweep signal sources (i.e. from different
+    probe faces), or multiple such linear combinations, from a diagnostic dataset.
+    The entries of `vectors` determine what linear combinations of data are plotted in `plots.py`.
 
     Parameters
     ----------
     ds : `xarray.Dataset`
         The Langmuir diagnostic dataset to select one or more probe-face linear combinations from.
     vectors : `list` of `list` of `list`
-        "3D" nested list of linear combination of isweep signals to compute (WIP)
+        3D nested list specifying one or more linear combinations of diagnostic data from different probes and faces.
+            - 2D entries in `vectors` each represent one linear combination.
+            - 1D sub-entries in an entry each correspond to one probe.
+            - 0D elements in these sub-entries give coefficients for diagnostic data from each face on that probe.
+              Diagnostic data from that probe face is multiplied by its coefficient and then summed.
+              Coefficients may be negative.
+        See `Examples` for examples.
 
     Returns
     -------
     `list` of `xarray.Dataset`
         List of datasets containing data from the selected isweep signal or combination of isweep signals (WIP)
+
+    Examples
+    --------
+    The below description may be helped by imagining a drawing of LAPD, similar to that in the comments of `main.py`,
+    overlaid above the 2D entry. Each element in an entry multiplies data from a specific probe face.
+    For a dataset with data from two Langmuir probes, each with two faces, in the parameter `vectors`,
+        - An entry of [[1, 0], [0, 0]] indicates *one* times the diagnostic data from the *first lexicographical* face
+          on the *lowest port number* probe
+        - An entry of [[0, 1], [0, 0]] indicates *one* times the diagnostic data from the *second lexicographical* face
+          on the *lowest port number* probe
+        - An entry of [[0, 0], [1, 0]] indicates *one* times the diagnostic data from the *first lexicographical* face
+          on the *second-lowest port number* probe
+        - An entry of [[0, 0], [-1, 0]] indicates the *negative* of the above data.
+        - An entry of [[1, 0], [-1, 0]] indicates the sum of the data from the first bullet point above and the fourth
+          bullet point above. It therefore indicates the parallel difference of data from equivalent faces
+          on the lower port number probe and on the higher port number probe (specifically, former minus latter).
+    Finally, if `vectors` as a whole takes the value [ [[1, 0], [0, 0]], [[1, 0], [-1, 0]] ], then the two linear
+    combinations of data described by the first and last bullet points above are returned.
     """
 
     manual_attrs = ds.attrs  # TODO raise xarray issue about losing attrs even with xr.set_options(keep_attrs=True):
@@ -131,12 +151,13 @@ def core_steady_state(da_input, core_rad=None, steady_state_times=None, operatio
        Two-element quantity giving start and end times of steady-state period, inclusive.
     operation : {"mean", "median", "std", "std_error"}, optional
         Operation to perform on core/steady_state data on all dimensions but those specified in `dims_to_keep`.
-             - "mean" calculates the mean diagnostic value in the core/steady-state region.
-             - "median" calculates the median diagnostic value in the core/steady-state region.
-             - "std" calculates the standard deviation of the diagnostic values in the core/steady-state region.
-             - "std_error" calculates the unbiased standard error, or 95% confidence interval radius, of the (hypothetical) mean
-              of each value in the array that would result if a mean were performed over all dimensions
-              not specified in `dims_to_keep`. NaN values are removed from the degrees of freedom of the standard error.
+          - "mean" calculates the mean diagnostic value in the core/steady-state region.
+          - "median" calculates the median diagnostic value in the core/steady-state region.
+          - "std" calculates the standard deviation of the diagnostic values in the core/steady-state region.
+          - "std_error" calculates the unbiased standard error, or 95% confidence interval radius,
+            of the (hypothetical) mean of each value in the array that would result
+            if a mean were performed over all dimensions not specified in `dims_to_keep`.
+            NaN values are removed from the degrees of freedom of the standard error.
     dims_to_keep: `list` or `tuple`, default=(None,)
         List or tuple of dimension names not to calculate statistics across, or None to leave all dimensions intact.
         If not None, the resulting array will have only the dimensions given by `dims_to_keep`.

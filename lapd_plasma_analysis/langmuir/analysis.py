@@ -3,8 +3,8 @@ from lapd_plasma_analysis.experimental import get_exp_params
 
 from lapd_plasma_analysis.langmuir.helper import *
 from lapd_plasma_analysis.langmuir.configurations import *
-from lapd_plasma_analysis.langmuir.getIVsweep import get_isweep_vsweep
-from lapd_plasma_analysis.langmuir.characterization import characterize_sweep_array
+from lapd_plasma_analysis.langmuir.getIVsweep import get_sweep_voltage, get_sweep_current, get_shot_positions
+from lapd_plasma_analysis.langmuir.characterization import make_characteristic_array, isolate_ramps
 from lapd_plasma_analysis.langmuir.preview import preview_raw_sweep, preview_characteristics
 from lapd_plasma_analysis.langmuir.diagnostics import (langmuir_diagnostics, detect_steady_state_times, get_pressure,
                                                        get_electron_ion_collision_frequencies)
@@ -116,10 +116,10 @@ def print_user_file_choices(hdf5_folder, lang_nc_folder, interferometry_folder, 
     print(f"Interferometry mode is {repr(interferometry_mode)}. "
           f"Calibrated density data will be {interferometry_mode_actions[interferometry_mode]}.")
 
-    print("Current HDF5 directory path:           \t", repr(hdf5_folder),
+    print("Current HDF5 directory path:             \t", repr(hdf5_folder),
           "\nCurrent NetCDF directory path:         \t", repr(lang_nc_folder),
           "\nCurrent interferometry directory path: \t", repr(interferometry_folder),
-          "\nLinear combinations of isweep sources:   \t", repr(isweep_choices),
+          "\nLinear combinations of isweep sources: \t", repr(isweep_choices),
           "\nThese can be changed in main.py.")
     input("Enter any key to continue: ")
 
@@ -154,7 +154,7 @@ def load_datasets(hdf5_folder, lang_nc_folder, bimaxwellian, plot_save_directory
         datasets = []
         for hdf5_path in hdf5_chosen_list:
 
-            print("\nOpening file", repr(hdf5_path), "...")
+            print(f"\nOpening file {repr(hdf5_path)} ...")
 
             exp_params_dict = get_exp_params(hdf5_path)  # list of experimental parameters
 
@@ -167,19 +167,58 @@ def load_datasets(hdf5_folder, lang_nc_folder, bimaxwellian, plot_save_directory
             voltage_gain = get_voltage_gain(config_id)
             orientation = get_orientation(config_id)
 
-            # get current and bias data from Langmuir probe
-            bias, currents, positions, dt = get_isweep_vsweep(hdf5_path, vsweep_board_channel,
-                                                              langmuir_configs, voltage_gain, orientation)
+            # todo revise get current and bias data from Langmuir probe and store in...
+            bias, dt = get_sweep_voltage(hdf5_path, vsweep_board_channel, voltage_gain)
+            ramp_bounds = isolate_ramps(bias)
+            ramp_times = ramp_bounds[:, 1] * dt.to(u.ms)
+            # todo NOTE: MATLAB code stores peak voltage time (end of plateaus), then only uses plateau times for very first position
+            #  This uses the time of the peak voltage for the average of all shots ("top of the average ramp")
 
-            if sweep_view_mode:
-                preview_raw_sweep(bias, currents, positions, langmuir_configs[['port', 'face']], exp_params_dict, dt,
-                                  plot_save_directory=plot_save_directory)
+            # This for loop extracts sweep data and creates Characteristic objects
+            characteristic_arrays = []
+            position_arrays = []
+            for i in range(len(langmuir_configs)):
+                current, motor_data = get_sweep_current(hdf5_path, langmuir_configs[i], orientation)
 
-            # organize sweep bias and current into an array of Characteristic objects
-            characteristics, ramp_times = characterize_sweep_array(bias, currents, dt)
+                # ensure "hardcoded" ports listed in configurations.py match those listed in HDF5 file
+                assert motor_data.info['controls']['6K Compumotor']['probe']['port'] == langmuir_configs[i]['port']
 
-            # cleanup 1
-            del bias, currents
+                position_array, num_positions, shots_per_position, selected_shots = get_shot_positions(motor_data)
+                position_arrays += [position_array]
+
+                # Drop some shots from the data because they don't fit into a 3D structure
+                if len(bias.shape) == 2:  # already selected certain shots in bias data
+                    bias = bias[selected_shots, ...]
+                current = current[selected_shots, ...]
+
+                # Make bias and current 3D (position, shot_at_a_certain_position, frame) arrays
+                #    as opposed to 2D (shot number, frame) arrays
+                bias = bias.reshape(num_positions,       shots_per_position, -1)
+                current = current.reshape(num_positions, shots_per_position, -1)
+                # Dimensions of bias and current arrays:   position, shot, frame   (e.g. (71, 15, 55296))
+
+                if sweep_view_mode:
+                    preview_raw_sweep(bias, current, position_array, langmuir_configs[i], exp_params_dict, dt,
+                                      plot_save_directory=plot_save_directory)
+
+                # organize sweep bias and current into a 3D array of Characteristic objects
+                characteristic_array = make_characteristic_array(bias, current, ramp_bounds)
+                characteristic_arrays += [characteristic_array]
+
+                # cleanup 1
+                del current
+
+            # cleanup 2
+            del bias
+
+            # Check that all probes access the same positions at all times. Independent probe positions not implemented
+            assert np.all([position == position_arrays[0] for position in position_arrays])
+            positions = position_arrays[0]
+
+            characteristics = np.stack(characteristic_arrays, axis=0)
+            # Above: characteristics has one extra dimension "in front",
+            #  to represent characteristics (sweep curves) from different probes or probe faces.
+            #  Probe/face combinations are ordered by the order of elements in langmuir_configs, from configurations.py.
 
             if chara_view_mode:
                 preview_characteristics(characteristics, positions, ramp_times,
@@ -192,7 +231,7 @@ def load_datasets(hdf5_folder, lang_nc_folder, bimaxwellian, plot_save_directory
             diagnostics_dataset = langmuir_diagnostics(characteristics, positions, ramp_times,
                                                        langmuir_configs, ion_type, bimaxwellian=bimaxwellian)
 
-            # cleanup 2
+            # cleanup 3
             del characteristics, positions
 
             diagnostics_dataset = diagnostics_dataset.assign_attrs(exp_params_dict)
