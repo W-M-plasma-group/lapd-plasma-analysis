@@ -10,7 +10,7 @@ def preview_raw_sweep(bias, current, positions, langmuir_config, exp_params_dict
     bias
     currents
     positions
-    ports_faces
+    langmuir_config
     exp_params_dict
     dt
     plot_save_directory
@@ -57,9 +57,8 @@ def preview_raw_sweep(bias, current, positions, langmuir_config, exp_params_dict
             bias_to_plot = bias[(loc,                                    *isweep_x_y_shot_to_plot[3:])]
             current_to_plot = currents[(isweep_x_y_shot_to_plot[0], loc, *isweep_x_y_shot_to_plot[3:])]
 
-            port_face = ports_faces[isweep_x_y_shot_to_plot[0]]
-            port_face_string = (str(port_face['port'])
-                                + (f" {port_face['face']}" if port_face['face'] else ""))
+            # String indicating port and face of sweep current source (e.g. "20L" or "27")
+            port_face_string = f"{langmuir_config['port']}{langmuir_config['face'] if langmuir_config['face'] else ''}"
             plt.plot(np.arange(len(bias_to_plot)) * dt.to(u.ms).value, bias_to_plot)  # , label="Bias (V)")
             plt.title(f"Run: {exp_params_dict['Exp name']}, {exp_params_dict['Run name']}\n"
                       f"Isweep: {isweep_x_y_shot_to_plot[0]} ({port_face_string}), "
@@ -74,8 +73,8 @@ def preview_raw_sweep(bias, current, positions, langmuir_config, exp_params_dict
 
             plt.plot(np.arange(len(bias_to_plot)) * dt.to(u.ms).value, current_to_plot)  # , label="Current (A)")
             plt.title(f"Run: {exp_params_dict['Exp name']}, {exp_params_dict['Run name']}\n"
-                      f"Isweep: {isweep_x_y_shot_to_plot[0]} ({port_face_string}), "
-                      f"x: {loc_x}, y: {loc_y}, shot: {isweep_x_y_shot_to_plot[3]}\n\n"
+                      f"Probe port and face: {port_face_string}, "
+                      f"x: {loc_x}, y: {loc_y}, shot: {x_y_shot_to_plot[2]}\n\n"
                       f"Current [A]")
             plt.xlabel("Time [ms]")
             # plt.legend()
