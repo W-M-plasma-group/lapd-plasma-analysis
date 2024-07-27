@@ -4,9 +4,46 @@ from bapsflib import lapd
 from warnings import warn
 
 
-def get_isweep_vsweep(filename, vsweep_bc, isweep_metadatas, voltage_gain, orientation):
+def get_sweep_voltage(filename, vsweep_bc, voltage_gain):
     """
-    Reads all sweep data (V-sweep and I-sweep) from HDF5 file Langmuir code.
+    Reads the voltage applied to Langmuir probes from an HDF5 file.
+    Note that one single sweep voltage signal is applied to all Langmuir probes in each experiment.
+
+    Parameters
+    ----------
+    filename : `str`
+        file path of HDF5 file from LAPD (WIP)
+    vsweep_bc : `tuple` or `list`
+        board and channel number of vsweep data in HDF5 file (WIP)
+    voltage_gain : `float`
+        Numerical value of scaling constant for calculating real bias voltages from abstract vsweep data.
+
+    Returns
+    -------
+    bias : `astropy.units.Quantity`
+        Array of applied sweep voltage with dimensions of position, shot, and frame, e.g. of shape (71, 15, 55296).
+    dt : `astropy.units.Quantity`
+        Timestep in between individual Langmuir probe voltage and current measurements, sometimes referred to
+        as "frames". One frame is only a tiny part of a single sweep curve, so the time in between Langmuir probe
+        temperature and density measurements (the time in between voltage/current sweeps) is much larger.
+    """
+
+    with lapd.File(filename) as lapd_file:
+        vsweep = lapd_file.read_data(*vsweep_bc, silent=True)
+
+    dt = vsweep.dt
+    vsweep = vsweep['signal']
+
+    # Convert to real units (not abstract)
+    bias = vsweep * voltage_gain * u.V
+
+    return bias, dt
+
+
+def get_sweep_current(filename, isweep_metadata, orientation):
+    """
+    Reads the current collected by a Langmuir probe from an HDF5 file.
+    Note that one sweep current signal is collected for every face on every Langmuir probe in each experiment.
 
     Parameters
     ----------
@@ -16,8 +53,6 @@ def get_isweep_vsweep(filename, vsweep_bc, isweep_metadatas, voltage_gain, orien
         board and channel number of vsweep data in HDF5 file (WIP)
     isweep_metadatas : `numpy.ndarray`
         structured array of board, channel, receptacle, port, face, resistance, and area for each isweep signal (WIP)
-    voltage_gain : `float`
-        Numerical value of scaling constant for calculating real bias voltages from abstract vsweep data.
     orientation : {+1, -1}
         +1 or -1, depending on if Isweep should be inverted before analysis (WIP)
 
