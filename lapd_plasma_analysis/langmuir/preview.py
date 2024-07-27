@@ -20,7 +20,7 @@ def preview_raw_sweep(bias, current, positions, langmuir_config, exp_params_dict
     -------
 
     """
-    plt.rcParams['figure.figsize'] = (8, 3)  # 40, 4 but decrease dpi!
+    plt.rcParams['figure.figsize'] = (8, 3)
 
     x = np.unique(positions[:, 0])
     y = np.unique(positions[:, 1])
@@ -35,7 +35,8 @@ def preview_raw_sweep(bias, current, positions, langmuir_config, exp_params_dict
     x_y_shot_to_plot = [0, 0, 0]
     variables_to_enter = ["x position", "y position", "shot"]
     print("\nNotes: \tIndices are zero-based; choose an integer between 0 and n - 1, inclusive."
-          "\n \t \tEnter a non-integer below to quit raw sweep preview mode and continue to diagnostics.")
+          "\n \t \tEnter a non-integer below to skip raw sweep preview mode for this isweep source "
+          "and continue to diagnostics.")
     sweep_view_mode = True
     while sweep_view_mode:
         for i in range(len(x_y_shot_to_plot)):

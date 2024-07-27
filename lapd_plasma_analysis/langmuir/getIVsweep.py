@@ -60,19 +60,13 @@ def get_sweep_current(filename, isweep_metadata, orientation):
     """
 
     with lapd.File(filename) as lapd_file:
-        isweep_bcs = np.atleast_1d(isweep_metadatas[['board', 'channel']])
+        # TODO revise
+        #  isweep_metadata is a structured Numpy array storing the digitizer and motor information for Langmuir probes.
+        #  It can have one or zero dimensions. Zero dimensions is possible if there is only one source of sweep current.
 
-        vsweep = lapd_file.read_data(*vsweep_bc, silent=True)
-        isweep = [lapd_file.read_data(*isweep_bc, silent=True) for isweep_bc in isweep_bcs]
-        dt = vsweep.dt
+        isweep = lapd_file.read_data(isweep_metadata['board'], isweep_metadata['channel'], silent=True)['signal']
 
-        vsweep = vsweep['signal']
-        isweep = np.concatenate([isweep_signal['signal'][np.newaxis, ...] for isweep_signal in isweep], axis=0)
-        # Above: isweep_signal has one extra dimension "in front" compared to vsweep signal,
-        #  to represent different probes or probe faces; ordered by (board, channel) as listed in isweep_metadatas
-        signal_length = vsweep.shape[-1]
-
-        # List of motor data about the probe associated with each isweep signal.
+        # TODO revise List of motor data about the probe associated with each isweep signal.
         #   Motor data may be repeated, for example if two isweep signals were taken using two faces on the same probe.
         motor_data = lapd_file.read_controls([("6K Compumotor", isweep_metadata['receptacle'])], silent=True)
 

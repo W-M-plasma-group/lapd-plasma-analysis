@@ -116,10 +116,10 @@ def print_user_file_choices(hdf5_folder, lang_nc_folder, interferometry_folder, 
     print(f"Interferometry mode is {repr(interferometry_mode)}. "
           f"Calibrated density data will be {interferometry_mode_actions[interferometry_mode]}.")
 
-    print("Current HDF5 directory path:           \t", repr(hdf5_folder),
+    print("Current HDF5 directory path:             \t", repr(hdf5_folder),
           "\nCurrent NetCDF directory path:         \t", repr(lang_nc_folder),
           "\nCurrent interferometry directory path: \t", repr(interferometry_folder),
-          "\nLinear combinations of isweep sources:   \t", repr(isweep_choices),
+          "\nLinear combinations of isweep sources: \t", repr(isweep_choices),
           "\nThese can be changed in main.py.")
     input("Enter any key to continue: ")
 
