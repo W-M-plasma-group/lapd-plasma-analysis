@@ -7,7 +7,7 @@ import sys
 from lapd_plasma_analysis.langmuir.helper import *
 
 
-def characterize_sweep_array(bias, currents, dt):
+def make_characteristic_array(bias, current, ramp_bounds):
     """
     Function that processes bias and current data into a DataArray of distinct Characteristics.
     Takes in bias and current arrays, smooths them, divides them into separate ramp sections, 
@@ -92,53 +92,3 @@ def isolate_plateaus(bias, margin=0):
                                               width=min_plateau_width, rel_height=0.97)  # TODO 0.97 is hardcoded
 
     return np.stack((peak_properties['left_ips'].astype(int) + margin // 2, peak_frames - margin // 2), axis=-1)
-
-
-def ensure_sweep_units(bias, current):
-    try:
-        if bias.unit.is_equivalent(u.V):
-            new_bias = bias.to(u.V)
-        else:
-            raise ValueError(f"Probe bias has units of {bias.unit} when units convertible to Volts were expected.")
-    except AttributeError:
-        warnings.warn("Input bias array is missing explicit units. Assuming units of Volts.")
-        new_bias = bias * u.V
-    try:
-        if current.unit.is_equivalent(u.A):
-            new_current = current.to(u.A)
-        else:
-            raise ValueError(f"Probe current has units of {current.unit} when units convertible to Amps were expected.")
-    except AttributeError:
-        warnings.warn("Input current array is missing explicit units. Assuming units of Amps.")
-        new_current = current * u.A
-    return new_bias, new_current
-
-
-def characteristic_array(bias, currents, ramp_bounds):
-    """ Returns 4D array of characteristics: num_isweep * unique_position * shot * plateau_num """
-    # "currents" has "isweep" dimension in front; may have size 1
-
-    ramp_slices = np.array([slice(ramp[0], ramp[1]) for ramp in ramp_bounds])
-
-    num_isweep = currents.shape[0]
-    num_loc = currents.shape[1]
-    num_shot = currents.shape[2]
-    num_ramp = len(ramp_slices)
-
-    print(f"Creating characteristics ...")
-    warnings.simplefilter(action='ignore', category=FutureWarning)  # Suppress FutureWarnings to not break loading bar
-    print("\t(plasmapy.langmuir.diagnostics pending deprecation FutureWarning suppressed)")
-
-    num_characteristics = num_isweep * num_loc * num_shot * num_ramp
-    chara_array = np.empty((len(currents), num_loc, num_shot, len(ramp_slices)), dtype=Characteristic)
-    with tqdm(total=num_characteristics, unit="characteristic", file=sys.stdout) as pbar:
-        for swp in range(num_isweep):
-            for loc in range(num_loc):
-                for shot in range(num_shot):
-                    for ramp in range(num_ramp):
-                        chara_array[swp,  loc, shot, ramp] = Characteristic(
-                            bias[loc,          shot, ramp_slices[ramp]],
-                            currents[swp, loc, shot, ramp_slices[ramp]])
-                        pbar.update(1)
-
-    return chara_array
