@@ -9,9 +9,12 @@ from lapd_plasma_analysis.langmuir.helper import *
 
 def make_characteristic_array(bias, current, ramp_bounds):
     """
-    Function that processes bias and current data into a DataArray of distinct Characteristics.
-    Takes in bias and current arrays, smooths them, divides them into separate ramp sections, 
-    and creates a Characteristic object for each ramp at each unique x,y position.
+    Process bias and current data into an array of Characteristic objects, each representing one sweep curve.
+    The resulting array is 3D, with dimensions: unique (x, y) position, shot, ramp. # todo explain ramp WIP
+    Takes in bias and current arrays,  divides them into separate ramp sections, and creates a Characteristic object 
+    for each ramp at each unique x,y position.
+    Later concatenated with 3D arrays from other isweeps (other sources of sweep current, e.g.
+     faces on a Langmuir probe) to make a larger 4D array to pass to diagnostics.py.
 
     Parameters
     ----------
