@@ -7,39 +7,54 @@ import sys
 from lapd_plasma_analysis.langmuir.helper import *
 
 
-def characterize_sweep_array(bias, currents, dt):
+def make_characteristic_array(bias, current, ramp_bounds):
     """
-    Function that processes bias and current data into a DataArray of distinct Characteristics.
-    Takes in bias and current arrays, smooths them, divides them into separate ramp sections, 
-    and creates a Characteristic object for each ramp at each unique x,y position.
+    Process bias and current data into an array of Characteristic objects, each representing one sweep curve.
+    The resulting array is 3D, with dimensions: unique (x, y) position, shot, ramp. # todo explain ramp WIP
+    Takes in bias and current arrays,  divides them into separate ramp sections, and creates a Characteristic object 
+    for each ramp at each unique x,y position.
+    Later concatenated with 3D arrays from other isweeps (other sources of sweep current, e.g.
+     faces on a Langmuir probe) to make a larger 4D array to pass to diagnostics.py.
 
     Parameters
     ----------
     bias : `astropy.units.Quantity`
-        Array with units of voltage, representing Langmuir probe voltage over time, with dimensions of
+        3D array with units of voltage, representing Langmuir probe voltage over time, with dimensions of
         position, shot, and frame (within a sweep).
-    currents : `astropy.units.Quantity`
-        Array with units of currents, representing Langmuir probe voltage over time, with dimensions of
-        isweep (probe/face combination), position, shot, and frame (within a sweep).
-    dt : `astropy.units.Quantity`
-        Timestep in units of time between individual "frames" of sweep voltage/current measurement within a single shot.
+    current : `astropy.units.Quantity`
+        3D array with units of current, representing Langmuir probe voltage over time, with dimensions of
+         position, shot, and frame (within a sweep).
+    ramp_bounds : # todo complete
+        WIP
 
     Returns
     -------
-    `numpy.ndarray`
-        4D array of Characteristic objects with isweep, location, shot, and ramp number dimensions.
+    `numpy.ndarray` of `plasmapy.diagnostics.langmuir.Characteristic`
+        3D array of Characteristic objects with location, shot, and ramp number dimensions.
     """
 
-    bias, currents = ensure_sweep_units(bias, currents)
+    ramp_slices = np.array([slice(ramp[0], ramp[1]) for ramp in ramp_bounds])
 
-    # trim bad, distorted averaged ends in isolated plateaus
-    ramp_bounds = isolate_plateaus(bias)
+    num_loc = current.shape[0]
+    num_shot = current.shape[1]
+    num_ramp = len(ramp_slices)
 
-    ramp_times = ramp_bounds[:, 1] * dt.to(u.ms)
-    # NOTE: MATLAB code stores peak voltage time (end of plateaus), then only uses plateau times for very first position
-    # This uses the time of the peak voltage for the average of all shots ("top of the average ramp")
+    print(f"Creating characteristics ...")
+    warnings.simplefilter(action='ignore', category=FutureWarning)  # Suppress FutureWarnings to not break loading bar
+    print("\t(plasmapy.langmuir.diagnostics pending deprecation FutureWarning suppressed)")
 
-    return characteristic_array(bias, currents, ramp_bounds), ramp_times
+    num_characteristics = num_loc * num_shot * num_ramp
+    chara_array = np.empty((num_loc, num_shot, len(ramp_slices)), dtype=Characteristic)
+    with tqdm(total=num_characteristics, unit="characteristic", file=sys.stdout) as pbar:
+        for loc in range(num_loc):
+            for shot in range(num_shot):
+                for ramp in range(num_ramp):
+                    chara_array[loc, shot, ramp] = Characteristic(
+                        bias[loc,    shot, ramp_slices[ramp]],
+                        current[loc, shot, ramp_slices[ramp]])
+                    pbar.update(1)
+
+    return chara_array
 
 
 def smooth_array(raw_array, margin: int, method: str = "median") -> np.ndarray:
@@ -59,7 +74,7 @@ def smooth_array(raw_array, margin: int, method: str = "median") -> np.ndarray:
     return array
 
 
-def isolate_plateaus(bias, margin=0):
+def isolate_ramps(bias, margin=0):
     """
     Find indices corresponding to the beginning and end of every bias ramp.
 
@@ -92,53 +107,3 @@ def isolate_plateaus(bias, margin=0):
                                               width=min_plateau_width, rel_height=0.97)  # TODO 0.97 is hardcoded
 
     return np.stack((peak_properties['left_ips'].astype(int) + margin // 2, peak_frames - margin // 2), axis=-1)
-
-
-def ensure_sweep_units(bias, current):
-    try:
-        if bias.unit.is_equivalent(u.V):
-            new_bias = bias.to(u.V)
-        else:
-            raise ValueError(f"Probe bias has units of {bias.unit} when units convertible to Volts were expected.")
-    except AttributeError:
-        warnings.warn("Input bias array is missing explicit units. Assuming units of Volts.")
-        new_bias = bias * u.V
-    try:
-        if current.unit.is_equivalent(u.A):
-            new_current = current.to(u.A)
-        else:
-            raise ValueError(f"Probe current has units of {current.unit} when units convertible to Amps were expected.")
-    except AttributeError:
-        warnings.warn("Input current array is missing explicit units. Assuming units of Amps.")
-        new_current = current * u.A
-    return new_bias, new_current
-
-
-def characteristic_array(bias, currents, ramp_bounds):
-    """ Returns 4D array of characteristics: num_isweep * unique_position * shot * plateau_num """
-    # "currents" has "isweep" dimension in front; may have size 1
-
-    ramp_slices = np.array([slice(ramp[0], ramp[1]) for ramp in ramp_bounds])
-
-    num_isweep = currents.shape[0]
-    num_loc = currents.shape[1]
-    num_shot = currents.shape[2]
-    num_ramp = len(ramp_slices)
-
-    print(f"Creating characteristics ...")
-    warnings.simplefilter(action='ignore', category=FutureWarning)  # Suppress FutureWarnings to not break loading bar
-    print("\t(plasmapy.langmuir.diagnostics pending deprecation FutureWarning suppressed)")
-
-    num_characteristics = num_isweep * num_loc * num_shot * num_ramp
-    chara_array = np.empty((len(currents), num_loc, num_shot, len(ramp_slices)), dtype=Characteristic)
-    with tqdm(total=num_characteristics, unit="characteristic", file=sys.stdout) as pbar:
-        for swp in range(num_isweep):
-            for loc in range(num_loc):
-                for shot in range(num_shot):
-                    for ramp in range(num_ramp):
-                        chara_array[swp,  loc, shot, ramp] = Characteristic(
-                            bias[loc,          shot, ramp_slices[ramp]],
-                            currents[swp, loc, shot, ramp_slices[ramp]])
-                        pbar.update(1)
-
-    return chara_array
