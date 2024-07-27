@@ -19,30 +19,42 @@ def make_characteristic_array(bias, current, ramp_bounds):
     Parameters
     ----------
     bias : `astropy.units.Quantity`
-        Array with units of voltage, representing Langmuir probe voltage over time, with dimensions of
+        3D array with units of voltage, representing Langmuir probe voltage over time, with dimensions of
         position, shot, and frame (within a sweep).
-    currents : `astropy.units.Quantity`
-        Array with units of currents, representing Langmuir probe voltage over time, with dimensions of
-        isweep (probe/face combination), position, shot, and frame (within a sweep).
-    dt : `astropy.units.Quantity`
-        Timestep in units of time between individual "frames" of sweep voltage/current measurement within a single shot.
+    current : `astropy.units.Quantity`
+        3D array with units of current, representing Langmuir probe voltage over time, with dimensions of
+         position, shot, and frame (within a sweep).
+    ramp_bounds : # todo complete
+        WIP
 
     Returns
     -------
-    `numpy.ndarray`
-        4D array of Characteristic objects with isweep, location, shot, and ramp number dimensions.
+    `numpy.ndarray` of `plasmapy.diagnostics.langmuir.Characteristic`
+        3D array of Characteristic objects with location, shot, and ramp number dimensions.
     """
 
-    bias, currents = ensure_sweep_units(bias, currents)
+    ramp_slices = np.array([slice(ramp[0], ramp[1]) for ramp in ramp_bounds])
 
-    # trim bad, distorted averaged ends in isolated plateaus
-    ramp_bounds = isolate_plateaus(bias)
+    num_loc = current.shape[0]
+    num_shot = current.shape[1]
+    num_ramp = len(ramp_slices)
 
-    ramp_times = ramp_bounds[:, 1] * dt.to(u.ms)
-    # NOTE: MATLAB code stores peak voltage time (end of plateaus), then only uses plateau times for very first position
-    # This uses the time of the peak voltage for the average of all shots ("top of the average ramp")
+    print(f"Creating characteristics ...")
+    warnings.simplefilter(action='ignore', category=FutureWarning)  # Suppress FutureWarnings to not break loading bar
+    print("\t(plasmapy.langmuir.diagnostics pending deprecation FutureWarning suppressed)")
 
-    return characteristic_array(bias, currents, ramp_bounds), ramp_times
+    num_characteristics = num_loc * num_shot * num_ramp
+    chara_array = np.empty((num_loc, num_shot, len(ramp_slices)), dtype=Characteristic)
+    with tqdm(total=num_characteristics, unit="characteristic", file=sys.stdout) as pbar:
+        for loc in range(num_loc):
+            for shot in range(num_shot):
+                for ramp in range(num_ramp):
+                    chara_array[loc, shot, ramp] = Characteristic(
+                        bias[loc,    shot, ramp_slices[ramp]],
+                        current[loc, shot, ramp_slices[ramp]])
+                    pbar.update(1)
+
+    return chara_array
 
 
 def smooth_array(raw_array, margin: int, method: str = "median") -> np.ndarray:
@@ -62,7 +74,7 @@ def smooth_array(raw_array, margin: int, method: str = "median") -> np.ndarray:
     return array
 
 
-def isolate_plateaus(bias, margin=0):
+def isolate_ramps(bias, margin=0):
     """
     Find indices corresponding to the beginning and end of every bias ramp.
 
