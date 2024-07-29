@@ -14,20 +14,57 @@ from lapd_plasma_analysis.langmuir.configurations import get_config_id
 
 
 def get_exp_params(hdf5_path):
-    """
-    Returns a dictionary of important LAPD experiment run parameters and their values.
+    r"""Returns a dictionary of experimental parameters.
 
     Parameters
     ----------
-    hdf5_path: `str`
-        Path to HDF5 file of LAPD experimental data.
+    hdf5_path : `str`
+        The path to the HDF5 file
 
     Returns
     -------
-    exp_params_names_values: `dict`
-        Dictionary that maps parameter names (str) to their values (`astropy.units.Quantity`)
+    `dict`
+        A dictionary of experimental parameters containing their name and
+        corresponding value as a `str` or an `astropy.units.Quantity`.
+
+    Notes
+    _____
+    Exactly which parameters are contained in the returned dictionary depends on the
+    config ID, which obtained inside this function as it is implicit to `hdf5_path`.
+
+    For all given files, the first five entries of the dictionary and the
+    functions used to obtain them (all in the
+    `lapd_plasma_analysis.experimental` module) are:
+
+        'Run name' -------------------- `lapd_plasma_analysis.experimental.get_run_name`
+        'Exp name' -------------------- `lapd_plasma_analysis.experimental.get_exp_name`
+        'Discharge current' ----------- `lapd_plasma_analysis.experimental.get_discharge`
+        'Fill pressure' --------------- `lapd_plasma_analysis.experimental.get_gas_pressure`
+        'Peak magnetic field' --------- `lapd_plasma_analysis.experimental.get_magnetic_field`
+
+    Afterward, the next dictionary entries vary depending on config ID. In each case,
+
+    config_id == 0:
+
+        'Nominal discharge' ----------- `lapd_plasma_analysis.experimental.get_nominal_discharge_03`
+        'Nominal pressure' ------------ `lapd_plasma_analysis.experimental.get_nominal_pressure_0`
+
+    config_id == 1 or config_id == 2:
+
+        'Nominal discharge' ----------- `lapd_plasma_analysis.experimental.get_nominal_discharge_12`
+        'Nominal gas puff' ------------ `lapd_plasma_analysis.experimental.get_nominal_gas_pump_12`
+
+    config_id == 3:
+
+        'Nominal magnetic field' ------ `lapd_plasma_analysis.experimental.get_nominal_magnetic_field`
+        'Nominal discharge' ----------- `lapd_plasma_analysis.experimental.get_nominal_discharge_03`
+        'Nominal gas puff' ------------ `lapd_plasma_analysis.experimental.get_nominal_gas_pump_3`
+
+    See each of the functions for an explanation of the meaning of each parameter
+    and the way in which it is obtained.
 
     """
+
 
     # The user can define these experimental control parameter functions
     exp_params_functions = [get_run_name,
