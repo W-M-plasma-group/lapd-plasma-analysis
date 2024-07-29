@@ -8,24 +8,39 @@ import xarray as xr
 
 
 def choose_multiple_list(choices, name, null_action=None):
-    """
-    Allow the user to choose multiple items from a list via console input.
-    Each choice is printed and labeled with a letter. Inputting the string "abc", for example,
-    would select the first, second, and third options in the list.
+    r"""Allows user to choose multiple items from a list via console input.
+
+    Prompts user to select any object (described by `name`) from a list `choices`
+    of such objects. This function can handle 52 choices, since each choice corresponds
+    to an upper-or-lower-case letter. For example, inputting the string `'abc'` would
+    select the first, second, and third options in `choices`.
 
     Parameters
-    ----------
-    choices : Iterable of `str`
-        List of options that may be selected.
+    __________
+    choices : `list`
+        A list of options (typically `str`) from which to choose
+
     name : `str`
-        Name for each choice in the form of a noun, e.g. "file" or "action".
-    null_action : :`str`, optional
-        Message to inform user what will be done if no options are input.
+        A name for the thing being chosen (e.g. 'HDF5 file' if `choices` is a list
+        of HDF5 file paths)
+
+    null_action : `str`
+        Optional parameter used to convey to the user the consequence of providing no
+        input when prompted (e.g. `'skip to Mach probe analysis'`)
 
     Returns
-    -------
-    list of `int`
-        List of integer indices representing the selected choices.
+    _______
+    `list`
+        A list of `int`, the indices of the selected items in `choices`. This list
+        is empty if no items are selected.
+
+    Raises
+    ______
+
+    `ValueError`
+        Gives an error if the user inputs a string containing symbols other than
+        letters.
+
     """
 
     if len(choices) > 52:
@@ -46,19 +61,22 @@ def choose_multiple_list(choices, name, null_action=None):
 
 
 def ask_yes_or_no(prompt):
-    """
+    """Prompts the user to answer a yes-or-no question.
+
     Asks user to input 'y' or 'n' in response to a prompt, then returns the corresponding bool.
-    Repeats prompt until given valid input.
+    (`True` if `'y'`, `False` if `'n'`.) Repeats prompt until given valid input.
 
     Parameters
     ----------
     prompt : `str`
-        Message to user posed as a yes-or-no question. Consider ending with ' (y/n) ', including spaces.
+        Message to user posed as a yes-or-no question. Consider ending with ' (y/n) ',
+        including spaces.
 
     Returns
     -------
     `bool`
         True or False value representing user's choice of 'y' or 'n'.
+
     """
 
     response = ""
@@ -68,6 +86,28 @@ def ask_yes_or_no(prompt):
 
 
 def chr_to_num(car):
+    r"""Converts a letter to an integer.
+
+    Auxiliary function to `lapd_plasma_analysis.file_access.choose_multiple_list`,
+    used to reconvert the user's letter input to an integer, based off the letter's
+    position in the alphabet.
+
+    Parameters
+    ----------
+    car : `str`
+        A letter in the alphabet
+
+    Returns
+    -------
+    `int`
+        The integer corresponding to the letter's position in the alphabet.
+
+    Raises
+    ______
+    `ValueError`
+        If the provided string is not a letter in the alphabet
+
+    """
     code = ord(car)
     if 97 <= code <= 122:
         return code - 97
@@ -78,6 +118,29 @@ def chr_to_num(car):
 
 
 def num_to_chr(num):
+    r"""Converts an integer to a letter in the alphabet.
+
+    Auxiliary function to `lapd_plasma_analysis.file_access.choose_multiple_list`,
+    used to convert an index of a list (`int`) to a letter in the alphabet, for
+    user selection.
+
+    Parameters
+    ----------
+    num : `int`
+        The integer to be converted
+
+    Returns
+    -------
+    `str`
+        The corresponding letter in the alphabet
+
+    Raises
+    ______
+    `ValueError`
+        If the provided number is outside the range of allowable values. Ensure
+        0 <= `num` <= 52 and that `num` is an `int`.
+
+    """
     if 0 <= num <= 25:
         return chr(num + 97)
     elif 26 <= num <= 52:
@@ -92,13 +155,16 @@ def check_netcdf(file_path):
 
     Parameters
     ----------
-    file_path : str
+    file_path : `str`
         Path to a file. This function checks if this file can be opened as a NetCDF file.
+        (This should end with `'.nc'` )
 
     Returns
     -------
-    bool
-        True or False value indicating if `file_path` indicates a usable NetCDF file.
+    `bool`
+        `True` or `False` value indicating if `file_path` indicates a usable NetCDF file.
+        `False` only if attempt to access file yields `FileNotFoundError`.
+
     """
     try:
         xr.open_dataset(file_path)
@@ -117,8 +183,32 @@ def write_netcdf(dataset, path):
 
 
 def search_folder(directory, ext, limit=None) -> list[str]:
-    """Searches the given directory and all subdirectories for files of a desired extension,
-    stopping when it reaches 'limit' number of file paths."""
+    r"""Searches the given directory for files matching given extension.
+
+    Stops when the number of collected files reaches `limit` if `limit != None`. It
+    otherwise continues until every file in the provided directory has been checked.
+    In many cases, `limit` should be <= 52 since this function works in conjunction
+    with `lapd_plasma_analysis.file_access.choose_multiple_list`, which handles a
+    maximum of 52 choices.
+
+    Parameters
+    ----------
+    directory : `str`
+        Directory in which to search for files of extension `ext`. Should end with `'/'`
+
+    ext : `str`
+        The file extension to search for. (e.g. `'nc'` if looking for NetCDF files)
+
+    limit : `int`
+        The maximum number of files to return. If `None` (default), all files that match
+        the provided extension are returned.
+
+    Returns
+    -------
+    `list`
+        A list of file paths (`str`) matching the given extension.
+
+    """
     ext = ext if ext.startswith(".") else "." + ext
     paths_found = []
     for path, dirs, files in os.walk(directory):

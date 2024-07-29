@@ -5,27 +5,41 @@ from warnings import warn
 
 
 def get_isweep_vsweep(filename, vsweep_bc, isweep_metadatas, voltage_gain, orientation):
-    """
-    Reads all sweep data (V-sweep and I-sweep) from HDF5 file Langmuir code.
+    r"""Reads all current and voltage sweep data from an HDF5 file.
 
     Parameters
     ----------
     filename : `str`
-        file path of HDF5 file from LAPD (WIP)
+        File path of the HDF5 file (should end in '.hdf5')
+
     vsweep_bc : `tuple` or `list`
-        board and channel number of vsweep data in HDF5 file (WIP)
+        The board and channel number for the V-sweep data. The format is
+        (board number, channel number)-- this should be the output of
+        `lapd_plasma_analysis.langmuir.configurations.get_vsweep_bc`
+
     isweep_metadatas : `numpy.ndarray`
-        structured array of board, channel, receptacle, port, face, resistance, and area for each isweep signal (WIP)
+        Structured array of board, channel, receptacle, port, face, resistance,
+        and area of each I-sweep signal. This should be the output of
+        `lapd_plasma_analysis.langmuir.configurations.get_langmuir_config`
+
     voltage_gain : `float`
-        Numerical value of scaling constant for calculating real bias voltages from abstract vsweep data.
-    orientation : {+1, -1}
-        +1 or -1, depending on if Isweep should be inverted before analysis (WIP)
+        Value of scaling constant for getting real bias voltage from
+        V-sweep data (the output of `lapd_plasma_analysis.langmuir.configurations.get_voltage_gain`)
+
+    orientation : `int`
+        1 or -1, depending on if I-sweep should be inverted before analysis (the
+        output of `lapd_plasma_analysis.langmuir.configurations.get_orientation`)
 
     Returns
     -------
-    bias, currents, positions, dt: v_sweep array, i_sweeps array, position array, and timestep amount (WIP)
-    """
+    `tuple`
+        (`bias`, `currents`, `positions`, `dt`)
+        `bias`: 
+        'currents':
+        'positions':
+        'dt':
 
+    """
     with lapd.File(filename) as lapd_file:
         isweep_bcs = np.atleast_1d(isweep_metadatas[['board', 'channel']])
 
