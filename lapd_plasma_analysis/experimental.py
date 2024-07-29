@@ -15,7 +15,7 @@ from lapd_plasma_analysis.langmuir.configurations import get_config_id
 
 def get_exp_params(hdf5_path):
     """
-    Returns a dictionary of important LAPD experiment run parameters and their values.
+    Returns a dictionary of LAPD experiment run parameter names and values.
 
     Parameters
     ----------

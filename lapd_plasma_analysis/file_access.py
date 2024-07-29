@@ -24,7 +24,7 @@ def choose_multiple_list(choices, name, null_action=None):
         of HDF5 file paths).
 
     null_action : `str`, optional
-        Optional parameter used to convey to the user the consequence of providing no
+        Parameter used to convey to the user the consequence of providing no
         input when prompted (e.g. `'skip to Mach probe analysis'`).
 
     Returns
