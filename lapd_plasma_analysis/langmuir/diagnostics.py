@@ -18,7 +18,7 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, langmuir_
         4D NumPy array of Characteristics (dims: isweep, position #, shot, plateau) (WIP)
     positions : `list` of coordinates for position of each shot
         (WIP)
-    ramp_times : `list` of `astropy.units.Quantity`
+    ramp_times : `astropy.units.Quantity`
         Time-based Quantities corresponding to time of each shot (peak vsweep) (WIP)
     langmuir_configs
         (WIP)
@@ -98,8 +98,6 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, langmuir_
                         if bimaxwellian:
                             diagnostics = unpack_bimaxwellian(diagnostics)
                         for key in diagnostics.keys():
-                            # REMOVED: crop diagnostics with "T_e" in name because otherwise skew averages:
-                            # if "T_e" in key: crop_value(diagnostics[key], 0, 10)
                             val = value_safe(diagnostics[key])
                             diagnostics_ds[key].loc[{"probe": np.where(ports == langmuir_configs['port'][i])[0][0],
                                                      "face": langmuir_configs['face'][i],
@@ -133,11 +131,8 @@ def filter_characteristic(characteristic) -> bool:
     bias = characteristic.bias
     current = characteristic.current
 
-    # reject characteristic if V_F > 0
-    if np.max(bias[current < 0]) > 0 * u.V:
-        return False
-
-    return True
+    # only accept characteristic if floating potential is below 0 V
+    return np.max(bias[current < 0]) < 0 * u.V
 
 
 def get_pressure(density, temperature):
@@ -201,8 +196,6 @@ def detect_steady_state_times(langmuir_dataset: xr.Dataset, core_rad):
         return [16, 24] * u.ms
     else:
         density = langmuir_dataset['n_i_OML']
-        # core_density = density.where(np.logical_and(*in_core([density.x, density.y], core_rad)), drop=True)
-        # core_density_vs_time = core_density.isel(probe=0, face=0).mean(['x', 'y', 'shot']).squeeze()
         core_density_vs_time = core_steady_state(density.isel(probe=0, face=0), core_rad=core_rad,
                                                  operation="median", dims_to_keep=["time"])
         threshold = 0.9 * core_density_vs_time.max()
@@ -214,11 +207,9 @@ def detect_steady_state_times(langmuir_dataset: xr.Dataset, core_rad):
 
 
 def diagnose_char(characteristic, probe_area, ion_type, bimaxwellian, indices=None):
+    """ Use swept_probe_analysis function to extract diagnostic data from Characteristic, or return error string. """
     if characteristic is None:
         return "characteristic is None"
-    threshold = 8 * u.mA  # TODO hardcoded; use r^2 coefficient instead?
-    if np.max(characteristic.current.to(u.A).value) < threshold.to(u.A).value:
-        return f"Probe current is below {str(threshold)}, which can lead to unreliable results"
     try:
         diagnostics = swept_probe_analysis(characteristic, probe_area, ion_type, bimaxwellian=bimaxwellian)
     except (ValueError, TypeError, RuntimeError) as e:

@@ -19,7 +19,7 @@ def get_sweep_voltage(filename, vsweep_bc, voltage_gain):
         The board and channel number for the V-sweep data. The format is
         (board number, channel number)-- this should be the output of
         `lapd_plasma_analysis.langmuir.configurations.get_vsweep_bc`
-        
+
     voltage_gain : `float`
         Value of scaling constant for getting real bias voltage from
         V-sweep data (the output of `lapd_plasma_analysis.langmuir.configurations.get_voltage_gain`)

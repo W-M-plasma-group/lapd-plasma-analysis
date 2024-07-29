@@ -17,16 +17,15 @@ def choose_multiple_list(choices, name, null_action=None):
 
     Parameters
     __________
-    choices : `list`
-        A list of options (typically `str`) from which to choose
-
+    choices : `list` of `str`
+        List of options that may be selected.
     name : `str`
         A name for the thing being chosen (e.g. 'HDF5 file' if `choices` is a list
-        of HDF5 file paths)
+        of HDF5 file paths).
 
-    null_action : `str`
-        Optional parameter used to convey to the user the consequence of providing no
-        input when prompted (e.g. `'skip to Mach probe analysis'`)
+    null_action : `str`, optional
+        Parameter used to convey to the user the consequence of providing no
+        input when prompted (e.g. `'skip to Mach probe analysis'`).
 
     Returns
     _______
@@ -63,8 +62,8 @@ def choose_multiple_list(choices, name, null_action=None):
 def ask_yes_or_no(prompt):
     """Prompts the user to answer a yes-or-no question.
 
-    Asks user to input 'y' or 'n' in response to a prompt, then returns the corresponding bool.
-    (`True` if `'y'`, `False` if `'n'`.) Repeats prompt until given valid input.
+    Asks user to input 'y' or 'n' in response to a prompt, then returns the corresponding boolean value
+    (`True` if `'y'`, `False` if `'n'`). Repeats prompt until given valid input.
 
     Parameters
     ----------
