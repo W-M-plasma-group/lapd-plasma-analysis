@@ -33,7 +33,6 @@ def get_sweep_voltage(filename, vsweep_bc, voltage_gain):
         as "frames". One frame is only a tiny part of a single sweep curve, so the time in between Langmuir probe
         temperature and density measurements (the time in between voltage/current sweeps) is much larger.
     """
-
     with lapd.File(filename) as lapd_file:
         vsweep = lapd_file.read_data(*vsweep_bc, silent=True)
 
@@ -56,10 +55,10 @@ def get_sweep_current(filename, isweep_metadata, orientation):
     filename : `str`
         file path of HDF5 file from LAPD (WIP)
     isweep_metadata : `numpy.ndarray` of `int` and `str`
-        structured array of board, channel, receptacle, port, face, resistance, and area for each isweep signal.
+        structured array of board, channel, receptacle, port, face, resistance, and area for each isweep signal. 
         This should be the output of `lapd_plasma_analysis.langmuir.configurations.get_langmuir_config`.
     orientation : {+1, -1}
-        +1 or -1, depending on if I_sweep should be inverted before analysis (WIP). This is
+        +1 or -1, depending on if I_sweep should be inverted before analysis (WIP). This is 
         the output of `lapd_plasma_analysis.langmuir.configurations.get_orientation`.
 
     Returns

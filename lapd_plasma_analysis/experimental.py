@@ -19,8 +19,8 @@ def get_exp_params(hdf5_path):
 
     Parameters
     ----------
-    hdf5_path: `str`
-        Path to HDF5 file of LAPD experimental data.
+    hdf5_path : `str`
+        The path to the HDF5 file
 
     Returns
     -------
@@ -65,6 +65,7 @@ def get_exp_params(hdf5_path):
     and the way in which it is obtained.
 
     """
+
 
     # The user can define these experimental control parameter functions
     exp_params_functions = [get_run_name,

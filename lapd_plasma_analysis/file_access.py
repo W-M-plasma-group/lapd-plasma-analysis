@@ -16,7 +16,7 @@ def choose_multiple_list(choices, name, null_action=None):
     select the first, second, and third options in `choices`.
 
     Parameters
-    ----------
+    __________
     choices : `list` of `str`
         List of options that may be selected.
     name : `str`
@@ -75,6 +75,7 @@ def ask_yes_or_no(prompt):
     -------
     `bool`
         True or False value representing user's choice of 'y' or 'n'.
+
     """
 
     response = ""
