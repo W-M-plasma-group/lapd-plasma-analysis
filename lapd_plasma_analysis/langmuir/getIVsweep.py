@@ -12,11 +12,17 @@ def get_sweep_voltage(filename, vsweep_bc, voltage_gain):
     Parameters
     ----------
     filename : `str`
-        file path of HDF5 file from LAPD (WIP)
+        File path of the HDF5 file (should end in '.hdf5')
+
     vsweep_bc : `tuple` or `list`
-        board and channel number of vsweep data in HDF5 file (WIP)
+
+        The board and channel number for the V-sweep data. The format is
+        (board number, channel number)-- this should be the output of
+        `lapd_plasma_analysis.langmuir.configurations.get_vsweep_bc`
+
     voltage_gain : `float`
-        Numerical value of scaling constant for calculating real bias voltages from abstract vsweep data.
+        Value of scaling constant for getting real bias voltage from
+        V-sweep data (the output of `lapd_plasma_analysis.langmuir.configurations.get_voltage_gain`)
 
     Returns
     -------
@@ -50,13 +56,15 @@ def get_sweep_current(filename, isweep_metadata, orientation):
     filename : `str`
         file path of HDF5 file from LAPD (WIP)
     isweep_metadata : `numpy.ndarray` of `int` and `str`
-        structured array of board, channel, receptacle, port, face, resistance, and area for each isweep signal (WIP)
+        structured array of board, channel, receptacle, port, face, resistance, and area for each isweep signal.
+        This should be the output of `lapd_plasma_analysis.langmuir.configurations.get_langmuir_config`.
     orientation : {+1, -1}
-        +1 or -1, depending on if Isweep should be inverted before analysis (WIP)
+        +1 or -1, depending on if I_sweep should be inverted before analysis (WIP). This is
+        the output of `lapd_plasma_analysis.langmuir.configurations.get_orientation`.
 
     Returns
     -------
-    bias, current, positions, dt: v_sweep array, i_sweeps array, position array, and timestep amount (WIP)
+    bias, current, positions, dt: v_sweep array, i_sweep array, position array, and timestep amount (WIP)
     """
 
     with lapd.File(filename) as lapd_file:

@@ -24,22 +24,28 @@ def get_langmuir_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder
     ----------
     langmuir_nc_folder : `str`
         Path to folder storing Langmuir probe diagnostic data NetCDF files.
+
     hdf5_folder : `str`
         Path to folder storing LAPD experiment HDF5 files.
+
     interferometry_folder : `str`
         Path to folder storing interferometry data. If interferometry data is stored in the HDF5 files,
         then this should be equal to `hdf5_folder`.
+
     interferometry_mode : {'skip', 'append', 'overwrite'}
         Mode for handling interferometry data.
         - 'skip' skips all interferometry calibration calculations.
         - 'append' performs interferometry calibration only on datasets that do not already have calibrated densities.
         - 'overwrite' recalculates calibrated densities for all datasets.
+
     core_radius : `astropy.units.Quantity`
         Radius of core region, or region with high, stable densities. Used to calculate steady-state period
         and in interferometry calibration.
+
     bimaxwellian : `bool`
         Specifies if plasmapy Langmuir diagnostics functions should assume a bimaxwellian plasma
         (i.e. mixed hot and cold electrons).
+
     plot_save_directory : `str`
         Path to directory for saving plots, including sweep voltage, current, and curve preview plots.
 
@@ -47,15 +53,18 @@ def get_langmuir_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder
     -------
     datasets : list of `xarray.Dataset`
         List of Langmuir diagnostic datasets.
+
     steady_state_times_runs : list of `astropy.unit.Quantity`
         List of ordered pairs (tuples?) of `astropy.unit.Quantity` objects indicating the beginning and end time
          of the steady-state period.
+
     hdf5_paths
-        List of paths to HDF5 files opened. Can be None if NetCDF files used.
+        List of paths to HDF5 files opened. Can be `None` if NetCDF files used.
 
     See Also
     --------
     load_datasets : creates `xarray.Dataset` datasets used in this function
+
     """
 
     # Create folder to save NetCDF files if not yet existing
@@ -110,6 +119,37 @@ def get_langmuir_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder
 
 
 def print_user_file_choices(hdf5_folder, lang_nc_folder, interferometry_folder, interferometry_mode, isweep_choices):
+    r"""Displays file directory, interferometry mode, and I-sweep choices.
+
+    Prompts the user to press any key to proceed.
+
+    Parameters
+    ----------
+    hdf5_folder : `str`
+        The directory in which the HDF5 files are stored.
+
+    lang_nc_folder : `str`
+        A directory at which to deposit generated NetCDF files and/or a directory
+        already containing NetCDF files.
+
+    interferometry_folder : `str`
+        Directory at which to store interferometry data.
+
+    interferometry_mode : `str`
+        Options are `'append'`, `'skip'`, and `'overwrite'`. Controls how new interferometry
+        data will be created and stored.
+        `'append'`: Collects and stores interferometry data only for HDF5/NetCDF files
+        which have not already been analyzed.
+        `'skip'`: Skips collecting and storing interferometry data from all selected
+        HDF5/NetCDF files.
+        `'overwrite'`: Collects and stores interferometry data for all selected files
+        regardless of prior analyzation status.
+
+    isweep_choices : `list`
+        A vector or list of vectors (e.g. `[1, 0]` or `[[1, 0], [1, -1]]` which
+        specifies how the current data from different probe faces are combined.
+
+    """
     interferometry_mode_actions = ({"skip": "skipped",
                                     "append": "added to uncalibrated datasets only",
                                     "overwrite": "recalculated for all datasets"})
@@ -125,8 +165,32 @@ def print_user_file_choices(hdf5_folder, lang_nc_folder, interferometry_folder, 
 
 
 def load_datasets(hdf5_folder, lang_nc_folder, bimaxwellian, plot_save_directory):
-    """
-    Load Langmuir datasets from NetCDF files or generate them from HDF5 files.
+    r"""
+
+    Parameters
+    ----------
+    hdf5_folder : `str`
+        The directory in which the HDF5 files are stored.
+
+    lang_nc_folder : `str`
+        A directory at which to deposit generated NetCDF files and/or a directory
+        already containing NetCDF files.
+
+    bimaxwellian : `bool`
+        Specifies whether the plasma should be considered to consist of both hot and
+        cold ions (`True`) or not (`False`).
+
+    plot_save_directory : `str`
+        Directory in which to save any plots. If `' '`, then no plots are saved.
+
+    Returns
+    -------
+    `tuple`
+        (`datasets`, `hdf5_chosen_list`) OR `None`, if user skips to Mach calculation
+        `datasets`: List of `xarray.Dataset` objects containing Langmuir diagnostic data.
+        `hdf5_chosen_list`: List of `str`, the paths to the selected HDF5 files.
+        Can also be `None` if no HDF5 files were chosen.
+
     """
 
     print("\nThe following Langmuir NetCDF files were found in the NetCDF folder (specified in main.py): ")
