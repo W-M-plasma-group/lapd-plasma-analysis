@@ -271,6 +271,13 @@ def load_datasets(hdf5_folder, lang_nc_folder, bimaxwellian, plot_save_directory
                 characteristic_array = make_characteristic_array(bias, current, ramp_bounds)
                 characteristic_arrays += [characteristic_array]
 
+                if chara_view_mode:
+                    preview_characteristics(characteristic_array, position_array, ramp_times,
+                                            langmuir_configs[i], exp_params_dict,
+                                            diagnostics=True, ion=ion_type,
+                                            bimaxwellian=bimaxwellian,
+                                            plot_save_directory=plot_save_directory)
+
                 # cleanup 1
                 del current
 
@@ -286,14 +293,7 @@ def load_datasets(hdf5_folder, lang_nc_folder, bimaxwellian, plot_save_directory
             #  to represent characteristics (sweep curves) from different probes or probe faces.
             #  Probe/face combinations are ordered by the order of elements in langmuir_configs, from configurations.py.
 
-            if chara_view_mode:
-                preview_characteristics(characteristics, positions, ramp_times,
-                                        langmuir_configs, exp_params_dict,
-                                        diagnostics=True, ion=ion_type,
-                                        bimaxwellian=bimaxwellian,
-                                        plot_save_directory=plot_save_directory)
-
-            # perform langmuir diagnostics on each dataset
+            # Perform langmuir diagnostics on each dataset
             diagnostics_dataset = langmuir_diagnostics(characteristics, positions, ramp_times,
                                                        langmuir_configs, ion_type, bimaxwellian=bimaxwellian)
 

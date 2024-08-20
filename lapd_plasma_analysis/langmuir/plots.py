@@ -248,7 +248,7 @@ def plot_linear_diagnostic(diagnostics_dataset: xr.Dataset, probe_face_coefficie
                         probe_eq_string = probe_face_choice_to_eq_string(probe_face_coefficients[d],
                                                                          diagnostics_dataset.coords['port'].data,
                                                                          diagnostics_dataset.coords['face'].data)
-                        plot_title += f", {probe_eq_string}"
+                        plot_title += f", port/face {probe_eq_string}"
                     except (ValueError, TypeError, AttributeError, KeyError, IndexError) as e:
                         print(e)
                         pass
