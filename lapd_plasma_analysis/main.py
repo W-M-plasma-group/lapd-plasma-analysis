@@ -51,6 +51,7 @@ bimaxwellian = False
 core_radius = 21. * u.cm                                                # TODO user can adjust (26 cm in MATLAB code)
 plot_tolerance = np.nan  # 0.25                                         # TODO user can adjust
 velocity_plot_unit = u.km / u.s         # TODO not yet working          # TODO adjust
+display_core_steady_state_lines = True                                  # user can adjust
 
 # ----------------------------------------------------------------------------------------
 
@@ -116,7 +117,8 @@ if __name__ == "__main__":
         for plot_diagnostic in diagnostics_to_plot_list:
             for i in range(len(datasets)):
                 plot_linear_diagnostic(datasets[i], isweep_choices, plot_diagnostic, 'contour',
-                                       steady_state_times_runs[i])
+                                       steady_state_times_runs[i],
+                                       display_core_steady_state=True, core_radius=core_radius)
 
     # Plot radial profiles of diagnostic (steady-state time average), with color corresponding to first attribute
     #    and plot position on multiplot corresponding to second attribute
@@ -124,7 +126,8 @@ if __name__ == "__main__":
         for plot_diagnostic in diagnostics_to_plot_list:
             multiplot_linear_diagnostic(datasets, plot_diagnostic, isweep_choices, 'x',
                                         steady_state_by_runs=steady_state_times_runs, core_rad=core_radius,
-                                        tolerance=plot_tolerance, save_directory=plot_save_folder)
+                                        tolerance=plot_tolerance, display_core_steady_state=True,
+                                        save_directory=plot_save_folder)
 
     # Plot time profiles
     if ask_yes_or_no("Generate line plot of selected diagnostics over time? (y/n) "):

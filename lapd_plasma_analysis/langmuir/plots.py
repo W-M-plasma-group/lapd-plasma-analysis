@@ -11,7 +11,7 @@ from lapd_plasma_analysis.langmuir.configurations import get_ion
 
 def multiplot_linear_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagnostic, probe_face_choices, x_dim='x',
                                 steady_state_by_runs=None, core_rad=None, attribute=None, tolerance=np.nan,
-                                save_directory=""):
+                                display_core_steady_state=False, save_directory=""):
     """
     Plot multiple profiles (x, y, or time) from different datasets on a row of side-by-side plots.
     Plots are grouped by gas puff voltage and cathode discharge current. (WIP)
@@ -255,6 +255,15 @@ def plot_linear_diagnostic(diagnostics_dataset: xr.Dataset, probe_face_coefficie
                     plot_title += f"\n{get_title(key)} {plot_type} plot (2D)"
                     plt.title(plot_title)
                     plt.tight_layout()
+
+                    dataset_time_unit = linear_ds_s[d].coords['time'].attrs['units']
+                    dataset_x_unit = linear_ds_s[d].coords['x'].attrs['units']
+                    if display_core_steady_state:
+                        for steady_state_bound_time in steady_state.to(dataset_time_unit).value:
+                            plt.axvline(steady_state_bound_time, color="gray")  # , linestyles
+                        for plus_minus_core_radius in ((-1, 1) * core_radius.to(dataset_x_unit)).value:
+                            plt.axhline(plus_minus_core_radius, color="gray")
+
                     if save_directory:
                         plt.savefig(save_directory + "2D_plot_" + diagnostic + ".pdf", bbox_inches="tight")
                     plt.show()
