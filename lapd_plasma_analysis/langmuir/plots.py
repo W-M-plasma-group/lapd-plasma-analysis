@@ -380,7 +380,7 @@ def scatter_plot_diagnostics(datasets, diagnostics_to_plot_list, steady_state_ti
 
 def plot_parallel_inverse_scale_length(datasets, steady_state_times_runs, diagnostic, probes_faces_midplane,
                                        probes_faces_parallel, marker_styles, operation, core_radius, save_directory,
-                                       scale_length_mode="linear"):
+                                       annotate=False, scale_length_mode="linear"):
     plt.rcParams['figure.figsize'] = 6, 3.5
 
     color_map, normalizer = get_colormap_normalizer(datasets, core_radius, steady_state_times_runs,
@@ -416,8 +416,11 @@ def plot_parallel_inverse_scale_length(datasets, steady_state_times_runs, diagno
 
         diagnostic_scale_length_abs = 1 / np.abs(diagnostic_inverse_scale_length)
 
-        plt.plot(z, diagnostic_scale_length_abs, marker=marker_styles[i], color=color_map[i],
-                 label=get_exp_run_string(datasets[i].attrs))
+        plt.plot(z, diagnostic_scale_length_abs, marker=marker_styles[i], color=color_map[i])
+        #        label=get_exp_run_string(datasets[i].attrs))
+        if annotate:
+            plt.annotate(get_exp_run_string(datasets[i].attrs),
+                         (z, diagnostic_scale_length_abs), size="small")  # noqa
     plt.title(f"Parallel gradient scale length [m] \n\n{get_title(diagnostic)} ", y=0.88)
     plt.xlabel("z location [m]")
 

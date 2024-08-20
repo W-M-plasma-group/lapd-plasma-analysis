@@ -19,6 +19,9 @@ from lapd_plasma_analysis.mach.analysis import get_mach_datasets, get_velocity_d
 hdf5_folder = "/Users/leomurphy/lapd-data/combined/"
 # hdf5_folder = "/Users/leomurphy/lapd-data/November_2022/"
 # hdf5_folder = "/Users/leomurphy/lapd-data/April_2018/"
+# hdf5_folder = "/Users/leomurphy/lapd-data/March_2022/"
+# hdf5_folder = "/Users/leomurphy/lapd-data/November_2022/all/"
+# hdf5_folder = "/Users/leomurphy/lapd-data/January_2024/"
 
 assert hdf5_folder.endswith("/")
 
@@ -38,7 +41,7 @@ interferometry_folder = ("/Users/leomurphy/lapd-data/November_2022/uwave_288_GHz
 
 # Interferometry & Mach access modes. Options are "skip", "append", "overwrite"; recommended is "append".
 interferometry_mode = "skip"                                            # TODO user adjust
-mach_velocity_mode = "append"                                           # not fully implemented
+mach_velocity_mode = "skip"                                           # not fully implemented
 
 # ----------------------------------------------------------------------------------------
 
@@ -47,6 +50,10 @@ mach_velocity_mode = "append"                                           # not fu
 isweep_choices = [[[1, 0], [0, 0]],     # . 1st combination to plot: 1 * (first face on first probe)
                   [[0, 0], [1, 0]]]     # . 2nd combination to plot: 1 * (first face on second probe)
 # isweep_choices = [[[1, 0], [-1, 0]]]  # .     combination to plot: 1 * (face 1 on probe 1) - 1 * (face 1 on probe 2)
+
+# ----------------------------------------------------------------------------------------
+
+# Other user parameters
 bimaxwellian = False
 core_radius = 21. * u.cm                                                # TODO user can adjust (26 cm in MATLAB code)
 plot_tolerance = np.nan  # 0.25                                         # TODO user can adjust
@@ -158,7 +165,7 @@ if __name__ == "__main__":
             plot_parallel_diagnostic(datasets_split, steady_state_times_runs,
                                      probes_faces_midplane, probes_faces_parallel,
                                      marker_styles, diagnostic=plot_diagnostic, operation="mean",
-                                     core_radius=core_radius, save_directory=plot_save_folder)
+                                     core_radius=core_radius, line_style='-', save_directory=plot_save_folder)
 
     at_least_two_diagnostics = (len(diagnostics_to_plot_list) >= 2)
     if at_least_two_diagnostics and ask_yes_or_no("Generate scatter plot of first two selected diagnostics? (y/n) "):
