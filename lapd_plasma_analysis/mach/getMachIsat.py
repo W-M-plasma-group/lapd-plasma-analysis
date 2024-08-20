@@ -12,12 +12,19 @@ from lapd_plasma_analysis.langmuir.getIVsweep import get_shot_positions
 
 def get_mach_isat(filename, mach_configs):
     """
+    Get the ion saturation current signal from the Mach probe and restore it to meaningful units. (WIP)
 
-    :param filename:
-    :param mach_configs:
-    :return:
+    Parameters
+    ----------
+    filename : `str`
+        Path to an HDF5 file.
+    mach_configs : `numpy.ndarray`
+        Structured array (WIP)
+
+    Returns
+    -------
+
     """
-    # TODO add function definition
 
     with lapd.File(filename) as lapd_file:
         run_name = lapd_file.info['run name']
@@ -95,12 +102,17 @@ def get_shot_positions(isat_motor_data):
 def to_mach_isat_da(isat, positions, shots_per_position, mach_configs, dt):
     """
 
-    :param isat:
-    :param shots_per_position:
-    :param positions:
-    :param mach_configs:
-    :param dt:
-    :return:
+    Parameters
+    ----------
+    isat
+    positions
+    shots_per_position
+    mach_configs
+    dt
+
+    Returns
+    -------
+
     """
 
     ports_unique = np.unique([port for port in mach_configs['port']])

@@ -5,6 +5,44 @@ from lapd_plasma_analysis.langmuir.configurations import get_ports_receptacles
 
 
 def get_mach_config(hdf5_path, config_id):
+    r"""Obtains a dictionary of configuration parameters for a given experiment.
+
+    Gets a list of configuration settings for Mach probe signals from a specific HDf5 file and experiment series.
+    These settings are primarily hard-coded into this function based off of the config ID,
+    except `receptacle` which is the output of
+    `lapd_plasma_analysis.langmuir.configuration.get_ports_receptacles(hdf5_path)`.
+
+    Parameters
+    ----------
+    hdf5_path : `str`
+        Path to the relevant HDF5 file. This should end with ".hdf5"
+
+    config_id : `int`
+        The output of `lapd_plasma_analysis.langmuir.configurations.get_config_id` for
+        the relevant experiment name
+
+    Returns
+    -------
+    mach_configs_array : `numpy.ndarray`
+    1D structured array of Mach configurations. Each element represents one Mach probe saturation current signal,
+    for example from one probe face, and contains fields for
+    board, channel, receptacle, port, face, resistance, probe area, and gain.
+        - "board" is the digitizer board number for the Mach signal. Used to access the Mach signal in the HDF5 file.
+        - "channel" is the digitizer channel number for the Mach signal.
+          Used to access the Mach signal in the HDF5 file.
+          The "board" and "channel" fields together uniquely identify a particular signal from a single Mach probe face.
+        - "receptacle" indicates the motor receptacle for the Mach probe, which uniquely identifies a single Mach probe.
+        - "port" is the LAPD port number where the Mach probe was connected. It also uniquely identifies one Mach probe.
+        - "face" is a text label given to a face on a probe. It can be an empty string, for example,
+          if only one face on each probe is connected, or it can indicate the left-side probe face with "L".
+          The "probe" and "face" fields together also uniquely identify the signal from a specific Mach probe face.
+        - "resistance" is the resistance in series with the Mach probe. Raw measurements are collected as voltage;
+          these values must be divided by the series resistance to get the Mach probe saturation current.
+        - "area" is a Quantity object giving the exposed area of the Mach probe face electrode.
+          Collected current must be divided by area to get current density.
+        - "gain" is the total gain of the system amplifiers and resistors that act on the Mach probe saturation current.
+          The Mach probe signal should be divided by the gain to recover physical voltages.
+    """
 
     # each list in tuple corresponds to an experiment series;
     # each tuple in list corresponds to configuration data for a single probe used in those experiments

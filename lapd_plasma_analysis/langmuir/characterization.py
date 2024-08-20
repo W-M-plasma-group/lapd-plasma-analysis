@@ -1,3 +1,6 @@
+"""
+(WIP) # TODO
+"""
 import warnings
 import bottleneck as bn
 from scipy.signal import find_peaks
@@ -10,11 +13,15 @@ from lapd_plasma_analysis.langmuir.helper import *
 def make_characteristic_array(bias, current, ramp_bounds):
     """
     Process bias and current data into an array of Characteristic objects, each representing one sweep curve.
-    The resulting array is 3D, with dimensions: unique (x, y) position, shot, ramp. # todo explain ramp WIP
-    Takes in bias and current arrays,  divides them into separate ramp sections, and creates a Characteristic object 
+    The resulting array is 3D, with dimensions: unique (x, y) position, shot, ramp.
+    Takes in a bias and a current array, selects each ramp, and creates a Characteristic object
     for each ramp at each unique x,y position.
     Later concatenated with 3D arrays from other isweeps (other sources of sweep current, e.g.
-     faces on a Langmuir probe) to make a larger 4D array to pass to diagnostics.py.
+    faces on a Langmuir probe) to make a larger 4D array to pass to diagnostics.py.
+        - Note: a "ramp" is a series of frames in which a Langmuir probe voltage sweep is performed.
+          It is called a "ramp" because the applied voltage, instead of remaining at the typical large negative value,
+          increases steadily to a large positive value (ramp), then rapidly drops back to negative (quench).
+          (WIP explain better # todo)
 
     Parameters
     ----------
@@ -24,13 +31,19 @@ def make_characteristic_array(bias, current, ramp_bounds):
     current : `astropy.units.Quantity`
         3D array with units of current, representing Langmuir probe voltage over time, with dimensions of
          position, shot, and frame (within a sweep).
-    ramp_bounds : # todo complete
-        WIP
+    ramp_bounds : `numpy.ndarray` of `int`
+        2D array of shape (number of ramps, 2). Ramp start indices are in the first column; end indices in the second.
+        Calculated by the `isolate_ramps` function.
 
     Returns
     -------
     `numpy.ndarray` of `plasmapy.diagnostics.langmuir.Characteristic`
         3D array of Characteristic objects with location, shot, and ramp number dimensions.
+
+    See Also
+    --------
+    isolate_ramps
+
     """
 
     ramp_slices = np.array([slice(ramp[0], ramp[1]) for ramp in ramp_bounds])

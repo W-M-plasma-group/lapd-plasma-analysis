@@ -147,6 +147,7 @@ def print_user_file_choices(hdf5_folder, lang_nc_folder, interferometry_folder, 
         regardless of prior analyzation status.
 
     isweep_choices : `list`
+        # wip TODO
         A vector or list of vectors (e.g. `[1, 0]` or `[[1, 0], [1, -1]]` which
         specifies how the current data from different probe faces are combined.
 

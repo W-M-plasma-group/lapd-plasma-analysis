@@ -32,6 +32,12 @@ def get_sweep_voltage(filename, vsweep_bc, voltage_gain):
         Timestep in between individual Langmuir probe voltage and current measurements, sometimes referred to
         as "frames". One frame is only a tiny part of a single sweep curve, so the time in between Langmuir probe
         temperature and density measurements (the time in between voltage/current sweeps) is much larger.
+
+    See Also
+    --------
+    lapd_plasma_analysis.langmuir.configurations.get_vsweep_bc
+    lapd_plasma_analysis.langmuir.configurations.get_voltage_gain
+    get_sweep_current
     """
     with lapd.File(filename) as lapd_file:
         vsweep = lapd_file.read_data(*vsweep_bc, silent=True)
@@ -92,7 +98,49 @@ def get_sweep_current(filename, isweep_metadata, orientation):
 
 
 def get_shot_positions(isweep_motor_data):
-    """ (WIP) """
+    """
+    Accesses probe position data. (WIP)
+
+    Parameters
+    ----------
+    isweep_motor_data : Motor data object from one or more probes, retrieved from an HDF5 file using the
+    `bapsflib.lapd.File.read_controls` function, for example as in `get_sweep_current`. (WIP)
+
+    Returns
+    -------
+    positions : `numpy.ndarray` of `float`
+        (WIP confirm)
+        2D array that lists all unique (x, y) positions achieved during probe motion, in the order they were reached.
+        The two columns store the x and y position of each unique (x, y) position.
+
+    num_positions : `int`
+        Number of unique (x, y) positions achieved during probe motion. This is the length of `positions` above.
+
+    shots_per_position : `int`
+        The number of shots that were taken at each unique (x, y) position. If the number of shots at each position
+        differs by position, then this is the minimum number of shots taken at any unique position.
+        For example, if 20 shots were conducted at position (x1, y1) and 8 shots at position (x2, y2),
+        then `shots_per_position` is limited to 8.
+
+    selected_shots : `numpy.ndarray` of `int`
+        1D array of the indices of shots that are retained for future analysis.
+        Length is `num_positions` * `shots_per_position`. If the number of shots at each position
+        differs by position, then at each position, all shots after the first `shots_per_positions` are ignored.
+        Therefore, each unique position in `positions` corresponds to a block of `shots_per_position` elements
+        in `selected_shots`; each entry is an index for one shot taken at that unique position.
+
+    Examples
+    --------
+    If five shots were conducted with (x, y) positions ((0, 0), (1, 2), (0, 0), (1, 2), (1, 2), (1, 2), (0, 0)), then
+        - `positions` is ((0, 0), (1, 2)),
+        - `num_positions` is 2,
+        - `shots_per_position` is 3 (as there are 4 shots at (1, 2) but only 3 at (0, 0)), and
+        - `selected_shots` is (0, 2, 6, 1, 3, 4), as
+        the first block of `shots_per_position` elements of `selected_shots` gives indices for
+        the shots at (0, 0), which is the first position in `positions`, and
+        the second block of `shots_per_position` elements of `selected_shots` gives indices
+        for the shots at (1, 2), which is the second position in `positions`.
+    """
     num_shots = len(isweep_motor_data['shotnum'])
     shot_positions = np.round(isweep_motor_data['xyz'], 1)
 

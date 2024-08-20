@@ -34,6 +34,8 @@ def multiplot_linear_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_dia
         WIP
     tolerance : _
         WIP
+    display_core_steady_state : _
+        WIP
     save_directory : _
         WIP
 
@@ -158,8 +160,29 @@ def multiplot_linear_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_dia
 
 
 def plot_linear_diagnostic(diagnostics_dataset: xr.Dataset, probe_face_coefficients, diagnostic: str, plot_type: str,
-                           steady_state, shot_mode="mean", save_directory="", tolerance=np.nan):
-    """ Plots the given diagnostic(s) from the dataset in the given style. """
+                           steady_state, shot_mode="mean", save_directory="", tolerance=np.nan,
+                           display_core_steady_state=False, core_radius=26*u.cm):
+    """
+    Plots the given diagnostic(s) from the dataset in the given style. (WIP)
+
+    Parameters
+    ----------
+    diagnostics_dataset : `xarray.Dataset`
+
+    probe_face_coefficients
+    diagnostic : `str`
+    plot_type : {'line', 'contour', 'surface'}
+    steady_state
+    shot_mode
+    save_directory
+    tolerance
+    display_core_steady_state
+    core_radius
+
+    Returns
+    -------
+
+    """
 
     linear_ds_s = []
     linear_dimensions = []
