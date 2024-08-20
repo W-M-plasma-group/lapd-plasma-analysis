@@ -104,19 +104,19 @@ def isolate_ramps(bias, margin=0):
         2D array of shape (number of ramps, 2). Ramp start indices are in the first column; end indices in the second.
     """
 
-    # Assume strictly that all plateaus start and end at the same time after the start of the shot as in any other shot
+    # Assume strictly that all ramps start and end at the same time after the start of the shot as in any other shot
     bias_axes_to_average = tuple(np.arange(bias.ndim)[:-1])
     bias_avg = np.mean(bias, axis=bias_axes_to_average)  # mean of bias across all positions and shots, preserving time
 
     # todo Report on how dissimilar the vsweep biases are and if they can be averaged together safely?
 
     # Initial fit to guess number of peaks
-    min_plateau_width = 500  # change as necessary
-    guess_num_plateaus = len(find_peaks(bias_avg, height=0, distance=min_plateau_width)[0])
-    guess_plateau_spacing = bias.shape[-1] // guess_num_plateaus
+    min_ramp_width = 500  # change as necessary
+    guess_num_ramps = len(find_peaks(bias_avg, height=0, distance=min_ramp_width)[0])
+    guess_ramp_spacing = bias.shape[-1] // guess_num_ramps
 
     # Second fit to find maximum bias frames
-    peak_frames, peak_properties = find_peaks(bias_avg, height=0, distance=guess_plateau_spacing // 2,
-                                              width=min_plateau_width, rel_height=0.97)  # TODO 0.97 is hardcoded
+    peak_frames, peak_properties = find_peaks(bias_avg, height=0, distance=guess_ramp_spacing // 2,
+                                              width=min_ramp_width, rel_height=0.97)  # TODO 0.97 is hardcoded
 
     return np.stack((peak_properties['left_ips'].astype(int) + margin // 2, peak_frames - margin // 2), axis=-1)
