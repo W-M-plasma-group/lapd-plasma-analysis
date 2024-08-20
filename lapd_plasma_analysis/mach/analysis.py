@@ -33,7 +33,7 @@ def get_mach_datasets(mach_nc_folder, hdf5_folder, lang_datasets, hdf5_selected_
     print_mach_file_choices(hdf5_folder, mach_nc_folder, mach_mode)
 
     if mach_mode == "skip":
-        return
+        return []
 
     mach_completed = False
     mach_datasets = []
