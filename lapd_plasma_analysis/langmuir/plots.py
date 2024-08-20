@@ -11,7 +11,7 @@ from lapd_plasma_analysis.langmuir.configurations import get_ion
 
 def multiplot_linear_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_diagnostic, probe_face_choices, x_dim='x',
                                 steady_state_by_runs=None, core_rad=None, attribute=None, tolerance=np.nan,
-                                save_directory=""):
+                                display_core_steady_state=False, save_directory=""):
     """
     Plot multiple profiles (x, y, or time) from different datasets on a row of side-by-side plots.
     Plots are grouped by gas puff voltage and cathode discharge current. (WIP)
@@ -33,6 +33,8 @@ def multiplot_linear_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_dia
     attribute : _
         WIP
     tolerance : _
+        WIP
+    display_core_steady_state : _
         WIP
     save_directory : _
         WIP
@@ -158,8 +160,29 @@ def multiplot_linear_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_dia
 
 
 def plot_linear_diagnostic(diagnostics_dataset: xr.Dataset, probe_face_coefficients, diagnostic: str, plot_type: str,
-                           steady_state, shot_mode="mean", save_directory="", tolerance=np.nan):
-    """ Plots the given diagnostic(s) from the dataset in the given style. """
+                           steady_state, shot_mode="mean", save_directory="", tolerance=np.nan,
+                           display_core_steady_state=False, core_radius=26*u.cm):
+    """
+    Plots the given diagnostic(s) from the dataset in the given style. (WIP)
+
+    Parameters
+    ----------
+    diagnostics_dataset : `xarray.Dataset`
+
+    probe_face_coefficients
+    diagnostic : `str`
+    plot_type : {'line', 'contour', 'surface'}
+    steady_state
+    shot_mode
+    save_directory
+    tolerance
+    display_core_steady_state
+    core_radius
+
+    Returns
+    -------
+
+    """
 
     linear_ds_s = []
     linear_dimensions = []
@@ -230,13 +253,17 @@ def plot_linear_diagnostic(diagnostics_dataset: xr.Dataset, probe_face_coefficie
                         print(e)
                         pass
                     plot_title += f"\n{get_title(key)} {plot_type} plot (2D)"
-                    # TODO change
-                    """
-                    if hasattr(linear_ds_s[0], "facevector"):
-                        plot_title += f"\nLinear combination of faces: {linear_ds_s[d].attrs['facevector']}"
-                    """
                     plt.title(plot_title)
                     plt.tight_layout()
+
+                    dataset_time_unit = linear_ds_s[d].coords['time'].attrs['units']
+                    dataset_x_unit = linear_ds_s[d].coords['x'].attrs['units']
+                    if display_core_steady_state:
+                        for steady_state_bound_time in steady_state.to(dataset_time_unit).value:
+                            plt.axvline(steady_state_bound_time, color="gray")  # , linestyles
+                        for plus_minus_core_radius in ((-1, 1) * core_radius.to(dataset_x_unit)).value:
+                            plt.axhline(plus_minus_core_radius, color="gray")
+
                     if save_directory:
                         plt.savefig(save_directory + "2D_plot_" + diagnostic + ".pdf", bbox_inches="tight")
                     plt.show()
@@ -246,7 +273,7 @@ def plot_linear_diagnostic(diagnostics_dataset: xr.Dataset, probe_face_coefficie
 
 
 def plot_parallel_diagnostic(datasets, steady_state_times_runs, probes_faces_midplane, probes_faces_parallel,
-                             marker_styles, diagnostic, operation="mean", core_radius=26 * u.cm,
+                             marker_styles, diagnostic, operation="mean", core_radius=26 * u.cm, line_style='none',
                              save_directory=""):
     plt.rcParams['figure.figsize'] = (6.5, 3.5)
 
@@ -282,7 +309,7 @@ def plot_parallel_diagnostic(datasets, steady_state_times_runs, probes_faces_mid
         diagnostic_units = datasets[i][diagnostic].attrs['units']
 
         plt.errorbar(zs, diagnostic_values, yerr=diagnostic_errors, marker=marker_styles[i],
-                     color=color_map[i], linestyle='none')
+                     color=color_map[i], linestyle=line_style)
     plt.title(f"{get_title(diagnostic)} [{get_diagnostic_keys_units()[diagnostic]}] ", y=0.9, loc='right')
     plt.xlabel("z location [m]")
 
@@ -353,7 +380,7 @@ def scatter_plot_diagnostics(datasets, diagnostics_to_plot_list, steady_state_ti
 
 def plot_parallel_inverse_scale_length(datasets, steady_state_times_runs, diagnostic, probes_faces_midplane,
                                        probes_faces_parallel, marker_styles, operation, core_radius, save_directory,
-                                       scale_length_mode="linear"):
+                                       annotate=False, scale_length_mode="linear"):
     plt.rcParams['figure.figsize'] = 6, 3.5
 
     color_map, normalizer = get_colormap_normalizer(datasets, core_radius, steady_state_times_runs,
@@ -389,8 +416,11 @@ def plot_parallel_inverse_scale_length(datasets, steady_state_times_runs, diagno
 
         diagnostic_scale_length_abs = 1 / np.abs(diagnostic_inverse_scale_length)
 
-        plt.plot(z, diagnostic_scale_length_abs, marker=marker_styles[i], color=color_map[i],
-                 label=get_exp_run_string(datasets[i].attrs))
+        plt.plot(z, diagnostic_scale_length_abs, marker=marker_styles[i], color=color_map[i])
+        #        label=get_exp_run_string(datasets[i].attrs))
+        if annotate:
+            plt.annotate(get_exp_run_string(datasets[i].attrs),
+                         (z, diagnostic_scale_length_abs), size="small")  # noqa
     plt.title(f"Parallel gradient scale length [m] \n\n{get_title(diagnostic)} ", y=0.88)
     plt.xlabel("z location [m]")
 
@@ -525,9 +555,9 @@ def plot_acceleration_vs_pressure_gradient(datasets, steady_state_times_runs, co
         Path to folder to save plot
     with_expectation : `bool`
         If True, add three lines to the plot for visualization purposes -
-        - the equality line, predicted by MHD;
-        - the zero-acceleration line; and
-        - the equality line shifted by a constant offset.
+            - the equality line, predicted by MHD;
+            - the zero-acceleration line; and
+            - the equality line shifted by a constant offset.
     offset : `float` or `int`
         The offset applied to the equality line in the third line plotted above
     """

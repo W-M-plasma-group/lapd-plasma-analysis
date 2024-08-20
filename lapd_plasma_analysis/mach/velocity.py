@@ -54,21 +54,15 @@ def get_mach_numbers(mach_isat_da: xr.DataArray):
 
     """
 
-    # ASCII diagram of Mach probe below
-
-    """
-
-        Model of Mach probe faces (perfect octagon)
-                            ___________
-                 |         /           \ 
-        fore     |    3  /               \  4
-                 |      |                 |
-    (<- Cathode) |   2  |                 |  5            <----  B-field
-                 |      |                 |
-        aft      |    1  \               /  6
-                 |         \___________/ 
-
-    """  # noqa
+    #     Model of Mach probe faces (perfect octagon)
+    #                         ___________
+    #              |         /           \
+    #     fore     |    3  /               \  4
+    #              |      |                 |
+    # (<- Cathode) |   2  |                 |  5            <----  B-field
+    #              |      |                 |
+    #     aft      |    1  \               /  6
+    #              |         \___________/
 
     """ CONSTANTS AND DESCRIPTIONS ARE TAKEN FROM MATLAB CODE WRITTEN BY CONOR PERKS
         Additional information can be found in, among other sources, 'Mach probes' (Chung 2012) """
@@ -113,7 +107,7 @@ def get_velocity(mach_ds: xr.Dataset, electron_temperature_da: xr.DataArray, ion
     Parameters
     ----------
     mach_ds : `xr.Dataset`
-        param
+        WIP
     electron_temperature_da : `xr.DataArray`
         param
     ion_type : str
@@ -125,14 +119,13 @@ def get_velocity(mach_ds: xr.Dataset, electron_temperature_da: xr.DataArray, ion
         Dataset containing parallel and, if applicable, perpendicular velocity data
     """
 
-    # description of electron temperature DataArray dimensions below
-
-    """
-    Electron temperature DataArray will have dimensions
-        probe               (additional coordinates: port, z),
-        face,   x,  y,  shot,
-        time                (additional coordinates: plateau (1-based))
-    """
+    # Electron temperature DataArray will have dimensions
+    #     probe,     (additional coordinates: port, z)
+    #     face,
+    #     x,
+    #     y,
+    #     shot,
+    #     time      (additional coordinates: plateau (1-based))
 
     ion_mass = particle_mass(ion_type)
     ion_adiabatic_index = 3

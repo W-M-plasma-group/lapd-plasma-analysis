@@ -13,56 +13,63 @@ from lapd_plasma_analysis.langmuir.plots import *
 
 from lapd_plasma_analysis.mach.analysis import get_mach_datasets, get_velocity_datasets
 
+# ----------------------------------------------------------------------------------------
 
 # HDF5 file directory; end path with a slash                            # TODO user adjust
-# ----------------------------------------------------------------------------------------
 hdf5_folder = "/Users/leomurphy/lapd-data/combined/"
 # hdf5_folder = "/Users/leomurphy/lapd-data/November_2022/"
 # hdf5_folder = "/Users/leomurphy/lapd-data/April_2018/"
+# hdf5_folder = "/Users/leomurphy/lapd-data/March_2022/"
+# hdf5_folder = "/Users/leomurphy/lapd-data/November_2022/all/"
+# hdf5_folder = "/Users/leomurphy/lapd-data/January_2024/"
 
 assert hdf5_folder.endswith("/")
 
+# ----------------------------------------------------------------------------------------
 
 # Langmuir & Mach NetCDF directories; end path with a slash             # TODO user adjust
-# ----------------------------------------------------------------------------------------
 langmuir_nc_folder = hdf5_folder + "lang_nc/"
 mach_nc_folder = hdf5_folder + "mach_nc/"
 
+# ----------------------------------------------------------------------------------------
 
 # Interferometry file directory; end path with a slash                  # TODO user adjust
-# ----------------------------------------------------------------------------------------
 interferometry_folder = ("/Users/leomurphy/lapd-data/November_2022/uwave_288_GHz_waveforms/"
                          if "November_2022" in hdf5_folder else hdf5_folder)
 
-
-# Interferometry & Mach access modes. Options are "skip", "append", "overwrite";
-#    recommended is "append".
 # ----------------------------------------------------------------------------------------
+
+# Interferometry & Mach access modes. Options are "skip", "append", "overwrite"; recommended is "append".
 interferometry_mode = "skip"                                            # TODO user adjust
-mach_velocity_mode = "append"                                           # not fully implemented
+mach_velocity_mode = "skip"                                           # not fully implemented
 
-
-# Other user parameters
 # ----------------------------------------------------------------------------------------
+
 # isweep_choice is user choice for probe or linear combination to plot; see isweep_selector in helper.py for more
 # e.g. coefficients are for [[p1f1, p1f2], [p2f1, p2f2]]
 isweep_choices = [[[1, 0], [0, 0]],     # . 1st combination to plot: 1 * (first face on first probe)
                   [[0, 0], [1, 0]]]     # . 2nd combination to plot: 1 * (first face on second probe)
 # isweep_choices = [[[1, 0], [-1, 0]]]  # .     combination to plot: 1 * (face 1 on probe 1) - 1 * (face 1 on probe 2)
+
+# ----------------------------------------------------------------------------------------
+
+# Other user parameters
 bimaxwellian = False
 core_radius = 21. * u.cm                                                # TODO user can adjust (26 cm in MATLAB code)
 plot_tolerance = np.nan  # 0.25                                         # TODO user can adjust
 velocity_plot_unit = u.km / u.s         # TODO not yet working          # TODO adjust
+display_core_steady_state_lines = True                                  # user can adjust
 
+# ----------------------------------------------------------------------------------------
 
 # Optional directory to save plots; end path with a slash.              # TODO user adjust
-# ----------------------------------------------------------------------------------------
 plot_save_folder = ("/Users/leomurphy/Desktop/wm/Plasma research/Research images/Research images spring 2024/"
                     "new research plots mar-apr 2024/saved plots/")
 
+# ----------------------------------------------------------------------------------------
 
 # Diagram of LAPD
-# ----------------------------------------------------------------------------------------
+#
 #           <- ~18m plasma length ->
 #  __________________________________
 #  |||     '                        |       A
@@ -107,12 +114,18 @@ if __name__ == "__main__":
     diagnostics_to_plot_list = get_diagnostics_to_plot(diagnostic_name_dict)
     print("Diagnostics selected:", diagnostics_to_plot_list)
 
+    # Print steady state periods detected or hardcoded for each experiment
+    if ask_yes_or_no("Print steady state periods? (y/n) "):
+        for i in range(len(datasets)):
+            print(f"\t{get_exp_run_string(datasets[i].attrs)}: {steady_state_times_runs[i]}")
+
     # Plot chosen diagnostics for each individual dataset
     if ask_yes_or_no("Generate contour plot of selected diagnostics over time and radial position? (y/n) "):
         for plot_diagnostic in diagnostics_to_plot_list:
             for i in range(len(datasets)):
                 plot_linear_diagnostic(datasets[i], isweep_choices, plot_diagnostic, 'contour',
-                                       steady_state_times_runs[i])
+                                       steady_state_times_runs[i],
+                                       display_core_steady_state=True, core_radius=core_radius)
 
     # Plot radial profiles of diagnostic (steady-state time average), with color corresponding to first attribute
     #    and plot position on multiplot corresponding to second attribute
@@ -120,7 +133,8 @@ if __name__ == "__main__":
         for plot_diagnostic in diagnostics_to_plot_list:
             multiplot_linear_diagnostic(datasets, plot_diagnostic, isweep_choices, 'x',
                                         steady_state_by_runs=steady_state_times_runs, core_rad=core_radius,
-                                        tolerance=plot_tolerance, save_directory=plot_save_folder)
+                                        tolerance=plot_tolerance, display_core_steady_state=True,
+                                        save_directory=plot_save_folder)
 
     # Plot time profiles
     if ask_yes_or_no("Generate line plot of selected diagnostics over time? (y/n) "):
@@ -151,7 +165,7 @@ if __name__ == "__main__":
             plot_parallel_diagnostic(datasets_split, steady_state_times_runs,
                                      probes_faces_midplane, probes_faces_parallel,
                                      marker_styles, diagnostic=plot_diagnostic, operation="mean",
-                                     core_radius=core_radius, save_directory=plot_save_folder)
+                                     core_radius=core_radius, line_style='-', save_directory=plot_save_folder)
 
     at_least_two_diagnostics = (len(diagnostics_to_plot_list) >= 2)
     if at_least_two_diagnostics and ask_yes_or_no("Generate scatter plot of first two selected diagnostics? (y/n) "):

@@ -9,15 +9,24 @@ from lapd_plasma_analysis.langmuir.getIVsweep import get_shot_positions
 # Note: This code is based on getIVsweep.py in the lapd-plasma-analysis repository.
 # TODO merge into getIVsweep.py ?
 
+# Todo see what langmuir functions are referenced the most in Mach analysis and consider moving them to a tools package?
+
 
 def get_mach_isat(filename, mach_configs):
     """
+    Get the ion saturation current signal from the Mach probe and restore it to meaningful units. (WIP)
 
-    :param filename:
-    :param mach_configs:
-    :return:
+    Parameters
+    ----------
+    filename : `str`
+        Path to an HDF5 file.
+    mach_configs : `numpy.ndarray`
+        Structured array (WIP)
+
+    Returns
+    -------
+
     """
-    # TODO add function definition
 
     with lapd.File(filename) as lapd_file:
         run_name = lapd_file.info['run name']
@@ -45,14 +54,13 @@ def get_mach_isat(filename, mach_configs):
     # gains = np.reshape(mach_configs['gain'], scale_shape)
 
     for i in range(len(isat)):
-        # assumes probes faces are all same area!  # * u.A
-        isat[i] = isat[i] / mach_configs['resistance'][i] / mach_configs['gain'][i]
+        isat[i] = isat[i] / mach_configs['resistance'][i] / mach_configs['gain'][i] / mach_configs['area'][i]   # * u.A
 
     ports = np.array([mach_motor_data.info['controls']['6K Compumotor']['probe']['port']
                       for mach_motor_data in mach_motor_datas])
     assert np.all(ports == mach_configs['port'])  # otherwise, ports in configurations.py do not match motor data
 
-    # currents dimensions:   isweep, position, shot, frame   (e.g. (1, 70, 7, 55295))
+    # isat array dimensions:   isweep, position, shot, frame   (e.g. (1, 70, 7, 55295))
     isat_da = to_mach_isat_da(isat, positions, num_shots_per_position, mach_configs, dt).rename(run_name)
 
     # Subtract out typical DC offset current on each face as average of last two thousand current measurements,
@@ -68,39 +76,20 @@ def get_mach_isat(filename, mach_configs):
     return isat_da
 
 
-"""
-def get_shot_positions(isat_motor_data):
-    num_shots = len(isat_motor_data['shotnum'])
-    shot_positions = np.round(isat_motor_data['xyz'], 1)
-
-    z_positions = shot_positions[:, 2]
-    # if np.amin(z_positions) != np.amax(z_positions):
-    #     raise ValueError("Varying z-position when only x and/or y variation expected")
-    # save z-position for later? Shouldn't need to, because hard to accidentally vary port
-    positions = np.unique(shot_positions[:, :2], axis=0)  # list of all unique (x, y) positions
-    num_positions = len(positions)
-    if num_shots % num_positions != 0:
-        raise ValueError("Number of Mach measurements " + str(num_shots) +
-                         " does not evenly divide into " + str(num_positions) + " unique positions")
-    shots_per_position = int(num_shots // num_positions)
-
-    xy_at_positions = shot_positions[:, :2].reshape((num_positions, shots_per_position, 2))  # (x, y) at shots by pos.
-    if not (np.amax(xy_at_positions, axis=1) == np.amin(xy_at_positions, axis=1)).all():
-        raise ValueError("Non-uniform position values when grouping Mach probe data by position")
-
-    return positions, num_positions, shots_per_position
-"""
-
-
 def to_mach_isat_da(isat, positions, shots_per_position, mach_configs, dt):
     """
 
-    :param isat:
-    :param shots_per_position:
-    :param positions:
-    :param mach_configs:
-    :param dt:
-    :return:
+    Parameters
+    ----------
+    isat
+    positions
+    shots_per_position
+    mach_configs
+    dt
+
+    Returns
+    -------
+
     """
 
     ports_unique = np.unique([port for port in mach_configs['port']])
