@@ -195,8 +195,8 @@ def load_datasets(hdf5_folder, lang_nc_folder, bimaxwellian, plot_save_directory
 
     print("\nThe following Langmuir NetCDF files were found in the NetCDF folder (specified in main.py): ")
     nc_paths = sorted(search_folder(lang_nc_folder, 'nc', limit=52))
-    nc_paths_chosen_ints = choose_multiple_list(nc_paths, "Langmuir data NetCDF file",
-                                                null_action="perform diagnostics on HDF5 files")
+    nc_paths_chosen_ints = choose_multiple_from_list(nc_paths, "Langmuir data NetCDF file",
+                                                     null_action="perform diagnostics on HDF5 files")
 
     if len(nc_paths_chosen_ints) > 0:
         hdf5_chosen_list = None
@@ -204,8 +204,8 @@ def load_datasets(hdf5_folder, lang_nc_folder, bimaxwellian, plot_save_directory
     else:
         print("\nThe following HDF5 files were found in the HDF5 folder (specified in main.py): ")
         hdf5_paths = sorted(search_folder(hdf5_folder, "hdf5", limit=52))
-        hdf5_chosen_ints = choose_multiple_list(hdf5_paths, "HDF5 file",
-                                                null_action="skip to Mach number calculations only")
+        hdf5_chosen_ints = choose_multiple_from_list(hdf5_paths, "HDF5 file",
+                                                     null_action="skip to Mach number calculations only")
 
         if len(hdf5_chosen_ints) == 0:
             return None
@@ -339,9 +339,8 @@ def get_diagnostics_to_plot(diagnostic_name_dict):
     """ Ask users for a list of diagnostics to plot. """
     print("The following diagnostics are available to plot: ")
     diagnostics_sort_indices = np.argsort(list(diagnostic_name_dict.values()))
-    diagnostics_to_plot_ints = choose_multiple_list(
-        np.array(list(diagnostic_name_dict.values()))[diagnostics_sort_indices],
-        "diagnostic", null_action="skip")
+    diagnostics_to_plot_ints = choose_multiple_from_list(
+        np.array(list(diagnostic_name_dict.values()))[diagnostics_sort_indices], "diagnostic", null_action="skip")
     return [np.array(list(diagnostic_name_dict.keys()))[diagnostics_sort_indices][choice]
             for choice in diagnostics_to_plot_ints]
 

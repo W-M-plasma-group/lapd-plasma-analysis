@@ -7,7 +7,7 @@ import warnings
 import xarray as xr
 
 
-def choose_multiple_list(choices, name, null_action=None):
+def choose_multiple_from_list(choices, name, null_action=None):
     r"""Allows user to choose multiple items from a list via console input.
 
     Prompts user to select any object (described by `name`) from a list `choices`
