@@ -14,6 +14,20 @@ from lapd_plasma_analysis.mach.configurations import get_mach_config
 
 
 def get_mach_datasets(mach_nc_folder, hdf5_folder, lang_datasets, hdf5_selected_paths, mach_mode):
+    """
+
+    Parameters
+    ----------
+    mach_nc_folder
+    hdf5_folder
+    lang_datasets
+    hdf5_selected_paths
+    mach_mode
+
+    Returns
+    -------
+
+    """
 
     mach_nc_folder = ensure_directory(mach_nc_folder)
     print_mach_file_choices(hdf5_folder, mach_nc_folder, mach_mode)
@@ -72,6 +86,18 @@ def get_mach_datasets(mach_nc_folder, hdf5_folder, lang_datasets, hdf5_selected_
 
 
 def get_velocity_datasets(lang_datasets, mach_datasets, mach_mode):
+    """
+
+    Parameters
+    ----------
+    lang_datasets
+    mach_datasets
+    mach_mode
+
+    Returns
+    -------
+
+    """
     if mach_mode == "skip":
         return lang_datasets
 
