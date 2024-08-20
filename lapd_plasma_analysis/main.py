@@ -106,6 +106,11 @@ if __name__ == "__main__":
     diagnostics_to_plot_list = get_diagnostics_to_plot(diagnostic_name_dict)
     print("Diagnostics selected:", diagnostics_to_plot_list)
 
+    # Print steady state periods detected or hardcoded for each experiment
+    if ask_yes_or_no("Print steady state periods? (y/n) "):
+        for i in range(len(datasets)):
+            print(f"\t{get_exp_run_string(datasets[i].attrs)}: {steady_state_times_runs[i]}")
+
     # Plot chosen diagnostics for each individual dataset
     if ask_yes_or_no("Generate contour plot of selected diagnostics over time and radial position? (y/n) "):
         for plot_diagnostic in diagnostics_to_plot_list:
