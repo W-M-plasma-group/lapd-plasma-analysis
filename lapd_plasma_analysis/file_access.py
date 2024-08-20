@@ -45,10 +45,10 @@ def choose_multiple_from_list(choices, name, null_action=None):
     if len(choices) > 52:
         warnings.warn("More than 52 " + name + "s found. Only the first 52 are displayed.")
     print(*["  " + num_to_chr(i) + ": " + choices[i] for i in range(len(choices[:52]))], sep="\n")
-    prompt = "Input a string of letters to select the corresponding " + name + "s"
+    prompt = "Input a string of letters to select the corresponding " + name + "s (e.g. 'abc')"
     if null_action is not None:
         prompt += ", \n\tor the empty string to " + null_action
-    prompt += " (e.g. 'abc'): "
+    prompt += ": "
     selection_str = input(prompt)
 
     if selection_str == "" and null_action is not None:
