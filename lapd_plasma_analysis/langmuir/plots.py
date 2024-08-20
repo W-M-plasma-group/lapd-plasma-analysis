@@ -230,11 +230,6 @@ def plot_linear_diagnostic(diagnostics_dataset: xr.Dataset, probe_face_coefficie
                         print(e)
                         pass
                     plot_title += f"\n{get_title(key)} {plot_type} plot (2D)"
-                    # TODO change
-                    """
-                    if hasattr(linear_ds_s[0], "facevector"):
-                        plot_title += f"\nLinear combination of faces: {linear_ds_s[d].attrs['facevector']}"
-                    """
                     plt.title(plot_title)
                     plt.tight_layout()
                     if save_directory:
@@ -525,9 +520,9 @@ def plot_acceleration_vs_pressure_gradient(datasets, steady_state_times_runs, co
         Path to folder to save plot
     with_expectation : `bool`
         If True, add three lines to the plot for visualization purposes -
-        - the equality line, predicted by MHD;
-        - the zero-acceleration line; and
-        - the equality line shifted by a constant offset.
+            - the equality line, predicted by MHD;
+            - the zero-acceleration line; and
+            - the equality line shifted by a constant offset.
     offset : `float` or `int`
         The offset applied to the equality line in the third line plotted above
     """

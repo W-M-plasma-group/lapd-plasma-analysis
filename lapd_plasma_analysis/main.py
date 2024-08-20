@@ -13,37 +13,35 @@ from lapd_plasma_analysis.langmuir.plots import *
 
 from lapd_plasma_analysis.mach.analysis import get_mach_datasets, get_velocity_datasets
 
+# ----------------------------------------------------------------------------------------
 
 # HDF5 file directory; end path with a slash                            # TODO user adjust
-# ----------------------------------------------------------------------------------------
 hdf5_folder = "/Users/leomurphy/lapd-data/combined/"
 # hdf5_folder = "/Users/leomurphy/lapd-data/November_2022/"
 # hdf5_folder = "/Users/leomurphy/lapd-data/April_2018/"
 
 assert hdf5_folder.endswith("/")
 
+# ----------------------------------------------------------------------------------------
 
 # Langmuir & Mach NetCDF directories; end path with a slash             # TODO user adjust
-# ----------------------------------------------------------------------------------------
 langmuir_nc_folder = hdf5_folder + "lang_nc/"
 mach_nc_folder = hdf5_folder + "mach_nc/"
 
+# ----------------------------------------------------------------------------------------
 
 # Interferometry file directory; end path with a slash                  # TODO user adjust
-# ----------------------------------------------------------------------------------------
 interferometry_folder = ("/Users/leomurphy/lapd-data/November_2022/uwave_288_GHz_waveforms/"
                          if "November_2022" in hdf5_folder else hdf5_folder)
 
-
-# Interferometry & Mach access modes. Options are "skip", "append", "overwrite";
-#    recommended is "append".
 # ----------------------------------------------------------------------------------------
+
+# Interferometry & Mach access modes. Options are "skip", "append", "overwrite"; recommended is "append".
 interferometry_mode = "skip"                                            # TODO user adjust
 mach_velocity_mode = "append"                                           # not fully implemented
 
-
-# Other user parameters
 # ----------------------------------------------------------------------------------------
+
 # isweep_choice is user choice for probe or linear combination to plot; see isweep_selector in helper.py for more
 # e.g. coefficients are for [[p1f1, p1f2], [p2f1, p2f2]]
 isweep_choices = [[[1, 0], [0, 0]],     # . 1st combination to plot: 1 * (first face on first probe)
@@ -54,15 +52,16 @@ core_radius = 21. * u.cm                                                # TODO u
 plot_tolerance = np.nan  # 0.25                                         # TODO user can adjust
 velocity_plot_unit = u.km / u.s         # TODO not yet working          # TODO adjust
 
+# ----------------------------------------------------------------------------------------
 
 # Optional directory to save plots; end path with a slash.              # TODO user adjust
-# ----------------------------------------------------------------------------------------
 plot_save_folder = ("/Users/leomurphy/Desktop/wm/Plasma research/Research images/Research images spring 2024/"
                     "new research plots mar-apr 2024/saved plots/")
 
+# ----------------------------------------------------------------------------------------
 
 # Diagram of LAPD
-# ----------------------------------------------------------------------------------------
+#
 #           <- ~18m plasma length ->
 #  __________________________________
 #  |||     '                        |       A

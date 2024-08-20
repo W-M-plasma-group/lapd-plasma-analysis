@@ -55,7 +55,7 @@ def get_sweep_current(filename, isweep_metadata, orientation):
     filename : `str`
         file path of HDF5 file from LAPD (WIP)
     isweep_metadata : `numpy.ndarray` of `int` and `str`
-        structured array of board, channel, receptacle, port, face, resistance, and area for each isweep signal. 
+        structured array of board, channel, receptacle, port, face, resistance, and area for each isweep signal.
         This should be the output of `lapd_plasma_analysis.langmuir.configurations.get_langmuir_config`.
     orientation : {+1, -1}
         +1 or -1, depending on if I_sweep should be inverted before analysis (WIP). This is 

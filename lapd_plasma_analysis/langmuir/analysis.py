@@ -35,9 +35,9 @@ def get_langmuir_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder
 
     interferometry_mode : {'skip', 'append', 'overwrite'}
         Mode for handling interferometry data.
-        - 'skip' skips all interferometry calibration calculations.
-        - 'append' performs interferometry calibration only on datasets that do not already have calibrated densities.
-        - 'overwrite' recalculates calibrated densities for all datasets.
+            - 'skip' skips all interferometry calibration calculations.
+            - 'append' performs interferometry calibration only on datasets that do not already have calibrated densities.
+            - 'overwrite' recalculates calibrated densities for all datasets.
 
     core_radius : `astropy.units.Quantity`
         Radius of core region, or region with high, stable densities. Used to calculate steady-state period
@@ -57,7 +57,7 @@ def get_langmuir_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder
 
     steady_state_times_runs : list of `astropy.unit.Quantity`
         List of ordered pairs (tuples?) of `astropy.unit.Quantity` objects indicating the beginning and end time
-         of the steady-state period.
+        of the steady-state period.
 
     hdf5_paths
         List of paths to HDF5 files opened. Can be `None` if NetCDF files used.

@@ -24,8 +24,8 @@ def preview_raw_sweep(bias, current, positions, langmuir_config, exp_params_dict
 
     x = np.unique(positions[:, 0])
     y = np.unique(positions[:, 1])
-    print(f"Port {langmuir_config['port']}, face {langmuir_config['face']}")
-    print(f"\nDimensions of sweep bias and current array: "
+    print(f"\nPort {langmuir_config['port']}, face {langmuir_config['face']}")
+    print(f"Dimensions of sweep bias and current array: "
           f"{len(x)} x-positions, "
           f"{len(y)} y-positions, and "
           f"{current.shape[1]} shots")

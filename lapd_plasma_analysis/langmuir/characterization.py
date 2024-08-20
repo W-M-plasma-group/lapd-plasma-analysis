@@ -87,8 +87,8 @@ def isolate_ramps(bias, margin=0):
 
     Returns
     -------
-    `numpy.ndarray`
-        num_plateaus-by-2 array; start indices in first column, end indices in second
+    `numpy.ndarray` of `int`
+        2D array of shape (number of ramps, 2). Ramp start indices are in the first column; end indices in the second.
     """
 
     # Assume strictly that all plateaus start and end at the same time after the start of the shot as in any other shot
