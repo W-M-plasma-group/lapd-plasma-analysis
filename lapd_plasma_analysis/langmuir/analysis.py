@@ -11,6 +11,7 @@ from lapd_plasma_analysis.langmuir.diagnostics import (langmuir_diagnostics, det
 from lapd_plasma_analysis.langmuir.neutrals import get_neutral_density
 from lapd_plasma_analysis.langmuir.interferometry import interferometry_calibration
 from lapd_plasma_analysis.langmuir.plots import get_title
+from lapd_plasma_analysis.langmuir.metadata_for_dataset import get_supplemental_metadata
 
 
 def get_langmuir_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder, interferometry_mode,
@@ -304,6 +305,8 @@ def load_datasets(hdf5_folder, lang_nc_folder, bimaxwellian, plot_save_directory
             save_datasets_nc([diagnostics_dataset], lang_nc_folder, "lang_", bimaxwellian)
             datasets.append(diagnostics_dataset)
 
+    for i in range(len(datasets)):
+        datasets[i] = datasets[i].assign_attrs(get_supplemental_metadata(datasets[i]))
     return datasets, hdf5_chosen_list
 
 
