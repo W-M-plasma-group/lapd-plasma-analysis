@@ -273,7 +273,7 @@ def plot_linear_diagnostic(diagnostics_dataset: xr.Dataset, probe_face_coefficie
 
 
 def plot_parallel_diagnostic(datasets, steady_state_times_runs, probes_faces_midplane, probes_faces_parallel,
-                             marker_styles, diagnostic, operation="mean", core_radius=26 * u.cm,
+                             marker_styles, diagnostic, operation="mean", core_radius=26 * u.cm, line_style='none',
                              save_directory=""):
     plt.rcParams['figure.figsize'] = (6.5, 3.5)
 
@@ -309,7 +309,7 @@ def plot_parallel_diagnostic(datasets, steady_state_times_runs, probes_faces_mid
         diagnostic_units = datasets[i][diagnostic].attrs['units']
 
         plt.errorbar(zs, diagnostic_values, yerr=diagnostic_errors, marker=marker_styles[i],
-                     color=color_map[i], linestyle='none')
+                     color=color_map[i], linestyle=line_style)
     plt.title(f"{get_title(diagnostic)} [{get_diagnostic_keys_units()[diagnostic]}] ", y=0.9, loc='right')
     plt.xlabel("z location [m]")
 
