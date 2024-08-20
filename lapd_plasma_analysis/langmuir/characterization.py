@@ -119,4 +119,5 @@ def isolate_ramps(bias, margin=0):
     peak_frames, peak_properties = find_peaks(bias_avg, height=0, distance=guess_ramp_spacing // 2,
                                               width=min_ramp_width, rel_height=0.97)  # TODO 0.97 is hardcoded
 
+    # rename "ramp" to "sweep"?
     return np.stack((peak_properties['left_ips'].astype(int) + margin // 2, peak_frames - margin // 2), axis=-1)
