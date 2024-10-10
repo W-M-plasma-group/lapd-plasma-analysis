@@ -2,19 +2,25 @@
 Provide messages to add to each saved dataset (WIP) # todo
 """
 
-# Info metadata
+from lapd_plasma_analysis.langmuir.plots import get_title
 
-info = """
-This is one NetCDF dataset containing Langmuir diagnostic plasma data from the Large Plasma Device (LAPD) at UCLA.
-Diagnostic data was calculated from experiments using the online lapd-plasma-analysis library.
+
+# General metadata
+
+general = """
+General information
+
+This object is a dataset containing data from one experiment at the Large Plasma Device (LAPD) at UCLA.
+This dataset is in the NetCDF format and contains Langmuir probe diagnostic data.
 This data can be accessed through Python, for example, by using the xarray library's open_dataset function.
-For more information, find the 'contents', 'structure', 'use', and 'source' elements 
-of the 'attrs' dictionary attribute of this dataset. 
+Diagnostic data was calculated from experiments using the online lapd-plasma-analysis library.
+For more information, see the 'contents', 'structure', 'use', and 'source' elements 
+of the 'attrs' dictionary attribute of this dataset.
 """
 
 
 def get_supplemental_metadata(dataset):
-    return {"info": info,
+    return {"general": general,
             "contents": get_contents_metadata(dataset),
             "structure": get_structure_metadata(dataset),
             "use": get_use_metadata(dataset),
@@ -24,7 +30,10 @@ def get_supplemental_metadata(dataset):
 # Contents metadata
 
 contents = """
-This dataset is an instance of `xarray.Dataset`. It contains the following variables: 
+Contents information
+
+This dataset is an instance of `xarray.Dataset`. It contains the following variables, referred to by
+their Dataset variable (short) name followed by their descriptive (long) name:
     {variables_list_string} 
 Visit https://docs.xarray.dev/en/stable/index.html for documentation and information on xarray Datasets and DataArrays.
 (WIP)
@@ -45,10 +54,11 @@ def get_contents_metadata(dataset):
 
     """
 
-    # TODO link to the xarray website (in multiple metadatas?)
-
-    variables_list = list(dataset.keys())
-    variables_list_string = "\n\t".join(variables_list)
+    variable_short_names = [str(key) for key in dataset.keys()]
+    variable_long_names = [get_title(variable) for variable in variable_short_names]
+    variable_combined_names = [variable_short_names[i].ljust(20) + "  --  " + variable_long_names[i]
+                               for i in range(len(variable_short_names))]
+    variables_list_string = "\n\t".join(variable_combined_names)
     return contents.format(variables_list_string=variables_list_string,
                            )
 
@@ -56,10 +66,12 @@ def get_contents_metadata(dataset):
 # Structure metadata
 
 structure = """
+Structure information
+
 Each individual variable in this dataset is stored as an individual `xarray.DataArray` object.
 This dataset, and by extension each of its individual DataArrays, are {num_dimensions}-dimensional, 
-with the following dimensions, from outermost to innermost: 
-    {dimensions_list}
+with the following dimensions and sizes, ordered from outermost to innermost dimension: 
+    {dimensions_dict_string}
 Information on `xarray` Datasets and DataArrays can be found at the following links.
 Quick overview:  https://docs.xarray.dev/en/stable/getting-started-guide/quick-overview.html
 Terminology:     https://docs.xarray.dev/en/stable/user-guide/terminology.html
@@ -70,30 +82,34 @@ Indexing data:   https://docs.xarray.dev/en/stable/user-guide/indexing.html
 
 def get_structure_metadata(dataset):
 
-    dimensions_list = list(dataset.dims)
-    dimensions_list_string = "\n\t".join(dimensions_list)
-    return structure.format(num_dimensions=len(dimensions_list),
-                            dimensions_list=dimensions_list,
-                            dimensions_list_string=dimensions_list_string
+    variables_list = list(dataset.keys())
+    dimensions_dict = dict(dataset[variables_list[0]].sizes.items())
+    dimensions_dict_string = "\n\t".join([f"{dim:9} --  {dimensions_dict[dim]}" for dim in dimensions_dict])
+    return structure.format(num_dimensions=len(dimensions_dict),
+                            dimensions_dict=dimensions_dict,
+                            dimensions_dict_string=dimensions_dict_string
                             )
 
 
 # Use metadata
 
 use = """
+Usage information
+
 Below are some examples of Python code to access and display data from this dataset.
 
 # Open the dataset
 import xarray as xr
-ds = xr.open_dataset("path_to_file/dataset_file_name.nc")  # change the path name for your device
+dset = xr.open_dataset("path_to_file/dataset_file_name.nc")  # change the path name for your device
 
 # Access the DataArray with '{variables_list[0]}' data
-da = ds['{variables_list[0]}']   # note the difference between 'ds' and 'da' 
+da = dset['{variables_list[0]}']   # note the difference between 'dset' and 'da' 
 
 # Access and print various metadata
-ds.attrs['info']  # try printing these
-ds.attrs['use']
-ds.attrs.keys()   # to learn what is there     
+print(dset)                 # Try these yourself
+print(dset.general)    
+print(dset.use)
+print(dset.attrs.keys())
 
 # Two ways to access the '{variables_list[0]}' DataArray entry that has index 0 in every dimension
 da[{dataset_index_string}] 
@@ -110,7 +126,7 @@ da_squeezed_2D.plot.contourf()
 plt.show()
 
 # Access the first coordinate in the list of coordinates
-ds.coords[list(ds.coords)[-1]]
+dset.coords[list(dset.coords)[-1]]
 
 """
 
@@ -119,27 +135,37 @@ def get_use_metadata(dataset):
 
     # todo Add full name support for printing e.g. variables_list[0], such as "Electron temperature" instead of "T_e" ?
     dimensions_list = list(dataset.dims)
+    num_squeezed_dimensions = len([dimension for dimension in dataset.dims if dataset.sizes[dimension] <= 1])
     dataset_index_string = ', '.join(['0' for _ in dimensions_list])
     dataset_loc_index_string = ', \n        '.join(
-        [repr(dimension) + ': ' + str(dataset.coords[dimension][0].data)
+        [repr(dimension) + ': ' + repr(dataset.coords[dimension][0].data)
          for dimension in dimensions_list])
 
     return use.format(variables_list=list(dataset.keys()),
                       dimensions_list=dimensions_list,
                       dataset_index_string=dataset_index_string,
                       dataset_loc_index_string=dataset_loc_index_string,
-                      dataset_index_string_truncated=dataset_index_string[:-6],
+                      dataset_index_string_truncated=dataset_index_string[:-3 * (2 + num_squeezed_dimensions)],
                       )
 
 
 # Source metadata
 
 source = """
-Documentation for the lapd-plasma-analysis library is available online at this link: 
-https://lapd-plasma-analysis.readthedocs.io/en/index.html
+Source information
 
-Further information on lapd-plasma-analysis is not yet complete.
+Langmuir diagnostic values were calculated using lapd-plasma-analysis 
+with the help of the diagnostics toolkit of the PlasmaPy library.
+Documentation for the lapd-plasma-analysis library is available online at this link: 
+    https://lapd-plasma-analysis.readthedocs.io/en/index.html
+Documentation for the PlasmaPy library is available online at these links: 
+    https://docs.plasmapy.org/en/stable/
+    https://docs.plasmapy.org/en/stable/ad/diagnostics/langmuir.html
+
+Further information on lapd-plasma-analysis is not yet complete. (WIP)
 """
+
+# TODO most important part - how was this data calculated?
 
 
 def get_source_metadata(dataset):

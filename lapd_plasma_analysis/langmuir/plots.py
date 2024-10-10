@@ -679,34 +679,34 @@ def check_diagnostic(diagnostic_dataset, choice):
 
 
 def get_title(diagnostic: str) -> str:
-    full_names = {'V_P':            "Plasma potential",
-                  'V_F':            "Floating potential",
-                  'I_es':           "Electron saturation current",
-                  'I_is':           "Ion saturation current",
-                  'n_e':            "Electron density",
-                  'n_i':            "Ion density",
-                  'T_e':            "Electron temperature",
-                  'n_i_OML':        "Ion density (OML)",
-                  'hot_fraction':   "Hot electron fraction",
-                  'T_e_cold':       "Cold electron temperature",
-                  'T_e_hot':        "Hot electron temperature",
-                  'T_e_avg':        "Average bimaxwellian electron temperature",
-                  'P_e':            "Electron pressure",
-                  'P_e_cal':        "Calibrated electron pressure",
-                  'P_e_from_n_i':   "Electron pressure (from ion density)",             # not added yet
-                  'P_e_from_n_i_OML': "Electron pressure (from ion density (OML))",
-                  'P_ei':           "Plasma pressure",                                  # Electron + ion pressure
-                  'P_ei_cal':       "Calibrated plasma pressure",
-                  'P_ei_from_n_i':  "Plasma pressure (from ion density)",               # not added yet
-                  'P_ei_from_n_i_OML': "Plasma pressure (from ion density (OML))",
-                  'n_e_cal':        "Calibrated electron density",
-                  'n_i_cal':        "Calibrated ion density",
-                  'n_i_OML_cal':    "Calibrated ion density (OML)",
-                  'nu_ei':          "Electron-ion collision frequency",
-                  'M_para':         "Parallel Mach number",
-                  'M_perp':         "Perpendicular Mach number",
-                  'v_para':         "Parallel velocity",
-                  'v_perp':         "Perpendicular velocity"}
+    full_names = {'V_P':                "Plasma potential",
+                  'V_F':                "Floating potential",
+                  'I_es':               "Electron saturation current",
+                  'I_is':               "Ion saturation current",
+                  'n_e':                "Electron density",
+                  'n_i':                "Ion density",
+                  'T_e':                "Electron temperature",
+                  'n_i_OML':            "Ion density (OML)",
+                  'hot_fraction':       "Hot electron fraction",
+                  'T_e_cold':           "Cold electron temperature",
+                  'T_e_hot':            "Hot electron temperature",
+                  'T_e_avg':            "Average bimaxwellian electron temperature",
+                  'P_e':                "Electron pressure",
+                  'P_e_cal':            "Calibrated electron pressure",
+                  'P_e_from_n_i':       "Electron pressure (from ion density)",             # not added yet
+                  'P_e_from_n_i_OML':   "Electron pressure (from ion density (OML))",
+                  'P_ei':               "Plasma pressure",                                  # Electron + ion pressure
+                  'P_ei_cal':           "Calibrated plasma pressure",
+                  'P_ei_from_n_i':      "Plasma pressure (from ion density)",               # not added yet
+                  'P_ei_from_n_i_OML':  "Plasma pressure (from ion density (OML))",
+                  'n_e_cal':            "Calibrated electron density",
+                  'n_i_cal':            "Calibrated ion density",
+                  'n_i_OML_cal':        "Calibrated ion density (OML)",
+                  'nu_ei':              "Electron-ion collision frequency",
+                  'M_para':             "Parallel Mach number",
+                  'M_perp':             "Perpendicular Mach number",
+                  'v_para':             "Parallel velocity",
+                  'v_perp':             "Perpendicular velocity"}
 
     for key in sorted(list(full_names.keys()), key=len, reverse=True):
         diagnostic = diagnostic.replace(key, full_names[key])
