@@ -146,6 +146,7 @@ def preview_characteristics(characteristics_array, positions, ramp_times, langmu
         try:
             loc_x, loc_y = x[x_y_shot_ramp_to_plot[0]], y[x_y_shot_ramp_to_plot[1]]
             loc = (positions == [loc_x, loc_y]).all(axis=1).nonzero()[0][0]
+
             chara_to_plot = characteristics_array[(loc, *x_y_shot_ramp_to_plot[2:])]
             """ while chara_view_mode not in ["s", "a"]:
                 chara_view_mode = input("(S)how current plot or (a)dd another Characteristic?").lower()

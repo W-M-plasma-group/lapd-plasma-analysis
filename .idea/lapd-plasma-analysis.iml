@@ -8,10 +8,11 @@
       <excludeFolder url="file://$MODULE_DIR$/venv-2023-10-04" />
       <excludeFolder url="file://$MODULE_DIR$/venv-2023-10-04/python" />
       <excludeFolder url="file://$MODULE_DIR$/.venv" />
+      <excludeFolder url="file://$MODULE_DIR$/.venv3_11" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
-    <orderEntry type="module" module-name="jul23-lapd-plasma-analysis" />
+    <orderEntry type="module" module-name="lapd-plasma-analysis" />
   </component>
   <component name="PyDocumentationSettings">
     <option name="format" value="NUMPY" />

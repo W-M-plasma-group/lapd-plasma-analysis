@@ -4,7 +4,8 @@ based on code written in MATLAB by Conor Perks (MIT) and using the PlasmaPy and
 bapsflib libraries. Comments are added inline. Separate documentation is under construction.
 """
 
-from lapd_plasma_analysis.file_access import ask_yes_or_no
+from lapd_plasma_analysis.file_access import ask_yes_or_no, choose_multiple_list
+from lapd_plasma_analysis.fluctuations.interface_with_main import ask_about_plots
 
 from lapd_plasma_analysis.langmuir.configurations import get_config_id
 from lapd_plasma_analysis.langmuir.analysis import (get_langmuir_datasets, get_diagnostics_to_plot, save_datasets_nc,
@@ -13,10 +14,14 @@ from lapd_plasma_analysis.langmuir.plots import *
 
 from lapd_plasma_analysis.mach.analysis import get_mach_datasets, get_velocity_datasets
 
-# ----------------------------------------------------------------------------------------
+import os
+import xarray as xr
+
 
 # HDF5 file directory; end path with a slash                            # TODO user adjust
-hdf5_folder = "/Users/leomurphy/lapd-data/combined/"
+# ----------------------------------------------------------------------------------------
+hdf5_folder = "/home/michael/Documents/school/Plasma/LAPD Plasma Analysis/HDF5 Files/March_2022_HDF5 and NetCDF/"
+
 # hdf5_folder = "/Users/leomurphy/lapd-data/November_2022/"
 # hdf5_folder = "/Users/leomurphy/lapd-data/April_2018/"
 # hdf5_folder = "/Users/leomurphy/lapd-data/March_2022/"
@@ -30,6 +35,7 @@ assert hdf5_folder.endswith("/")
 # Langmuir & Mach NetCDF directories; end path with a slash             # TODO user adjust
 langmuir_nc_folder = hdf5_folder + "lang_nc/"
 mach_nc_folder = hdf5_folder + "mach_nc/"
+flux_nc_folder = hdf5_folder + "flux_nc/"
 
 # ----------------------------------------------------------------------------------------
 
@@ -63,8 +69,10 @@ display_core_steady_state_lines = True                                  # user c
 # ----------------------------------------------------------------------------------------
 
 # Optional directory to save plots; end path with a slash.              # TODO user adjust
-plot_save_folder = ("/Users/leomurphy/Desktop/wm/Plasma research/Research images/Research images spring 2024/"
-                    "new research plots mar-apr 2024/saved plots/")
+
+# ----------------------------------------------------------------------------------------
+plot_save_folder = (" ")
+
 
 # ----------------------------------------------------------------------------------------
 
@@ -101,6 +109,18 @@ if __name__ == "__main__":
     datasets, steady_state_times_runs, hdf5_paths = get_langmuir_datasets(
         langmuir_nc_folder, hdf5_folder, interferometry_folder, interferometry_mode,
         core_radius, bimaxwellian, plot_save_folder)
+
+    print("\n===== Flux probe analysis =====")
+    print("Only data from March 2022 is currently supported.")
+    files_in_flux_nc = os.listdir(flux_nc_folder)
+    print(r"Choose one of the following NetCDF files to analyze,\n"
+          r"or press Enter to retrieve data from HDF5 files")
+    choice_indices = choose_multiple_list(files_in_flux_nc, "Flux NetCDF file")
+    if choice_indices != []:
+        assert len(choice_indices) == 1, "Only one NetCDF file is currently supported."
+        ask_about_plots(xr.open_dataset(flux_nc_folder+files_in_flux_nc[choice_indices[0]]))
+
+
 
     print("\n===== Mach probe analysis =====")
     mach_datasets = get_mach_datasets(mach_nc_folder, hdf5_folder, datasets, hdf5_paths, mach_velocity_mode)
