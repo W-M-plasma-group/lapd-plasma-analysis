@@ -92,7 +92,7 @@ def get_langmuir_config(hdf5_path, config_id):
     Gets a list of configuration settings for the Langmuir probe corresponding to a
     specific dataset (`hdf5_path`) and experiment (specified by `config_id`). These
     settings are primarily hard-coded into this function based off of the config ID,
-    with the exception of `receptacle` which is the output of
+    except `receptacle` which is the output of
     `lapd_plasma_analysis.langmuir.configuration.get_ports_receptacles(hdf5_path)`.
 
     Parameters

@@ -11,6 +11,7 @@ from lapd_plasma_analysis.langmuir.diagnostics import (langmuir_diagnostics, det
 from lapd_plasma_analysis.langmuir.neutrals import get_neutral_density
 from lapd_plasma_analysis.langmuir.interferometry import interferometry_calibration
 from lapd_plasma_analysis.langmuir.plots import get_title
+from lapd_plasma_analysis.langmuir.metadata_for_dataset import get_supplemental_metadata
 
 
 def get_langmuir_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder, interferometry_mode,
@@ -34,9 +35,9 @@ def get_langmuir_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder
 
     interferometry_mode : {'skip', 'append', 'overwrite'}
         Mode for handling interferometry data.
-        - 'skip' skips all interferometry calibration calculations.
-        - 'append' performs interferometry calibration only on datasets that do not already have calibrated densities.
-        - 'overwrite' recalculates calibrated densities for all datasets.
+            - 'skip' skips all interferometry calibration calculations.
+            - 'append' performs interferometry calibration only on datasets that do not already have calibrated densities.
+            - 'overwrite' recalculates calibrated densities for all datasets.
 
     core_radius : `astropy.units.Quantity`
         Radius of core region, or region with high, stable densities. Used to calculate steady-state period
@@ -56,7 +57,7 @@ def get_langmuir_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder
 
     steady_state_times_runs : list of `astropy.unit.Quantity`
         List of ordered pairs (tuples?) of `astropy.unit.Quantity` objects indicating the beginning and end time
-         of the steady-state period.
+        of the steady-state period.
 
     hdf5_paths
         List of paths to HDF5 files opened. Can be `None` if NetCDF files used.
@@ -146,6 +147,7 @@ def print_user_file_choices(hdf5_folder, lang_nc_folder, interferometry_folder, 
         regardless of prior analyzation status.
 
     isweep_choices : `list`
+        # wip TODO
         A vector or list of vectors (e.g. `[1, 0]` or `[[1, 0], [1, -1]]` which
         specifies how the current data from different probe faces are combined.
 
@@ -195,8 +197,8 @@ def load_datasets(hdf5_folder, lang_nc_folder, bimaxwellian, plot_save_directory
 
     print("\nThe following Langmuir NetCDF files were found in the NetCDF folder (specified in main.py): ")
     nc_paths = sorted(search_folder(lang_nc_folder, 'nc', limit=52))
-    nc_paths_chosen_ints = choose_multiple_list(nc_paths, "Langmuir data NetCDF file",
-                                                null_action="perform diagnostics on HDF5 files")
+    nc_paths_chosen_ints = choose_multiple_from_list(nc_paths, "Langmuir data NetCDF file",
+                                                     null_action="perform diagnostics on HDF5 files")
 
     if len(nc_paths_chosen_ints) > 0:
         hdf5_chosen_list = None
@@ -204,8 +206,8 @@ def load_datasets(hdf5_folder, lang_nc_folder, bimaxwellian, plot_save_directory
     else:
         print("\nThe following HDF5 files were found in the HDF5 folder (specified in main.py): ")
         hdf5_paths = sorted(search_folder(hdf5_folder, "hdf5", limit=52))
-        hdf5_chosen_ints = choose_multiple_list(hdf5_paths, "HDF5 file",
-                                                null_action="skip to Mach number calculations only")
+        hdf5_chosen_ints = choose_multiple_from_list(hdf5_paths, "HDF5 file",
+                                                     null_action="skip to Mach number calculations only")
 
         if len(hdf5_chosen_ints) == 0:
             return None, None
@@ -269,6 +271,13 @@ def load_datasets(hdf5_folder, lang_nc_folder, bimaxwellian, plot_save_directory
                 characteristic_array = make_characteristic_array(bias, current, ramp_bounds)
                 characteristic_arrays += [characteristic_array]
 
+                if chara_view_mode:
+                    preview_characteristics(characteristic_array, position_array, ramp_times,
+                                            langmuir_configs[i], exp_params_dict,
+                                            diagnostics=True, ion=ion_type,
+                                            bimaxwellian=bimaxwellian,
+                                            plot_save_directory=plot_save_directory)
+
                 # cleanup 1
                 del current
 
@@ -284,14 +293,7 @@ def load_datasets(hdf5_folder, lang_nc_folder, bimaxwellian, plot_save_directory
             #  to represent characteristics (sweep curves) from different probes or probe faces.
             #  Probe/face combinations are ordered by the order of elements in langmuir_configs, from configurations.py.
 
-            if chara_view_mode:
-                preview_characteristics(characteristics, positions, ramp_times,
-                                        langmuir_configs, exp_params_dict,
-                                        diagnostics=True, ion=ion_type,
-                                        bimaxwellian=bimaxwellian,
-                                        plot_save_directory=plot_save_directory)
-
-            # perform langmuir diagnostics on each dataset
+            # Perform langmuir diagnostics on each dataset
             diagnostics_dataset = langmuir_diagnostics(characteristics, positions, ramp_times,
                                                        langmuir_configs, ion_type, bimaxwellian=bimaxwellian)
 
@@ -304,6 +306,8 @@ def load_datasets(hdf5_folder, lang_nc_folder, bimaxwellian, plot_save_directory
             save_datasets_nc([diagnostics_dataset], lang_nc_folder, "lang_", bimaxwellian)
             datasets.append(diagnostics_dataset)
 
+    for i in range(len(datasets)):
+        datasets[i] = datasets[i].assign_attrs(get_supplemental_metadata(datasets[i]))
     return datasets, hdf5_chosen_list
 
 
@@ -339,9 +343,8 @@ def get_diagnostics_to_plot(diagnostic_name_dict):
     """ Ask users for a list of diagnostics to plot. """
     print("The following diagnostics are available to plot: ")
     diagnostics_sort_indices = np.argsort(list(diagnostic_name_dict.values()))
-    diagnostics_to_plot_ints = choose_multiple_list(
-        np.array(list(diagnostic_name_dict.values()))[diagnostics_sort_indices],
-        "diagnostic", null_action="skip")
+    diagnostics_to_plot_ints = choose_multiple_from_list(
+        np.array(list(diagnostic_name_dict.values()))[diagnostics_sort_indices], "diagnostic", null_action="skip")
     return [np.array(list(diagnostic_name_dict.keys()))[diagnostics_sort_indices][choice]
             for choice in diagnostics_to_plot_ints]
 
