@@ -8,8 +8,9 @@
       <excludeFolder url="file://$MODULE_DIR$/venv-2023-10-04" />
       <excludeFolder url="file://$MODULE_DIR$/venv-2023-10-04/python" />
       <excludeFolder url="file://$MODULE_DIR$/.venv" />
+      <excludeFolder url="file://$MODULE_DIR$/.venv3_11" />
     </content>
-    <orderEntry type="jdk" jdkName="Python 3.10 (LAPD-plasma-analysis)" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="Python 3.11 (LAPD-plasma-analysis)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="module" module-name="jul23-lapd-plasma-analysis" />
   </component>

@@ -208,7 +208,7 @@ def load_datasets(hdf5_folder, lang_nc_folder, bimaxwellian, plot_save_directory
                                                 null_action="skip to Mach number calculations only")
 
         if len(hdf5_chosen_ints) == 0:
-            return None
+            return None, None
 
         hdf5_chosen_list = [hdf5_paths[choice] for choice in hdf5_chosen_ints]
 
