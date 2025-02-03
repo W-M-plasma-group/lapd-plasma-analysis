@@ -75,7 +75,6 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, langmuir_
     error_chart = np.zeros(shape=(num_probe, num_face, num_x, num_y, num_shots, num_plateaus))
     # """
 
-    print(f"Calculating Langmuir diagnostics...")
     warnings.simplefilter(action='ignore')  # Suppress warnings to not break progress bar
     with tqdm(total=num_characteristics, unit="characteristic", file=sys.stdout) as pbar:
         for i in range(characteristic_arrays.shape[0]):  # isweep
