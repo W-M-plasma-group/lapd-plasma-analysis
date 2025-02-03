@@ -44,6 +44,16 @@ def get_mach_config(hdf5_path, config_id):
           The Mach probe signal should be divided by the gain to recover physical voltages.
     """
 
+    column_dtypes = [('board', int),
+                     ('channel', int),
+                     ('port', int),
+                     ('receptacle', int),
+                     ('face', int),
+                     ('resistance', float),
+                     ('area', u.Quantity),
+                     ('gain', float)]  # see note below
+    # Note: "gain" here refers to what was gained before saving data. Divide data by the gain to undo.
+
     # each list in tuple corresponds to an experiment series;
     # each tuple in list corresponds to configuration data for a single probe used in those experiments
     # -1 is placeholder; what each entry corresponds to is given in 'dtype' parameter below
@@ -75,15 +85,7 @@ def get_mach_config(hdf5_path, config_id):
                            ]
                           )
 
-    mach_configs_array = np.array(mach_probe_configs[config_id], dtype=[('board', int),
-                                                                        ('channel', int),
-                                                                        ('port', int),
-                                                                        ('receptacle', int),
-                                                                        ('face', int),
-                                                                        ('resistance', float),
-                                                                        ('area', u.Quantity),
-                                                                        ('gain', float)])  # see note below
-    # Note: "gain" here refers to what was gained before saving data. Divide data by the gain to undo.
+    mach_configs_array = np.array(mach_probe_configs[config_id], dtype=column_dtypes)
     # (End of hardcoded probe configuration data)
 
     ports_receptacles = get_ports_receptacles(hdf5_path)
