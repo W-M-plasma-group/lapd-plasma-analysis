@@ -8,7 +8,8 @@ from plasmapy.formulary.collisions.frequencies import MaxwellianCollisionFrequen
 from lapd_plasma_analysis.langmuir.helper import *
 
 
-def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, langmuir_configs, ion_type, bimaxwellian=False):
+def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, langmuir_configs, ion_type, bimaxwellian=False,
+                         filter_char=False):
     """
     Performs plasma diagnostics on a DataArray of Characteristic objects and returns the diagnostics as a Dataset.
 
@@ -84,9 +85,11 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, langmuir_
                 for s in range(characteristic_arrays.shape[2]):  # shot
                     for r in range(characteristic_arrays.shape[3]):  # ramp
                         characteristic = characteristic_arrays[i, l, s, r]
+                        pbar.update(1)
+                        if filter_char and not filter_characteristic(characteristic):
+                            continue
                         diagnostics = diagnose_char(characteristic, probe_areas[i], ion_type,
                                                     bimaxwellian=bimaxwellian)
-                        pbar.update(1)
                         if isinstance(diagnostics, str):  # error with diagnostics
                             """
                             if diagnostics not in error_types:

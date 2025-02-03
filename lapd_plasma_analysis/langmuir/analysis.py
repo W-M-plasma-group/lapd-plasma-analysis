@@ -298,7 +298,8 @@ def load_datasets(hdf5_folder, lang_nc_folder, bimaxwellian, plot_save_directory
             # Perform langmuir diagnostics on each dataset
             print(f"Calculating Langmuir diagnostics...")
             diagnostics_dataset = langmuir_diagnostics(characteristics, positions, ramp_times,
-                                                       langmuir_configs, ion_type, bimaxwellian=bimaxwellian)
+                                                       langmuir_configs, ion_type, bimaxwellian=bimaxwellian,
+                                                       filter_char=False)  # todo note filter_char
 
             # cleanup 3
             del characteristics, positions
