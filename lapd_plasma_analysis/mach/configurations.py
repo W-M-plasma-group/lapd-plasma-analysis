@@ -47,28 +47,28 @@ def get_mach_config(hdf5_path, config_id):
     # each list in tuple corresponds to an experiment series;
     # each tuple in list corresponds to configuration data for a single probe used in those experiments
     # -1 is placeholder; what each entry corresponds to is given in 'dtype' parameter below
-    mach_probe_configs = ([(2, 1, 25, -1, 1, 300.,  1 * u.mm ** 2, 1),           # April_2018  # check area?
+    mach_probe_configs = ([(2, 1, 25, -1, 1, 300.,  1 * u.mm ** 2, 1),          # April_2018  # check area?
                            (2, 2, 25, -1, 2, 300.,  1 * u.mm ** 2, 1),
                            (2, 3, 25, -1, 3, 300.,  1 * u.mm ** 2, 1),
                            (2, 4, 25, -1, 4, 300.,  1 * u.mm ** 2, 1),
                            (2, 6, 25, -1, 5, 300.,  1 * u.mm ** 2, 1),
                            (2, 7, 25, -1, 6, 300.,  1 * u.mm ** 2, 1),],
 
-                          [(3, 1, 29, -1, 2, 14.9,  8 * u.mm ** 2, 1),           # March_2022
+                          [(3, 1, 29, -1, 2, 14.9,  8 * u.mm ** 2, 1),          # March_2022
                            (3, 3, 29, -1, 5, 15.0,  8 * u.mm ** 2, 1),
                            (3, 4, 45, -1, 2, 14.9,  8 * u.mm ** 2, 1),
                            (3, 5, 45, -1, 5, 15.0,  8 * u.mm ** 2, 1)],
 
-                          [(2, 1, 27, -1, 2, 16.1,  8 * u.mm ** 2, 1 / 2),       # November_2022
+                          [(2, 1, 27, -1, 2, 16.1,  8 * u.mm ** 2, 1 / 2),      # November_2022
                            (2, 2, 27, -1, 5, 16.0,  8 * u.mm ** 2, 1 / 2),
                            (2, 3, 33, -1, 2, 16.1,  8 * u.mm ** 2, 1 / 2),
                            (2, 4, 33, -1, 5, 16.1,  8 * u.mm ** 2, 1 / 2)],
 
-                          [(2, 1, 18, -1, 2,  7.36, 2 * u.mm ** 2, 0.89),        # January_2024
+                          [(2, 1, 18, -1, 2,  7.36, 2 * u.mm ** 2, 0.89),       # January_2024
                            (2, 2, 18, -1, -2, 7.32, 2 * u.mm ** 2, 0.95),       # every other is Upper (up) vs Lower (d)
-                           (2, 3, 18, -1, 5,  7.51, 2 * u.mm ** 2, 0.96),        # first four are US, second four are DS
-                           (2, 4, 18, -1, -5, 7.32, 2 * u.mm ** 2, 0.89),       # negative faces mean lower
-                           (3, 1, 29, -1, 2,  5.26, 8 * u.mm ** 2, 0.89),
+                           (2, 3, 18, -1, 5,  7.51, 2 * u.mm ** 2, 0.96),       # first four are toward cathode
+                           (2, 4, 18, -1, -5, 7.32, 2 * u.mm ** 2, 0.89),       # second four are away from cathode
+                           (3, 1, 29, -1, 2,  5.26, 8 * u.mm ** 2, 0.89),       # negative faces mean lower
                            (3, 3, 29, -1, -2, 5.21, 8 * u.mm ** 2, 0.95),
                            (3, 4, 29, -1, 5,  5.21, 8 * u.mm ** 2, 0.96),
                            (3, 5, 29, -1, -5, 5.21, 8 * u.mm ** 2, 0.89)

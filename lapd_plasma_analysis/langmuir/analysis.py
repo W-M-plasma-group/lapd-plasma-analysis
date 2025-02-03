@@ -158,7 +158,7 @@ def print_user_file_choices(hdf5_folder, lang_nc_folder, interferometry_folder, 
     print(f"Interferometry mode is {repr(interferometry_mode)}. "
           f"Calibrated density data will be {interferometry_mode_actions[interferometry_mode]}.")
 
-    print("Current HDF5 directory path:             \t", repr(hdf5_folder),
+    print("Current HDF5 directory path:           \t",   repr(hdf5_folder),
           "\nCurrent NetCDF directory path:         \t", repr(lang_nc_folder),
           "\nCurrent interferometry directory path: \t", repr(interferometry_folder),
           "\nLinear combinations of isweep sources: \t", repr(isweep_choices),
@@ -234,7 +234,7 @@ def load_datasets(hdf5_folder, lang_nc_folder, bimaxwellian, plot_save_directory
             voltage_gain = get_voltage_gain(config_id)
             orientation = get_orientation(config_id)
 
-            # todo revise get current and bias data from Langmuir probe and store in...
+            # todo revise get current and bias data from Langmuir probe and store in... [???]
             bias, dt = get_sweep_voltage(hdf5_path, vsweep_board_channel, voltage_gain)
             ramp_bounds = isolate_ramps(bias)
             ramp_times = ramp_bounds[:, 1] * dt.to(u.ms)

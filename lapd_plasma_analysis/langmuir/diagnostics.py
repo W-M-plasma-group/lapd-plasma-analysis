@@ -25,12 +25,14 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, langmuir_
     ion_type : `string`
         String corresponding to a PlasmaPy Particle name.
     bimaxwellian : `boolean`
-        Specifies whether to assume a bimaxwellian plasma during plasmapy Langmuir analysis.
+        If True, assumes a bimaxwellian plasma during plasmapy Langmuir analysis; otherwise assumes Maxwellian.
+    filter_char : `boolean`
+        If True, rejects sweeps with positive floating potential; if False, includes them.
 
     Returns
     -------
     `xarray.Dataset`
-        Dataset containing diagnostic values at each position
+        Dataset containing diagnostic values for each time, shot, and probe position.
     """
 
     x = np.unique(positions[:, 0])
