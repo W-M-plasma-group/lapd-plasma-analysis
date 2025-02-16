@@ -63,7 +63,7 @@ def multiplot_linear_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_dia
     sort_indices = np.arange(len(diagnostics_datasets))         # not sorted yet
     for attr in attributes:
         try:
-            sort_indices = sorted(sort_indices, key=lambda j: diagnostics_datasets[j].attrs[attr])
+            sort_indices = sorted(sort_indices, key=lambda j: value_safe(diagnostics_datasets[j].attrs[attr]))
             # diagnostics_datasets_sorted.sort(key=lambda d: d.attrs[attr])
         except KeyError:
             raise KeyError("Key error for key " + repr(attr))

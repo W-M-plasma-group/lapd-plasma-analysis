@@ -158,7 +158,7 @@ def print_user_file_choices(hdf5_folder, lang_nc_folder, interferometry_folder, 
     print(f"Interferometry mode is {repr(interferometry_mode)}. "
           f"Calibrated density data will be {interferometry_mode_actions[interferometry_mode]}.")
 
-    print("Current HDF5 directory path:             \t", repr(hdf5_folder),
+    print("Current HDF5 directory path:           \t",   repr(hdf5_folder),
           "\nCurrent NetCDF directory path:         \t", repr(lang_nc_folder),
           "\nCurrent interferometry directory path: \t", repr(interferometry_folder),
           "\nLinear combinations of isweep sources: \t", repr(isweep_choices),
@@ -218,6 +218,7 @@ def load_datasets(hdf5_folder, lang_nc_folder, bimaxwellian, plot_save_directory
         chara_view_mode = (len(hdf5_chosen_list) == 1) and ask_yes_or_no("Use characteristic preview mode? (y/n) ")
 
         datasets = []
+        print("(Note: plasmapy.langmuir.diagnostics pending deprecation FutureWarnings are suppressed)")
         for hdf5_path in hdf5_chosen_list:
 
             print(f"\nOpening file {repr(hdf5_path)} ...")
@@ -233,7 +234,7 @@ def load_datasets(hdf5_folder, lang_nc_folder, bimaxwellian, plot_save_directory
             voltage_gain = get_voltage_gain(config_id)
             orientation = get_orientation(config_id)
 
-            # todo revise get current and bias data from Langmuir probe and store in...
+            # todo revise get current and bias data from Langmuir probe and store in... [???]
             bias, dt = get_sweep_voltage(hdf5_path, vsweep_board_channel, voltage_gain)
             ramp_bounds = isolate_ramps(bias)
             ramp_times = ramp_bounds[:, 1] * dt.to(u.ms)
@@ -243,6 +244,7 @@ def load_datasets(hdf5_folder, lang_nc_folder, bimaxwellian, plot_save_directory
             # This for loop extracts sweep data and creates Characteristic objects
             characteristic_arrays = []
             position_arrays = []
+            print(f"Creating characteristics ...")
             for i in range(len(langmuir_configs)):
                 current, motor_data = get_sweep_current(hdf5_path, langmuir_configs[i], orientation)
 
@@ -294,8 +296,10 @@ def load_datasets(hdf5_folder, lang_nc_folder, bimaxwellian, plot_save_directory
             #  Probe/face combinations are ordered by the order of elements in langmuir_configs, from configurations.py.
 
             # Perform langmuir diagnostics on each dataset
+            print(f"Calculating Langmuir diagnostics...")
             diagnostics_dataset = langmuir_diagnostics(characteristics, positions, ramp_times,
-                                                       langmuir_configs, ion_type, bimaxwellian=bimaxwellian)
+                                                       langmuir_configs, ion_type, bimaxwellian=bimaxwellian,
+                                                       filter_char=False)  # todo note filter_char
 
             # cleanup 3
             del characteristics, positions

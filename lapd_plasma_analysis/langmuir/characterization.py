@@ -52,9 +52,7 @@ def make_characteristic_array(bias, current, ramp_bounds):
     num_shot = current.shape[1]
     num_ramp = len(ramp_slices)
 
-    print(f"Creating characteristics ...")
     warnings.simplefilter(action='ignore', category=FutureWarning)  # Suppress FutureWarnings to not break loading bar
-    print("\t(plasmapy.langmuir.diagnostics pending deprecation FutureWarning suppressed)")
 
     num_characteristics = num_loc * num_shot * num_ramp
     chara_array = np.empty((num_loc, num_shot, len(ramp_slices)), dtype=Characteristic)

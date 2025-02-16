@@ -8,7 +8,8 @@ from plasmapy.formulary.collisions.frequencies import MaxwellianCollisionFrequen
 from lapd_plasma_analysis.langmuir.helper import *
 
 
-def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, langmuir_configs, ion_type, bimaxwellian=False):
+def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, langmuir_configs, ion_type, bimaxwellian=False,
+                         filter_char=False):
     """
     Performs plasma diagnostics on a DataArray of Characteristic objects and returns the diagnostics as a Dataset.
 
@@ -25,12 +26,14 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, langmuir_
     ion_type : `string`
         String corresponding to a PlasmaPy Particle name.
     bimaxwellian : `boolean`
-        Specifies whether to assume a bimaxwellian plasma during plasmapy Langmuir analysis.
+        If True, assumes a bimaxwellian plasma during plasmapy Langmuir analysis; otherwise assumes Maxwellian.
+    filter_char : `boolean`
+        If True, rejects sweeps with positive floating potential; if False, includes them.
 
     Returns
     -------
     `xarray.Dataset`
-        Dataset containing diagnostic values at each position
+        Dataset containing diagnostic values for each time, shot, and probe position.
     """
 
     x = np.unique(positions[:, 0])
@@ -75,7 +78,6 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, langmuir_
     error_chart = np.zeros(shape=(num_probe, num_face, num_x, num_y, num_shots, num_plateaus))
     # """
 
-    print(f"Calculating Langmuir diagnostics...")
     warnings.simplefilter(action='ignore')  # Suppress warnings to not break progress bar
     with tqdm(total=num_characteristics, unit="characteristic", file=sys.stdout) as pbar:
         for i in range(characteristic_arrays.shape[0]):  # isweep
@@ -83,9 +85,11 @@ def langmuir_diagnostics(characteristic_arrays, positions, ramp_times, langmuir_
                 for s in range(characteristic_arrays.shape[2]):  # shot
                     for r in range(characteristic_arrays.shape[3]):  # ramp
                         characteristic = characteristic_arrays[i, l, s, r]
+                        pbar.update(1)
+                        if filter_char and not filter_characteristic(characteristic):
+                            continue
                         diagnostics = diagnose_char(characteristic, probe_areas[i], ion_type,
                                                     bimaxwellian=bimaxwellian)
-                        pbar.update(1)
                         if isinstance(diagnostics, str):  # error with diagnostics
                             """
                             if diagnostics not in error_types:
