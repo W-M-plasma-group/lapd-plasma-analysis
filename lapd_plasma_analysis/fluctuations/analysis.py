@@ -172,7 +172,7 @@ def get_density_data(filename, isat_data_array, shot_array):
     plot_save_folder = " "
     datasets, steady_state_times_runs, hdf5_paths = get_langmuir_datasets(
         langmuir_nc_folder, hdf5_folder, interferometry_folder, interferometry_mode,
-        isweep_choices, core_radius, bimaxwellian, plot_save_folder)
+        core_radius, bimaxwellian, plot_save_folder)
 
     c = 299792458*u.m/u.s
     M = 4.002603254 * (931.49410372*u.MeV/(c**2)).to(u.eV*u.s*u.s/u.m/u.m)
@@ -240,8 +240,6 @@ def nan_filter(data, time):
 # argument of the result
 # I think the binning may be the issue, although I don't understand why
 # print('ran')
-
-
 
 
 

@@ -6,6 +6,7 @@ bapsflib libraries. Comments are added inline. Separate documentation is under c
 
 from lapd_plasma_analysis.file_access import ask_yes_or_no, choose_multiple_list
 from lapd_plasma_analysis.fluctuations.interface_with_main import ask_about_plots
+from lapd_plasma_analysis.fluctuations.analysis import get_isat_vf
 
 from lapd_plasma_analysis.langmuir.configurations import get_config_id
 from lapd_plasma_analysis.langmuir.analysis import (get_langmuir_datasets, get_diagnostics_to_plot, save_datasets_nc,
@@ -93,22 +94,37 @@ if __name__ == "__main__":
     #    to make it possible to change colorbar label on plots when diagnostic variable is changed
     # TODO do both non-bimaxwellian and bimaxwellian analysis and store in same NetCDF file?
 
+    print("\n===== Flux probe analysis =====")
+    print("Only data from March 2022 is currently supported.")
+    files_in_flux_nc = os.listdir(flux_nc_folder)
+    print("Choose one of the following NetCDF files to analyze,\n"
+          "or press Enter to retrieve data from HDF5 files")
+    choice_indices = choose_multiple_list(files_in_flux_nc, "Flux NetCDF file", null_action="retrieve data "
+                                                                                                 "from HDF5 files.")
+    if choice_indices != []:
+        datasets = []
+        for index in choice_indices:
+            datasets.append(xr.open_dataset(flux_nc_folder + files_in_flux_nc[index]))
+        ask_about_plots(datasets)
+    if choice_indices == []:
+        print("Choose one of the following HDF5 files to extract data from.\n"
+              "Press Enter to continue without processing data.")
+        files_in_hdf5_folder = os.listdir(hdf5_folder)
+        choice_indices = choose_multiple_list(files_in_hdf5_folder, "HDF5 file", null_action="not retrieve data from "
+                                                                                    "HDF5 files.")
+
+        if choice_indices != []:
+            assert len(choice_indices) == 1, "Only one HDF5 file is currently supported."
+            print(" !! Important !! (to be fixed later)")
+            print("You will be asked to selected another file shortly-- make sure you select the same one.")
+            print(" !! Important !!")
+            get_isat_vf(hdf5_folder + files_in_hdf5_folder[choice_indices[0]], hdf5_folder, flux_nc_folder)
+
     print("\n===== Langmuir probe analysis =====")
     print_user_file_choices(hdf5_folder, langmuir_nc_folder, interferometry_folder, interferometry_mode, isweep_choices)
     datasets, steady_state_times_runs, hdf5_paths = get_langmuir_datasets(
         langmuir_nc_folder, hdf5_folder, interferometry_folder, interferometry_mode,
         core_radius, bimaxwellian, plot_save_folder)
-
-    print("\n===== Flux probe analysis =====")
-    print("Only data from March 2022 is currently supported.")
-    files_in_flux_nc = os.listdir(flux_nc_folder)
-    print(r"Choose one of the following NetCDF files to analyze,\n"
-          r"or press Enter to retrieve data from HDF5 files")
-    choice_indices = choose_multiple_list(files_in_flux_nc, "Flux NetCDF file")
-    if choice_indices != []:
-        assert len(choice_indices) == 1, "Only one NetCDF file is currently supported."
-        ask_about_plots(xr.open_dataset(flux_nc_folder+files_in_flux_nc[choice_indices[0]]))
-
 
 
     print("\n===== Mach probe analysis =====")
@@ -279,6 +295,8 @@ if __name__ == "__main__":
                   f"{pressure[0]:5.2f} {pressure[1]:5.2f} \t "
                   f"{collision_frequency[0]:.2e} {collision_frequency[1]:.2e} \t"
                   f"{parallel_velocity[0]:.2e} {parallel_velocity[1]:.2e} \t")
+
+
 
 
 # TODO Not all MATLAB code has been transferred (e.g. ExB)
