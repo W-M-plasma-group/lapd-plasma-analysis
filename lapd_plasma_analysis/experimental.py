@@ -112,25 +112,25 @@ def get_exp_name(file):
 
 
 def get_discharge(file):
-    return {"Discharge current": np.mean(file.read_msi("Discharge", silent=True)['meta']['peak current']) * u.A}
+    return {"Discharge current": str(np.mean(file.read_msi("Discharge", silent=True)['meta']['peak current']) * u.A)}
     # Future work: plotting the discharge current could give a really helpful
     #     visualization of the plasma heating over time
 
 
 def get_gas_pressure(file):
-    return {"Fill pressure": np.mean(file.read_msi("Gas pressure", silent=True)['meta']['fill pressure']) * u.Torr}
+    return {"Fill pressure": str(np.mean(file.read_msi("Gas pressure", silent=True)['meta']['fill pressure']) * u.Torr)}
 
 
 def get_magnetic_field(file):
-    return {"Peak magnetic field": np.mean(file.read_msi("Magnetic field", silent=True)['meta']['peak magnetic field']
-                                           ) * u.gauss}
+    return {"Peak magnetic field": str(np.mean(file.read_msi("Magnetic field", silent=True
+                                                             )['meta']['peak magnetic field']) * u.gauss)}
 
 
 def get_nominal_magnetic_field(file):
     magnetic_field = get_magnetic_field(file)["Peak magnetic field"]
     # Round magnetic field to nearest 500 Gauss
-    nominal_magnetic_field = 500 * int(np.round(magnetic_field.to(u.gauss).value / 500)) * u.gauss  # round to 500s
-    return {"Nominal magnetic field": nominal_magnetic_field}
+    nominal_magnetic_field = 500 * int(np.round(u.Quantity(magnetic_field).to(u.gauss).value / 500)) * u.gauss
+    return {"Nominal magnetic field": str(nominal_magnetic_field)}
 
 
 def get_nominal_gas_puff_3(file):
@@ -138,19 +138,19 @@ def get_nominal_gas_puff_3(file):
     voltage_phrase = re.search("[0-9]+V", run_name).group(0)  # search for "95V", for example
     nominal_gas_puff_voltage = float(re.search("[0-9]+", voltage_phrase).group(0))
 
-    return {"Nominal gas puff": np.round(nominal_gas_puff_voltage, 0) * u.V}
+    return {"Nominal gas puff": str(np.round(nominal_gas_puff_voltage, 0) * u.V)}
 
 
 def get_nominal_discharge_12(file):
     description = file.info['run description'].lower()
     current_phrase = re.search("(?<=idis=)[0-9]{4}", description).group(0)  # e.g. search for "7400" right after "Idis="
-    return {"Nominal discharge": float(current_phrase) * u.A}
+    return {"Nominal discharge": str(float(current_phrase) * u.A)}
 
 
 def get_nominal_gas_puff_12(file):
     description = file.info['run description'].lower()
     voltage_phrase = re.search(".*puffing([^0-9]*)([0-9.]*)(?= ?v)", description).group(2)  # eg. "105." after "puffing"
-    return {"Nominal gas puff": float(voltage_phrase) * u.V}
+    return {"Nominal gas puff": str(float(voltage_phrase) * u.V)}
 
 
 def get_nominal_discharge_03(hdf5_file):
@@ -162,12 +162,11 @@ def get_nominal_discharge_03(hdf5_file):
     else:
         nominal_discharge = float(re.search("[0-9]+", current_phrase).group(0))
 
-    return {"Nominal discharge": np.round(nominal_discharge, 0) * u.A}
+    return {"Nominal discharge": str(np.round(nominal_discharge, 0) * u.A)}
 
 
 def get_nominal_pressure_0(hdf5_file):
     run_name = hdf5_file.info['run name']
     pressure_phrase = re.search("[0-9]+(?=press)", run_name).group(0)
     nominal_pressure = float(pressure_phrase) * 1E-6
-
-    return {"Nominal pressure": np.round(nominal_pressure, 8) * u.Torr}
+    return {"Nominal pressure": str(np.round(nominal_pressure, 8) * u.Torr)}

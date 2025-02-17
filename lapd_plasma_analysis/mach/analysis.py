@@ -2,7 +2,7 @@ import numpy as np
 import xarray as xr
 
 from lapd_plasma_analysis.experimental import get_exp_params, get_config_id
-from lapd_plasma_analysis.file_access import search_folder, choose_multiple_list, ensure_directory
+from lapd_plasma_analysis.file_access import search_folder, choose_multiple_from_list, ensure_directory
 
 from lapd_plasma_analysis.langmuir.plots import get_exp_run_string
 from lapd_plasma_analysis.langmuir.analysis import save_datasets_nc
@@ -14,12 +14,26 @@ from lapd_plasma_analysis.mach.configurations import get_mach_config
 
 
 def get_mach_datasets(mach_nc_folder, hdf5_folder, lang_datasets, hdf5_selected_paths, mach_mode):
+    """
+
+    Parameters
+    ----------
+    mach_nc_folder
+    hdf5_folder
+    lang_datasets
+    hdf5_selected_paths
+    mach_mode
+
+    Returns
+    -------
+
+    """
 
     mach_nc_folder = ensure_directory(mach_nc_folder)
     print_mach_file_choices(hdf5_folder, mach_nc_folder, mach_mode)
 
     if mach_mode == "skip":
-        return
+        return []
 
     mach_completed = False
     mach_datasets = []
@@ -33,8 +47,8 @@ def get_mach_datasets(mach_nc_folder, hdf5_folder, lang_datasets, hdf5_selected_
 
         print("\nThe following NetCDF files were found in the Mach NetCDF folder (specified in main.py): ")
         mach_nc_paths = sorted(search_folder(mach_nc_folder, 'nc', limit=52))
-        mach_nc_paths_to_open_ints = choose_multiple_list(mach_nc_paths, "Mach data NetCDF file",
-                                                          null_action="select HDF5 files or skip Mach calculations")
+        mach_nc_paths_to_open_ints = choose_multiple_from_list(mach_nc_paths, "Mach data NetCDF file",
+                                                               null_action="select HDF5 files or skip Mach calculations")
 
         if len(mach_nc_paths_to_open_ints) > 0:
             mach_datasets = [xr.open_dataset(mach_nc_paths[choice]) for choice in mach_nc_paths_to_open_ints]
@@ -42,8 +56,7 @@ def get_mach_datasets(mach_nc_folder, hdf5_folder, lang_datasets, hdf5_selected_
         else:
             print("\nThe following HDF5 files were found in the HDF5 folder (specified in main.py): ")
             hdf5_paths = sorted(search_folder(hdf5_folder, "hdf5", limit=52))
-            hdf5_chosen_ints = choose_multiple_list(hdf5_paths, "HDF5 file",
-                                                    null_action="skip Mach calculations")
+            hdf5_chosen_ints = choose_multiple_from_list(hdf5_paths, "HDF5 file", null_action="skip Mach calculations")
             hdf5_selected_paths = [hdf5_paths[choice] for choice in hdf5_chosen_ints]
 
     if not mach_completed:
@@ -73,6 +86,18 @@ def get_mach_datasets(mach_nc_folder, hdf5_folder, lang_datasets, hdf5_selected_
 
 
 def get_velocity_datasets(lang_datasets, mach_datasets, mach_mode):
+    """
+
+    Parameters
+    ----------
+    lang_datasets
+    mach_datasets
+    mach_mode
+
+    Returns
+    -------
+
+    """
     if mach_mode == "skip":
         return lang_datasets
 
