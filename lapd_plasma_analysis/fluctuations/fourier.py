@@ -253,7 +253,7 @@ def get_psd_from_data(data, time=None, shot=None, x=None, bin=None, plot=False, 
         ax.set_title(data.name+' psd\n time series '+params_desc+'\n bin: '+str(bin), fontsize=8)
         ax.set_xscale('log')
         ax.set_yscale('log')
-        ax.set_ylim(np.min(psd)/5, np.max(psd)*5)
+        #ax.set_ylim(np.min(psd)/5, np.max(psd)*5)
         if axis is None:
             fig.show()
 
@@ -336,6 +336,7 @@ def get_time_series(data, time=None, shot=None, x=None, plot=False, axis=None):
         time_array = data.coords['time']
     else:
         time_array = data.coords['time'].sel(time=slice(time[0], time[1]))
+        std = std.sel(time=slice(time[0], time[1]))
         time_series = time_series.sel(time=slice(time[0], time[1]))
 
     if plot:
@@ -502,7 +503,7 @@ def plot_total_flux_vs_Ln(data, x=(-27, -19), time=None, shot=None, bin=(7,14), 
     profile, _, __ = get_profile(data, time=time, shot=shot, x=x, plot=False)
     total_flux_list = []
     for x_value in d_grad_d.coords['x'].values:
-        psd, freq = get_psd_from_data(data, time=time, shot=shot, x=x_value, plot=True, bin=bin)
+        psd, freq = get_psd_from_data(data, time=time, shot=shot, x=x_value, plot=False, bin=bin)
         dfreq = freq[1]-freq[0]
         total_flux = np.sum(psd)*dfreq
         total_flux_list.append(total_flux)
