@@ -1,45 +1,55 @@
 
 from lapd_plasma_analysis.fluctuations.analysis import *
-from lapd_plasma_analysis.file_access import ask_yes_or_no, choose_multiple_list
+from lapd_plasma_analysis.file_access import ask_yes_or_no, choose_multiple_from_list
 import ast
 
 
 
-def ask_about_plots(data_list):
+def ask_about_plots(data_list, plot_save_folder=None):
+    """
+    Lets the user interface with the fluctuation data when `main.py` is run.
+    Asks the user to ask which data they would like visualized and over which coordinates.
+
+    Parameters
+    ----------
+    data_list : `list` of `xarray.Dataset`
+        A list of datasets, each of which corresponds to a single .nc file.
+
+    """
     quantities = ['density', 'isat', 'vf', 'dvf']
-    choice_indices = choose_multiple_list(quantities, "Quantities to plot")
+    choice_indices = choose_multiple_from_list(quantities, "Quantities to plot")
 
     if ask_yes_or_no("Plot profiles (y/n)?"):
+        x = get_plotting_params("x")
+        time = get_plotting_params("time")
+        shot = get_plotting_params("shot")
         for i in choice_indices:
-            x = get_plotting_params("x")
-            time = get_plotting_params("time")
-            shot = get_plotting_params("shot")
             for data in data_list:
-                get_profile(data[quantities[i]], x=x, time=time, shot=shot, plot=True)
+                get_profile(data[quantities[i]], x=x, time=time, shot=shot, plot=True, plot_save_folder=plot_save_folder)
 
     if ask_yes_or_no("Plot time series (y/n)?"):
+        x = get_plotting_params("x")
+        time = get_plotting_params("time")
+        shot = get_plotting_params("shot")
         for i in choice_indices:
-            x = get_plotting_params("x")
-            time = get_plotting_params("time")
-            shot = get_plotting_params("shot")
             for data in data_list:
-                get_time_series(data[quantities[i]], x=x, time=time, shot=shot, plot=True)
+                get_time_series(data[quantities[i]], x=x, time=time, shot=shot, plot=True, plot_save_folder=plot_save_folder)
 
     if ask_yes_or_no("Plot PSD (y/n)?"):
+        x = get_plotting_params("x")
+        bin = get_plotting_params("bin")
+        shot = get_plotting_params("shot")
         for i in choice_indices:
-            x = get_plotting_params("x")
-            bin = get_plotting_params("bin")
-            shot = get_plotting_params("shot")
             for data in data_list:
-                get_psd_from_data(data[quantities[i]], x=x, bin=bin, shot=shot, plot=True)
+                get_psd_from_data(data[quantities[i]], x=x, bin=bin, shot=shot, plot=True, plot_save_folder=plot_save_folder)
 
     if ask_yes_or_no("Make contour plot(s) (y/n)?"):
+        x = get_plotting_params("x")
+        time = get_plotting_params("time")
+        shot = get_plotting_params("shot")
         for i in choice_indices:
-            x = get_plotting_params("x")
-            time = get_plotting_params("time")
-            shot = get_plotting_params("shot")
             for data in data_list:
-                get_contour(data[quantities[i]], x=x, time=time, shot=shot, plot=True)
+                get_contour(data[quantities[i]], x=x, time=time, shot=shot, plot=True, plot_save_folder=plot_save_folder)
 
     if ask_yes_or_no("Make plot of integrated PSD vs density gradient scale length (y/n)?"):
         integrated_psds = []
@@ -60,6 +70,16 @@ def ask_about_plots(data_list):
         fig.show()
 
 def get_plotting_params(parameter_as_string):
+    """
+    Auxiliary function to `ask_about_plots`. Facilitates the user's selection of
+    coordinates against which to plot the data.
+
+    Parameters
+    ----------
+    parameter_as_string : `string`
+        The axis along which the coordinates are to be selected.
+
+    """
     print(f"      Input "+parameter_as_string+" value (ex. '12.0') or range (ex. '(10.0, 13.5)')\n"
            "      to plot, or press enter to plot over all " + parameter_as_string + ".")
 
