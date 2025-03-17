@@ -1,33 +1,15 @@
-
-"""
-Takes in HDF5 file
-
-gets vsat data, averages over shot (one array per x position)
-
-gets isat data, removes outliers, averages over shot (one array per x position)
-
-gets temperature data, averages over shot (one array per x position)
-
-combines isat and temperature data to get density data
-
-visualizes spectra and cross-spectra, cross-phase
-
-
-"""
 import numpy as np
 import astropy.units as u
 from bapsflib import lapd
 from warnings import warn
-
 from numpy.random import normal
-
-from langmuir.configurations import get_config_id, get_langmuir_config
+from lapd_plasma_analysis.langmuir.configurations import get_config_id, get_langmuir_config
 import matplotlib.pyplot as plt
 from matplotlib import ticker
 from scipy.fft import fft, fftfreq, ifft
-from langmuir.analysis import get_langmuir_datasets
-from experimental import get_exp_params
-from langmuir.configurations import get_ion
+from lapd_plasma_analysis.langmuir.analysis import get_langmuir_datasets
+from lapd_plasma_analysis.experimental import get_exp_params
+from lapd_plasma_analysis.langmuir.configurations import get_ion
 import xarray as xr
 from tqdm import tqdm
 from matplotlib.colors import LogNorm
@@ -35,16 +17,11 @@ from scipy.sparse import lil_matrix, csr_matrix
 from scipy.optimize import curve_fit
 from lapd_plasma_analysis.fluctuations.fourier import *
 
-C1 = ['#115740', '#B9975B']
-C2 = ['#F0B323', '#D0D3D4']
-C3 = ['#00B388', '#CAB64B', '#84344E', '#64CCC9', '#E56A54', '#789D4A',
-      '#789F90', '#5B6770', '#183028', '#00313C']
-
-
 def get_isat_vf(filename, hdf5_path, flux_nc_folder):
     """
     Obtains saturation current, floating potential, floating potential difference, sound speed,
-    and density data
+    and density data from the HDF5 file specified by `filename`. Deposits a NetCDF file containing this data (as
+    an `xarray.Dataset` in `flux_nc_folder`. The NetCDF file will have the same name as the HDF5 file.
 
     Parameters
     ----------
@@ -157,6 +134,32 @@ def get_isat_vf(filename, hdf5_path, flux_nc_folder):
 
 
 def get_density_data(filename, isat_data_array, shot_array):
+    """
+    Auxiliary function to `get_isat_vf`. Retrieves electron temperature data from langmuir
+    analysis, uses it to compute the sound speed and density data using the saturation current data.
+    Upsampling via linear interpolation of the electron temperature data is done to align the coordinates
+    of the sound speed dataset with those of the saturation current data array.
+
+    Right now, it requires the user to go through the prompting as if they are about to plot the Langmuir
+    analysis plots.
+
+    Parameters
+    ----------
+    filename : str
+        Currently unused.
+
+    isat_data_array : xarray.DataArray or xarray.Dataset
+        The saturation current data array calculated in `get_isat_vf`.
+
+    shot_array : numpy.array
+        Currently unused.
+
+    Returns
+    -------
+    `tuple`
+        A tuple of `xarray.DataArray` or `xarray.Dataset`,`(sound_speed_data_array, density_data_array)`.
+
+    """
     #todo hardcoded
 
     # note this only supports the use of 1 hdf5 file at a time, so as to be compatible
@@ -189,12 +192,13 @@ def get_density_data(filename, isat_data_array, shot_array):
     e_plus = 1.60217663e-19*u.C
     e = np.exp(1)
 
-    density_data_array = (1e6*isat_data_array*np.sqrt(e)/(sound_speed_data_array*area*e_plus)).rename('density')
+    density_data_array = (1e-6*isat_data_array*np.sqrt(e)/(sound_speed_data_array*area*e_plus)).rename('density')
     # density_data_array = (isat_data_array / (sound_speed_data_array * area * e_plus)).rename('density')
     density_data_array.attrs['units'] = '$cm^{-3}$'
     return sound_speed_data_array, density_data_array
 
 def nan_filter(data, time):
+    #todo I don't think this is ever used-- double check and then delete
 
     # finds the number of nans up front
     nan_front_count = 0
@@ -235,15 +239,9 @@ def nan_filter(data, time):
     return data, time
 
 
-#make_cross_spectrogram_averaged(data['dvf'], data['isat'], bins = (5,17), plot = True)
-# note Conor took the mean over shot and radial position of the conj(F_1)*F_2 and the cross phase was the
-# argument of the result
-# I think the binning may be the issue, although I don't understand why
-# print('ran')
-
-
-
 def derivative(y_values, dx):
+    #todo delete if this is used nowhere
+
     n=len(y_values)
     derivative_matrix = lil_matrix((n, n))
     derivative_matrix.setdiag(0.5/dx, 1)
@@ -255,110 +253,3 @@ def derivative(y_values, dx):
     derivative_matrix = derivative_matrix.tocsr()
     return derivative_matrix*y_values
 
-if __name__ == '__main__':
-    import os
-
-    files = os.listdir('/home/michael/Documents/school/Plasma/LAPD Plasma Analysis/'
-                           'HDF5 Files/March_2022_HDF5 and NetCDF/')
-
-    filenames = []
-    for file in files:
-        if file.endswith('.hdf5'):
-            filenames.append(file)
-
-    filename_0 = ('/home/michael/Documents/school/Plasma/LAPD Plasma Analysis/'
-                'HDF5 Files/March_2022_HDF5 and NetCDF/18_line_valves105V_7000A.hdf5')
-
-    hdf5_path = ('/home/michael/Documents/school/Plasma/LAPD Plasma Analysis/'
-                 'HDF5 Files/March_2022_HDF5 and NetCDF/')
-
-    flux_nc_path = ('/home/michael/Documents/school/Plasma/LAPD Plasma Analysis/'
-                    'HDF5 Files/March_2022_HDF5 and NetCDF/flux_nc/')
-
-    plot_save_folder = '/home/michael/Documents/school/Plasma/LAPD Plasma Analysis/plot_save_folder_nov14/'
-
-    # print(filenames)
-    #
-    # Lns = []
-    # psdsums = []
-    # for filename in filenames:
-    #     print('get_isat_vf')
-    #     print('Current file:', filename_0)
-    #     try:
-    #         dat = get_isat_vf(filename_0, hdf5_path, flux_nc_path)
-    #     except:
-    #         print("Skipped this file due to an error")
-    #         continue
-    #     print('done get_isat_vf')
-    #     data = xr.open_dataset((filename_0).replace('.hdf5', '.nc'))
-    #     Ln, psdsum = plot_total_flux_vs_Ln(data['density'], x=(-26, -19))
-    #     print(Ln, psdsum)
-    #     inp = input('Accept?')
-    #     if inp == 'y':
-    #         Lns.append(Ln)
-    #         psdsums.append(psdsum)
-    #
-    # print(Lns)
-    # print(psdsums)
-    #
-    # fig = plt.figure()
-    # ax = fig.add_subplot(111)
-    #
-    # ax.plot(Lns, psdsums, marker = 'o', color = 'black')
-    # ax.set_xlabel(r'$L_n = \frac{n_e}{\nabla n_e}$ ($cm$)')
-    # ax.set_ylabel(r'$\frac{1}{n_e}\int PSD$ ($cm^{-3}$)')
-    # ax.set_title(r'$\frac{1}{n_e}\int PSD$ vs $L_n$')
-    #
-    #
-    # fig.show()
-    # fig.savefig(plot_save_folder+'mutli_experiment_Ln.png')
-
-
-
-    print('get_isat_vf')
-    dat = get_isat_vf(filename_0, hdf5_path, flux_nc_path)
-    print('done get_isat_vf')
-
-    data = xr.open_dataset('/home/michael/Documents/school/Plasma/LAPD Plasma Analysis/HDF5 Files/March_2022_HDF5 '
-                           'and NetCDF/flux_nc/18_line_valves105V_7000A.nc')
-
-    plot_save_folder = '/home/michael/Documents/school/Plasma/LAPD Plasma Analysis/plot_save_folder_nov14/'
-
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-
-    # get_profile(data['density'], axis=ax)
-    # linear_fit_profile(data['density'], x=(-27, -19), plot=True, axis=ax)
-    # plot_total_flux_vs_Ln(data['density'], axis=ax, x=(-26, -19), plot=True)
-    # f=get_psd_from_data(data['density'], axis=ax, plot=True, bin=(7, 14), x=-26)[0]
-    # s=get_time_series(data['density'], time=(7, 14), x=-26)[0]
-    # print("print", np.sum(f), np.sum(s*s))
-
-
-    # for i in range(8):
-    #     get_profile(data['density'], plot=True, shot=i, time=(2,6), axis=ax)
-
-    fig.show()
-    fig.savefig(plot_save_folder+'norm_int_psd_vs_Ln.png')
-
-    #Diagnostics selected: [np.str_('n_e_cal'), np.str_('n_i_cal'), np.str_('n_i_OML_cal'), np.str_('n_i'), np.str_('n_i_OML')]
-    # hdf5_folder = "/home/michael/Documents/school/Plasma/LAPD Plasma Analysis/HDF5 Files/March_2022_HDF5 and NetCDF/"
-    # interferometry_folder = ("/Users/leomurphy/lapd-data/November_2022/uwave_288_GHz_waveforms/"
-    #                          if "November_2022" in hdf5_folder else hdf5_folder)
-    # interferometry_mode = "skip"
-    # isweep_choices = [[[1, 0], [0, 0]],     # . 1st combination to plot: 1 * (first face on first probe)
-    #                   [[0, 0], [1, 0]]]     # . 2nd combination to plot: 1 * (first face on second probe)
-    # bimaxwellian = False
-    # core_radius = 21. * u.cm
-    # langmuir_nc_folder = hdf5_folder + "lang_nc/"
-    # mach_nc_folder = hdf5_folder + "mach_nc/"
-    # from lapd_plasma_analysis.langmuir.plots import *
-    #
-    # datasets, steady_state_times_runs, hdf5_paths = get_langmuir_datasets(
-    #         langmuir_nc_folder, hdf5_folder, interferometry_folder, interferometry_mode, isweep_choices,
-    #         core_radius, bimaxwellian, plot_save_directory=' ')
-    #
-    # plot_diagnostic = np.str_('n_i_OML')
-    # multiplot_linear_diagnostic(datasets, plot_diagnostic, isweep_choices, 'time',
-    #                                         steady_state_by_runs=steady_state_times_runs, core_rad=core_radius,
-    #                                         save_directory=plot_save_folder)

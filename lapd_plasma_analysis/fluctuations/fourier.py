@@ -5,30 +5,63 @@ from warnings import warn
 
 from numpy.random import normal
 
-from langmuir.configurations import get_config_id, get_langmuir_config
+from lapd_plasma_analysis.langmuir.configurations import get_config_id, get_langmuir_config
 import matplotlib.pyplot as plt
 from matplotlib import ticker
 from scipy.fft import fft, fftfreq, ifft
-from langmuir.analysis import get_langmuir_datasets
-from experimental import get_exp_params
-from langmuir.configurations import get_ion
+from lapd_plasma_analysis.langmuir.analysis import get_langmuir_datasets
+from lapd_plasma_analysis.experimental import get_exp_params
+from lapd_plasma_analysis.langmuir.configurations import get_ion
 import xarray as xr
 from tqdm import tqdm
 from matplotlib.colors import LogNorm
 from scipy.sparse import lil_matrix, csr_matrix
 from scipy.optimize import curve_fit
+from datetime import datetime
+from time import sleep
 
-def get_fft(time_series, sample_rate = 1, bin = None, plot = False):
+def get_time():
     """
-    Assumes a real time series- returns 1 sided transform
+
+    Useful for attaching unique numerical string to the end of the name of plots.
+
+    """
+    return datetime.now().strftime("%Y%m%d_%H%M%S")
+
+def get_fft(time_series, dt=1, bin=None, for_power_spec=False, plot=False):
+    """
+    Performs a 1D, one-sided FFT of given time series data.
 
     Parameters
     ----------
-    time_series
-    sample_rate
+    time_series : `xarray.DataArray` or `xarray.Dataset` or `numpy.array`
+        Time series data.
+
+    dt : `float`
+        Time between successive data points in the time series.
+
+    bin : `tuple` or `int` or `None`
+        If not given, the FFT of the entire data will be returned.
+        If it is an integer, the FFT of the data in the time window (bin+0.02, bin+1-0.02)
+        will be returned.
+        If it is a tuple of integers, the returned spectra will be the averaged FFT result of
+        the data in each of the time windows corresponding to the range of integers specified by
+        the tuple.
+
+    for_power_spec: `bool`
+        If true, it will modulus square each of the spectra as they are returned-- if
+        bin is a tuple, the averaged spectra will then be the average of the squared
+        spectra
+
+    plot: `bool`
+        If true, it will plot the FFT of the data in the time series as it is computed.
+
 
     Returns
-    -------
+    _______
+    `tuple`
+        `ft, freq, dt` where `ft` is the spectra, `freq` is the frequency domain, and `dt` is the
+        time separation between data points in the time series.
 
     """
     if bin is not None:
@@ -43,7 +76,7 @@ def get_fft(time_series, sample_rate = 1, bin = None, plot = False):
             fts = []
             #len_fts = []
             for b in range(bin[0], bin[1]):
-                ft, freq = get_fft(time_series, sample_rate=sample_rate, bin=b, plot=False)
+                ft, freq, dt = get_fft(time_series, dt=dt, bin=b, plot=False)
                 fts.append(ft)
                 #len_fts.append(len(ft))
             ft=np.mean(fts, axis=0)
@@ -54,20 +87,21 @@ def get_fft(time_series, sample_rate = 1, bin = None, plot = False):
                 plt.yscale('log')
                 plt.xscale('log')
                 fig.show()
-            return ft, freq
+            return ft, freq, dt
 
-    if type(time_series) is xr.DataArray or time_series is xr.Dataset:
+    if isinstance(time_series, xr.DataArray) or isinstance(time_series, xr.Dataset):
         times=time_series.coords['time'].values
-        sample_rate=1000/(times[1]-times[0])
+        dt = (times[1]-times[0])/1000 #converts to seconds
         time_series = time_series.values
 
+    print("variance: ", np.var(time_series))
     ft = fft(time_series)
-    freq = fftfreq(len(time_series), 1/sample_rate)
+    freq = fftfreq(len(time_series), dt)
     ft_index = int(len(ft) / 2)
     if len(time_series) % 2 == 0:
         ft_index += -1
     ft = ft[1:ft_index]
-    freq = freq[1:ft_index] / (2*np.pi)
+    freq = freq[1:ft_index]
 
     if plot:
         fig = plt.figure()
@@ -76,13 +110,47 @@ def get_fft(time_series, sample_rate = 1, bin = None, plot = False):
         plt.xscale('log')
         fig.show()
 
-    return ft, freq
+    if for_power_spec:
+        ft = abs(ft)**2
 
-def get_psd(time_series, sample_rate = 1, bin = None, plot = False):
+    return ft, freq, dt
 
-    ft, freq = get_fft(time_series, sample_rate = sample_rate, bin = bin)
-    ps = 2*abs(ft)**2
-    psd = ps/(len(time_series)*sample_rate)
+def get_psd(time_series, dt=1, bin=None, plot=False):
+    """
+        Performs a 1D, one-sided PSD of given time series data.
+
+        Parameters
+        ----------
+        time_series : `xarray.DataArray` or `xarray.Dataset` or `numpy.array`
+            Time series data.
+
+        dt : `float`
+            Time between successive data points in the time series.
+
+        bin : `tuple` or `int` or `None`
+            If not given, the PSD of the entire data will be returned.
+            If it is an integer, the PSD of the data in the time window (bin+0.02, bin+1-0.02)
+            will be returned.
+            If it is a tuple of integers, the returned spectra will be the averaged PSD result of
+            the data in each of the time windows corresponding to the range of integers specified by
+            the tuple.
+
+        plot: `bool`
+            If true, it will plot the PSD of the data in the time series as it is computed.
+
+
+        Returns
+        -------
+        `tuple`
+            `psd, freq where `psd` is the power spectral density and `freq` is the frequency domain.
+
+        """
+
+    ft, freq, dt = get_fft(time_series, dt=dt, for_power_spec=True, bin=bin)
+    psd = ft/(len(freq)*dt)
+    print("time spacing in s: ", dt)
+    print("time over which psd computed in ms: ", dt*len(freq)*2*1000)
+    print("integrated psd: ", np.sum(psd)*(freq[1]-freq[0]))
 
     if plot:
         fig = plt.figure()
@@ -95,8 +163,8 @@ def get_psd(time_series, sample_rate = 1, bin = None, plot = False):
 
 def get_cross_spectrum(time_series1, time_series2, sample_rate = 1, bin = None, plot = False):
 
-    ft1, freq = get_fft(time_series1, sample_rate = sample_rate, bin = bin)
-    ft2 = get_fft(time_series2, sample_rate = sample_rate, bin = bin)[0]
+    ft1, freq, dt = get_fft(time_series1, bin = bin)
+    ft2, freq, dt = get_fft(time_series2, bin = bin)
 
     cross_spectrum = np.conjugate(ft1)*ft2
 
@@ -104,7 +172,7 @@ def get_cross_spectrum(time_series1, time_series2, sample_rate = 1, bin = None, 
 
 def get_cross_phase(time_series1, time_series2, sample_rate = 1, bin = None, plot = False):
 
-    cross_spec, freq = get_cross_spectrum(time_series1, time_series2, sample_rate = sample_rate, bin = bin)
+    cross_spec, freq = get_cross_spectrum(time_series1, time_series2, bin = bin)
 
     cross_phase = np.cos(np.angle(cross_spec))
 
@@ -202,11 +270,50 @@ def get_cross_spectrogram(data1, data2, bin, plot=False, axis=None):
             fig.show()
     return cross_spectra, x_positions, freq
 
-def get_fft_from_data(data, time=None, shot=None, x=None, bin=None, plot=False, axis=None):
-    time_series, params_desc = get_time_series(data, time=time, shot=shot, x=x)
-    times = data.coords['time'].values
-    sample_rate = 1000/(times[1]-times[0]) #hardcoded unit conversion
-    ft, freq = get_fft(time_series, sample_rate=sample_rate, bin=bin)
+def get_fft_from_data(data, time=None, shot=None, x=None, bin=None, plot=False, axis=None, plot_save_folder=None):
+    """
+        Performs a 1D, one-sided FFT of given time series data, given just the `xarray.DataArray` from the
+        NetCDF file.
+
+        Parameters
+        ----------
+        data : `xarray.DataArray`
+            Time series data array.
+
+        time : `tuple` or `None`
+            It's probably best to leave this as none, and specify the bins to compute the FFT over.
+            If `bin` is left as none, this is useful to compute the FFT over a given time range, and
+            it should be given as a tuple ex. `(7.1, 7.5)` (values are given in ms)
+
+        shot : `int` or `tuple` or `None`
+            Determines which shots to use in averaging. If `None`, all 8 are used. If an integer `n`, then
+            the `n-1`th shot is used. If a tuple, uses all shots in between the bounds specified by the tuple.
+            ex. `(1, 4)` will use shots 2, 3, 4, 5. (Indexing starts at 0). This averaging happens to the time
+            series data, not to the FFT-- it's a good idea to choose an integer.
+
+        x : `float` or `tuple` or `None`
+            If `None`, the FFT is computed from a time series which is averaged over all radial positions.
+            If `tuple`, say (x1, x2), the FFT is computed from a time series which is averaged over all x
+            in between x1 and x2.
+            It is recommended to provide a `float`, since time series averaging will remove data from the
+            spectrum. This provides the FFT using only data obtained at the given x position.
+
+        bin : `tuple` or `int` or `None`
+            If not given, the FFT of the entire data will be returned.
+            If it is an integer, the FFT of the data in the time window (bin+0.02, bin+1-0.02)
+            will be returned.
+            If it is a tuple of integers, the returned spectra will be the averaged FFT result of
+            the data in each of the time windows corresponding to the range of integers specified by
+            the tuple.
+
+
+        plot: `bool`
+            If true, it will plot the FFT of the data in the time series as it is computed.
+
+    """
+    time_series, params_desc, std = get_time_series(data, time=time, shot=shot, x=x)
+    dt = (data.coords['time'].values[1] - data.coords['time'].values[0]) / 1000
+    ft, freq, dt = get_fft(time_series, dt=dt, bin=bin)
 
     if plot:
         if axis is None:
@@ -226,11 +333,72 @@ def get_fft_from_data(data, time=None, shot=None, x=None, bin=None, plot=False, 
             fig.show()
 
 def get_psd_from_data(data, time=None, shot=None, x=None, bin=None, plot=False, plot_power_law=None,
-                      power_law_freq=None, axis=None):
-    times=data.coords['time'].values
-    sample_rate=1000/(times[1]-times[0])
+                      power_law_freq=None, axis=None, plot_save_folder=None):
+    """
+        Performs a 1D, one-sided PSD of given time series data, given just the `xarray.DataArray` from the
+        NetCDF file.
+
+        Parameters
+        ----------
+        data : `xarray.DataArray`
+            Time series data array.
+
+        time : `tuple` or `None`
+            It's probably best to leave this as none, and specify the bins to compute the PSD over.
+            If `bin` is left as none, this is useful to compute the PSD over a given time range, and
+            it should be given as a tuple ex. `(7.1, 7.5)` (values are given in ms)
+
+        shot : `int` or `tuple` or `None`
+            Determines which shots to use in averaging. If `None`, all 8 are used. If an integer `n`, then
+            the `n-1`th shot is used. If a tuple, uses all shots in between the bounds specified by the tuple.
+            ex. `(1, 4)` will use shots 2, 3, 4, 5. (Indexing starts at 0). This averaging happens to the time
+            series data, not to the PSD-- it's a good idea to choose an integer.
+
+        x : `float` or `tuple` or `None`
+            If `None`, the PSD is computed from a time series which is averaged over all radial positions.
+            If `tuple`, say (x1, x2), the PSD is computed from a time series which is averaged over all x
+            in between x1 and x2.
+            It is recommended to provide a `float`, since time series averaging will remove data from the
+            spectrum. This provides the PSD using only data obtained at the given x position.
+
+        bin : `tuple` or `int` or `None`
+            If not given, the PSD of the entire data will be returned.
+            If it is an integer, the PSD of the data in the time window (bin+0.02, bin+1-0.02)
+            will be returned.
+            If it is a tuple of integers, the returned spectra will be the averaged PSD result of
+            the data in each of the time windows corresponding to the range of integers specified by
+            the tuple.
+
+        plot: `bool`
+            If true, it will plot the PSD of the data in the time series as it is computed.
+
+        plot_power_law: `float` or `None`
+            Plots a line representing the power law specified by `float`, say 5/3 or 7/3.
+
+        power_law_freq: `float` or `None`
+            Give any frequency in the frequency range where the power law provided in plot_power_law
+            is expected to apply.
+
+        axis : `matplotlib.axes.Axes` or `None`
+            If `None`, this function will create its own figure. Supply axis if the output will be a smaller part of
+            an existing figure.
+
+        plot_save_folder: `str` or `None`
+            If `None`, the plot will not be saved. The `string`, if provided, should be the file path to the
+            directory where the plot will be saved. The path should end with a `/`.
+
+        Returns
+        -------
+        `tuple`
+            `(psd, freq)` where `psd` is the PSD of the data in the time series and `freq` is the frequency
+            domain
+
+    """
+    dt = (data.coords['time'].values[1] - data.coords['time'].values[0])/1000
     time_series, params_desc, std = get_time_series(data, time=time, shot=shot, x=x)
-    psd, freq = get_psd(time_series, sample_rate=sample_rate, bin=bin)
+    plt.plot(time_series)
+    plt.show()
+    psd, freq = get_psd(time_series, dt=dt, bin=bin)
 
     if plot_power_law is not None:
         assert power_law_freq is not None, 'give a frequency in the range the power law should apply'
@@ -256,10 +424,56 @@ def get_psd_from_data(data, time=None, shot=None, x=None, bin=None, plot=False, 
         #ax.set_ylim(np.min(psd)/5, np.max(psd)*5)
         if axis is None:
             fig.show()
+            if plot_save_folder is not None:
+                fig.savefig(plot_save_folder+data.name+'_psd'+get_time()+'.png', dpi=150)
+                sleep(1)
 
     return psd, freq
 
-def get_profile(data, time=None, shot=None, x=None, plot=False, axis=None):
+def get_profile(data, time=None, shot=None, x=None, plot=False, axis=None, plot_save_folder=None):
+    """
+        Given the data from an `xarray.DataArray` object (from the NetCDF file), obtains and plots
+        the radial profile of the data.
+
+        Parameters
+        ----------
+        data : `xarray.DataArray`
+            Time series data array.
+
+        time : `tuple` or `float` or `None`
+            Determines the range of the time series data over which to average. Give a tuple to
+            provide a range, or a float to obtain the profile at a given time. The `None` option will
+            automatically average over the entire time series.
+
+        shot : `int` or `tuple` or `None`
+            Determines which shots to use in averaging. If `None`, all 8 are used. If an integer `n`, then
+            the `n-1`th shot is used. If a tuple, uses all shots in between the bounds specified by the tuple.
+            ex. `(1, 4)` will use shots 2, 3, 4, 5. (Indexing starts at 0).
+
+        x : `tuple` or `None`
+            The range of x values over which to plot the profile. `None` will adjust the domain to be as wide as
+            possible, but a smaller range may be specified with a tuple.
+
+        plot: `bool`
+            If true, it will plot the profile as it is generated.
+
+        axis : `matplotlib.axes.Axes` or `None`
+            If `None`, this function will create its own figure. Supply axis if the output will be a smaller part of
+            an existing figure.
+
+        plot_save_folder: `str` or `None`
+            If `None`, the plot will not be saved. The `string`, if provided, should be the file path to the
+            directory where the plot will be saved. The path should end with a `/`.
+
+        Returns
+        -------
+        `tuple`
+            `(profile, std, params_desc)` where `profile` is the profile of the time series, `std` is the standard
+            deviation (square root of the variance of the data with respect to shot), and `params_desc` is a string
+            used in the plot to describe how the profile was obtained (over what values were averaged in each
+            coordinate).
+
+    """
     #if time and shot are none, average over both
     #if time or shot are some number, then it will be a specific time or shot
     #if time or shot are tuples, then it will averaged over the range specified by the tuple
@@ -306,10 +520,56 @@ def get_profile(data, time=None, shot=None, x=None, plot=False, axis=None):
         ax.errorbar(x_array, profile, yerr=std, color='black', linestyle='', marker='o', capsize=0, markersize=3)
         if axis is None:
             fig.show()
+            if plot_save_folder is not None:
+                fig.savefig(plot_save_folder+data.name+'_profile'+get_time()+'.png', dpi=150)
+                sleep(1)
 
     return profile, std, params_desc
 
-def get_time_series(data, time=None, shot=None, x=None, plot=False, axis=None):
+def get_time_series(data, time=None, shot=None, x=None, plot=False, axis=None, plot_save_folder=None):
+    """
+        Given the data from an `xarray.DataArray` object (from the NetCDF file), obtains and plots
+        the data versus time.
+
+        Parameters
+        ----------
+        data : `xarray.DataArray`
+            Time series data array.
+
+        time : `tuple` or `None`
+            The range of time values over which to plot the data. `None` will adjust the domain to be as long as
+            possible, but a smaller range may be specified with a tuple.
+
+        shot : `int` or `tuple` or `None`
+            Determines which shots to use in averaging. If `None`, all 8 are used. If an integer `n`, then
+            the `n-1`th shot is used. If a tuple, uses all shots in between the bounds specified by the tuple.
+            ex. `(1, 4)` will use shots 2, 3, 4, 5. (Indexing starts at 0).
+
+        x : `tuple` or `float` or `None`
+            Determines the span of the position data over which to average. Give a tuple to
+            provide a range, or a float to obtain the profile at a given location. The `None` option will
+            automatically average over the entire range of x values.
+
+        plot: `bool`
+            If true, it will plot the time series as it is obtained.
+
+        axis : `matplotlib.axes.Axes` or `None`
+            If `None`, this function will create its own figure. Supply axis if the output will be a smaller part of
+            an existing figure.
+
+        plot_save_folder: `str` or `None`
+            If `None`, the plot will not be saved. The `string`, if provided, should be the file path to the
+            directory where the plot will be saved. The path should end with a `/`.
+
+        Returns
+        -------
+        `tuple`
+            `(time_series, params_desc, std)` where `time_series` is the (averaged) time series, `std` is the standard
+            deviation (square root of the variance of the data with respect to shot), and `params_desc` is a string
+            used in the plot to describe how the time series was obtained (over what values were averaged in each
+            coordinate).
+
+    """
     if x is None:
         time_series = data.mean(dim = ['x'])
         params_desc = 'averaged over all x'
@@ -352,10 +612,47 @@ def get_time_series(data, time=None, shot=None, x=None, plot=False, axis=None):
         ax.plot(time_array, time_series, color='black', linestyle='', marker='o', markersize=1)
         if axis is None:
             fig.show()
+            if plot_save_folder is not None:
+                fig.savefig(plot_save_folder+data.name+'_time-series'+get_time()+'.png', dpi=150)
+                sleep(1)
 
     return time_series, params_desc, std
 
-def get_contour(data, time=None, shot=None, x=None, plot=True, axis=None):
+def get_contour(data, time=None, shot=None, x=None, plot=True, axis=None, plot_save_folder=None):
+    """
+        Given the data from an `xarray.DataArray` object (from the NetCDF file), obtains and plots
+        how the profile changes over time on a 2D color plot.
+
+        Parameters
+        ----------
+        data : `xarray.DataArray`
+            Time series data array.
+
+        time : `tuple` or `None`
+            The range of time values over which to plot. `None` will adjust the domain to be as long as
+            possible, but a smaller range may be specified with a tuple.
+
+        shot : `int` or `tuple` or `None`
+            Determines which shots to use in averaging. If `None`, all 8 are used. If an integer `n`, then
+            the `n-1`th shot is used. If a tuple, uses all shots in between the bounds specified by the tuple.
+            ex. `(1, 4)` will use shots 2, 3, 4, 5. (Indexing starts at 0).
+
+        x : `tuple` or `None`
+            The range of x values over which to plot the profile. `None` will adjust the domain to be as wide as
+            possible, but a smaller range may be specified with a tuple.
+
+        plot: `bool`
+            If true, the plot will appear as it is created.
+
+        axis : `matplotlib.axes.Axes` or `None`
+            If `None`, this function will create its own figure. Supply axis if the output will be a smaller part of
+            an existing figure.
+
+        plot_save_folder: `str` or `None`
+            If `None`, the plot will not be saved. The `string`, if provided, should be the file path to the
+            directory where the plot will be saved. The path should end with a `/`.
+
+    """
 
     data_unit = data.attrs['units']
     if shot is None:
@@ -393,6 +690,9 @@ def get_contour(data, time=None, shot=None, x=None, plot=True, axis=None):
         ax.set_title(data.name+' '+params_desc)
         if axis is None:
             fig.show()
+            if plot_save_folder is not None:
+                fig.savefig(plot_save_folder+data.name+'_contour'+get_time()+'.png', dpi=150)
+                sleep(1)
 
 def get_avg_flux_amplitude(data, time=None, shot=None, x=None, bin=None, freq_slice=None):
     psd, freq = get_psd_from_data(data, time=time, shot=shot, x=x, bin=bin)
