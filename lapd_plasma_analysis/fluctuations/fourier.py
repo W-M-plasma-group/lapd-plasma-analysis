@@ -17,8 +17,25 @@ from tqdm import tqdm
 from matplotlib.colors import LogNorm
 from scipy.sparse import lil_matrix, csr_matrix
 from scipy.optimize import curve_fit
+from scipy.signal import welch
 from datetime import datetime
 from time import sleep
+from nmmn.plots import parulacmap
+
+parula = parulacmap()
+
+
+SMALL_SIZE = 12 # font size code from Pedro Duarte on stack exchange
+MEDIUM_SIZE = 14
+BIGGER_SIZE = 16
+
+plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
+plt.rc('axes', titlesize=SMALL_SIZE)     # fontsize of the axes title
+plt.rc('axes', labelsize=MEDIUM_SIZE)    # fontsize of the x and y labels
+plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
+plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
 def get_time():
     """
@@ -28,7 +45,7 @@ def get_time():
     """
     return datetime.now().strftime("%Y%m%d_%H%M%S")
 
-def get_fft(time_series, dt=1, bin=None, for_power_spec=False, plot=False):
+def get_fft(time_series, scaling="spectrum", dt=1, bin=None, plot=False):
     """
     Performs a 1D, one-sided FFT of given time series data.
 
@@ -76,7 +93,7 @@ def get_fft(time_series, dt=1, bin=None, for_power_spec=False, plot=False):
             fts = []
             #len_fts = []
             for b in range(bin[0], bin[1]):
-                ft, freq, dt = get_fft(time_series, dt=dt, bin=b, plot=False)
+                ft, freq= get_fft(time_series, dt=dt, bin=b, plot=False, scaling=scaling)
                 fts.append(ft)
                 #len_fts.append(len(ft))
             ft=np.mean(fts, axis=0)
@@ -87,33 +104,55 @@ def get_fft(time_series, dt=1, bin=None, for_power_spec=False, plot=False):
                 plt.yscale('log')
                 plt.xscale('log')
                 fig.show()
-            return ft, freq, dt
+            return ft, freq
 
     if isinstance(time_series, xr.DataArray) or isinstance(time_series, xr.Dataset):
         times=time_series.coords['time'].values
         dt = (times[1]-times[0])/1000 #converts to seconds
         time_series = time_series.values
 
-    print("variance: ", np.var(time_series))
     ft = fft(time_series)
     freq = fftfreq(len(time_series), dt)
     ft_index = int(len(ft) / 2)
     if len(time_series) % 2 == 0:
         ft_index += -1
-    ft = ft[1:ft_index]
-    freq = freq[1:ft_index]
+    spec = ft[0:ft_index]
+    freq = freq[0:ft_index]
+
+    if scaling=="amplitude":
+        spec = (abs(spec) / len(time_series))
+        dc, nyquist = spec[0], spec[-1]
+        spec = 2*spec
+        spec[0], spec[-1] = dc, nyquist
+
+    if scaling=="power spectrum":
+        spec = (abs(spec) / len(time_series)) ** 2
+        dc, nyquist = spec[0], spec[-1]
+        spec = 2*spec
+        spec[0], spec[-1] = dc, nyquist
+
+    if scaling=="psd":
+        spec = (abs(spec)**2 / (len(time_series)*(1/dt)))
+        dc, nyquist = spec[0], spec[-1]
+        spec = 2*spec
+        spec[0], spec[-1] = dc, nyquist
+
+    # print("other dt: ", dt)
+    # print("length of time: ", len(time_series)*dt)
+    # freq, spec = welch(time_series, 1/dt, scaling=scaling, nperseg=len(time_series)//32, detrend="linear")
+    # var = np.var(time_series)
+    # total_power = np.trapezoid(spec, freq)
+    # print("variance: ", np.var(time_series))
+    # print(var, total_power, total_power / var)
 
     if plot:
         fig = plt.figure()
-        plt.plot(freq, np.abs(ft))
+        plt.plot(freq, spec)
         plt.yscale('log')
         plt.xscale('log')
         fig.show()
 
-    if for_power_spec:
-        ft = abs(ft)**2
-
-    return ft, freq, dt
+    return spec, freq
 
 def get_psd(time_series, dt=1, bin=None, plot=False):
     """
@@ -326,16 +365,16 @@ def get_fft_from_data(data, time=None, shot=None, x=None, bin=None, plot=False, 
         ax.plot(freq, abs(ft), color='black')
         ax.set_xlabel('frequency (Hz)')
         ax.set_ylabel('amplitude ('+data.attrs['units']+'/Hz)')
-        ax.set_title(data.name+' fft\n time series '+params_desc+'\n bin: '+str(bin), fontsize=8)
+        ax.set_title(data.name+' fft\n time series '+params_desc+'\n bin: '+str(bin))
         ax.set_xscale('log')
         ax.set_yscale('log')
         if axis is None:
             fig.show()
 
-def get_psd_from_data(data, time=None, shot=None, x=None, bin=None, plot=False, plot_power_law=None,
-                      power_law_freq=None, axis=None, plot_save_folder=None):
+def get_spectrum_from_data(data, time=None, shot=None, x=None, bin=None, plot=False, plot_power_law=None,
+                      scaling="power spectrum", power_law_freq=None, axis=None, plot_save_folder=None):
     """
-        Performs a 1D, one-sided PSD of given time series data, given just the `xarray.DataArray` from the
+        Performs a 1D, one-sided PS of given time series data, given just the `xarray.DataArray` from the
         NetCDF file.
 
         Parameters
@@ -344,33 +383,33 @@ def get_psd_from_data(data, time=None, shot=None, x=None, bin=None, plot=False, 
             Time series data array.
 
         time : `tuple` or `None`
-            It's probably best to leave this as none, and specify the bins to compute the PSD over.
-            If `bin` is left as none, this is useful to compute the PSD over a given time range, and
+            It's probably best to leave this as none, and specify the bins to compute the PS over.
+            If `bin` is left as none, this is useful to compute the PS over a given time range, and
             it should be given as a tuple ex. `(7.1, 7.5)` (values are given in ms)
 
         shot : `int` or `tuple` or `None`
             Determines which shots to use in averaging. If `None`, all 8 are used. If an integer `n`, then
             the `n-1`th shot is used. If a tuple, uses all shots in between the bounds specified by the tuple.
             ex. `(1, 4)` will use shots 2, 3, 4, 5. (Indexing starts at 0). This averaging happens to the time
-            series data, not to the PSD-- it's a good idea to choose an integer.
+            series data, not to the PS-- it's a good idea to choose an integer.
 
         x : `float` or `tuple` or `None`
-            If `None`, the PSD is computed from a time series which is averaged over all radial positions.
-            If `tuple`, say (x1, x2), the PSD is computed from a time series which is averaged over all x
+            If `None`, the PS is computed from a time series which is averaged over all radial positions.
+            If `tuple`, say (x1, x2), the PS is computed from a time series which is averaged over all x
             in between x1 and x2.
             It is recommended to provide a `float`, since time series averaging will remove data from the
             spectrum. This provides the PSD using only data obtained at the given x position.
 
         bin : `tuple` or `int` or `None`
-            If not given, the PSD of the entire data will be returned.
-            If it is an integer, the PSD of the data in the time window (bin+0.02, bin+1-0.02)
+            If not given, the PS of the entire data will be returned.
+            If it is an integer, the PS of the data in the time window (bin+0.02, bin+1-0.02)
             will be returned.
             If it is a tuple of integers, the returned spectra will be the averaged PSD result of
             the data in each of the time windows corresponding to the range of integers specified by
             the tuple.
 
         plot: `bool`
-            If true, it will plot the PSD of the data in the time series as it is computed.
+            If true, it will plot the PS of the data in the time series as it is computed.
 
         plot_power_law: `float` or `None`
             Plots a line representing the power law specified by `float`, say 5/3 or 7/3.
@@ -390,21 +429,44 @@ def get_psd_from_data(data, time=None, shot=None, x=None, bin=None, plot=False, 
         Returns
         -------
         `tuple`
-            `(psd, freq)` where `psd` is the PSD of the data in the time series and `freq` is the frequency
+            `(ps, freq)` where `ps` is the PS of the data in the time series and `freq` is the frequency
             domain
 
     """
-    dt = (data.coords['time'].values[1] - data.coords['time'].values[0])/1000
-    time_series, params_desc, std = get_time_series(data, time=time, shot=shot, x=x)
-    plt.plot(time_series)
-    plt.show()
-    psd, freq = get_psd(time_series, dt=dt, bin=bin)
+    dt = (data.coords['time'].values[1] - data.coords['time'].values[0])/1000 #todo hardcoded to change to seconds
+
+    tseries, params_desc, _ = get_time_series(data, time=time, shot=shot, x=x)
+    err = None
+
+    if x is not None and not isinstance(x, tuple):
+        if shot is not None and not isinstance(shot, tuple):
+            spec, freq = get_fft(tseries, dt=dt, bin=bin, scaling=scaling)
+        if shot is None:
+            shot = (0, 7) #todo potentially hardcoded- must be changed if the number of shots at each position is not 8
+        if isinstance(shot, tuple):
+            spectra = []
+            for s in range(shot[0], shot[1]):
+                tseries, _, _ = get_time_series(data, time=time, shot=s, x=x)
+                spec, freq = get_fft(tseries, dt=dt, bin=bin, scaling=scaling)
+                spectra.append(spec)
+            spec = np.mean(spectra, axis=0)
+            err = np.std(spectra, axis=0)
+
+    if isinstance(x, tuple):
+        spectra = []
+        errors = []
+        for xval in tqdm(range(x[0], x[1]+1), desc="Averaging..."):
+            spec, freq, err = get_spectrum_from_data(data, time=time, shot=shot, x=xval, bin=bin, scaling=scaling)
+            spectra.append(spec)
+            errors.append(err)
+        spec = np.mean(spectra, axis=0)
+        err = np.sqrt(np.mean(errors, axis=0)**2 + np.var(spectra, axis=0))
 
     if plot_power_law is not None:
         assert power_law_freq is not None, 'give a frequency in the range the power law should apply'
         print('fi', np.where(abs(freq-power_law_freq)<100)[0][0])
-        psd_start = psd[np.where(abs(freq-power_law_freq)<100)[0][0]]
-        line = psd_start * (freq/power_law_freq)**(plot_power_law)
+        spec_start = spec[np.where(abs(freq-power_law_freq)<100)[0][0]]
+        line = spec_start * (freq/power_law_freq)**(plot_power_law)
 
     if plot:
         if axis is None:
@@ -412,23 +474,73 @@ def get_psd_from_data(data, time=None, shot=None, x=None, bin=None, plot=False, 
             ax = fig.add_subplot(111)
         else:
             ax = axis
-        ax.plot(freq, psd, color='black')
+        if err is not None:
+            # ax.plot(freq, spec+err/2, linestyle='dashed', color='black')
+            # ax.plot(freq, spec-err/2, linestyle='dashed', color='black')
+            ax.fill_between(freq, spec+err, spec-err, edgecolor='olivedrab', facecolor='olive', alpha=0.6)
+        ax.plot(freq, spec, color='black')
         ax.set_xlabel('frequency (Hz)')
-        ax.set_ylabel('psd ('+data.attrs['units']+'^2/Hz)')
+        ylabel1 = scaling+' ('+data.attrs['units']
+        if scaling != "amplitude":
+            ylabel2 = '^2)'
+        else:
+            ylabel2 = ')'
+        ax.set_ylabel(ylabel1+ylabel2)
         if plot_power_law is not None:
             ax.plot(freq, line, 'darkgreen', label=str(plot_power_law)+' power scaling')
             ax.legend()
-        ax.set_title(data.name+' psd\n time series '+params_desc+'\n bin: '+str(bin), fontsize=8)
+        ax.set_title(data.name+' '+ scaling + '\n time series '+params_desc+'\n bin: '+str(bin))
         ax.set_xscale('log')
         ax.set_yscale('log')
-        #ax.set_ylim(np.min(psd)/5, np.max(psd)*5)
         if axis is None:
             fig.show()
             if plot_save_folder is not None:
-                fig.savefig(plot_save_folder+data.name+'_psd'+get_time()+'.png', dpi=150)
+                fig.savefig(plot_save_folder+data.name+'_'+scaling+'_'+get_time()+'.png', dpi=150)
                 sleep(1)
 
-    return psd, freq
+    return spec, freq, err
+
+def get_radial_spectrogram(data, x=None, shot=None, bin=None, scaling="amplitude", plot=False, axis=None,
+                           plot_save_folder=None):
+    spectra = []
+    assert isinstance(x, tuple) or x is None, "x should be a tuple"
+    if x is None:
+        x1, x2 = data.coords['x'].values.min(), data.coords['x'].values.max()
+        x = (int(x1+0.3), int(x2+0.1))
+    x_positions = np.array(range(x[0], x[1]+1))
+    for x_pos in x_positions:
+        spectrum, freq, err = get_spectrum_from_data(data, x=x_pos, shot=shot, bin=bin, scaling=scaling)
+        spectrum = spectrum[1:]
+        freq = freq[1:]
+        spectra.append(spectrum)
+
+    if plot:
+        if axis is None:
+            fig = plt.figure()
+            ax = fig.add_subplot(111)
+        else:
+            ax = axis
+        im = ax.imshow(
+            np.transpose(spectra),
+            aspect='auto',
+            origin='lower',
+            extent=(
+                x_positions.min(), x_positions.max(),
+                freq.min(), freq.max()
+            ),
+            cmap=parula,
+            norm=LogNorm()
+        )
+        fig.colorbar(im, ax=ax, label='amplitude spectrum ('+data.attrs['units']+')')
+        ax.set_yscale('log')
+        ax.set_ylabel('frequency (Hz)')
+        ax.set_xlabel('x position (cm)')
+        ax.set_title('radial '+scaling+' spectrogram (' + data.name +')')
+        if axis is None:
+            fig.show()
+            if plot_save_folder is not None:
+                fig.savefig(plot_save_folder+data.name+'_'+scaling+'_spectrogram_'+get_time()+'.png', dpi=150)
+    return spectra, x_positions, freq
 
 def get_profile(data, time=None, shot=None, x=None, plot=False, axis=None, plot_save_folder=None):
     """
@@ -505,7 +617,8 @@ def get_profile(data, time=None, shot=None, x=None, plot=False, axis=None, plot_
         x_array = data.coords['x']
     else:
         x_array = data.coords['x'].sel(x=slice(x[0], x[1]))
-        std = std.sel(x=slice(x[0], x[1]))
+        if not isinstance(shot, tuple) or shot is not None:
+            std = std.sel(x=slice(x[0], x[1]))
         profile = profile.sel(x=slice(x[0], x[1]))
 
     if plot:
@@ -564,10 +677,10 @@ def get_time_series(data, time=None, shot=None, x=None, plot=False, axis=None, p
         Returns
         -------
         `tuple`
-            `(time_series, params_desc, std)` where `time_series` is the (averaged) time series, `std` is the standard
-            deviation (square root of the variance of the data with respect to shot), and `params_desc` is a string
-            used in the plot to describe how the time series was obtained (over what values were averaged in each
-            coordinate).
+            `(time_series, params_desc, std)` where `time_series` is the (averaged) time series as an `xarray.DataArray`
+            , `std` is the standard deviation (square root of the variance of the data with respect to shot), also an
+            `xarray.DataArray`, and `params_desc` is a string used in the plot to describe how the time series was obtained
+            (over what values were averaged in each coordinate).
 
     """
     if x is None:
@@ -695,7 +808,7 @@ def get_contour(data, time=None, shot=None, x=None, plot=True, axis=None, plot_s
                 sleep(1)
 
 def get_avg_flux_amplitude(data, time=None, shot=None, x=None, bin=None, freq_slice=None):
-    psd, freq = get_psd_from_data(data, time=time, shot=shot, x=x, bin=bin)
+    psd, freq = get_spectrum_from_data(data, scaling="psd", time=time, shot=shot, x=x, bin=bin)
 
     if freq_slice is not None:
         assert isinstance(freq_slice, tuple), 'freq_slice must be a tuple'
@@ -803,7 +916,7 @@ def plot_total_flux_vs_Ln(data, x=(-27, -19), time=None, shot=None, bin=(7,14), 
     profile, _, __ = get_profile(data, time=time, shot=shot, x=x, plot=False)
     total_flux_list = []
     for x_value in d_grad_d.coords['x'].values:
-        psd, freq = get_psd_from_data(data, time=time, shot=shot, x=x_value, plot=False, bin=bin)
+        psd, freq = get_ps_from_data(data, time=time, shot=shot, x=x_value, plot=False, bin=bin)
         dfreq = freq[1]-freq[0]
         total_flux = np.sum(psd)*dfreq
         total_flux_list.append(total_flux)
@@ -820,10 +933,15 @@ def plot_total_flux_vs_Ln(data, x=(-27, -19), time=None, shot=None, bin=(7,14), 
                     marker = 'o', color='black')
         #todo hardcoded plot axes
         ax.set_xlabel(r'$L_n = \frac{n_e}{\nabla n_e}$ ($cm$)')
-        ax.set_ylabel(r'$\frac{1}{n_e}\int PSD$ ($cm^{-3}$)')
-        ax.set_title(r'$\frac{1}{n_e}\int PSD$ vs $L_n$')
+        ax.set_ylabel(r'$\frac{1}{n_e}\int PS$ ($cm^{-3}$)')
+        ax.set_title(r'$\frac{1}{n_e}\int PS$ vs $L_n$')
 
         if axis is None:
             fig.show()
 
     return np.mean(d_grad_d), np.mean(normalized_total_flux)
+
+if __name__ == "__main__":
+    x = np.linspace(0, 8*np.pi, 10000)
+    y = np.sin(x) + 0.5*np.cos(2*x) + 0.5*np.sin(3*x)
+    get_fft(y, dt = x[1]-x[0], scaling="spectrum", plot = True)

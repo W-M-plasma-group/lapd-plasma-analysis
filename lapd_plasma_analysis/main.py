@@ -22,6 +22,9 @@ import xarray as xr
 # HDF5 file directory; end path with a slash                            # TODO user adjust
 # ----------------------------------------------------------------------------------------
 hdf5_folder = "/home/michael/Documents/school/Plasma/LAPD Plasma Analysis/HDF5 Files/March_2022_HDF5 and NetCDF/"
+hdf5_folder = "/home/michael/Documents/school/Plasma/LAPD Plasma Analysis/HDF5 Files/January_2024_HDF5 and NetCDF/"
+hdf5_folder = "/home/michael/Documents/school/Plasma/LAPD Plasma Analysis/HDF5 Files/November_2022_HDF5 and NetCDF/"
+# hdf5_folder = "/home/michael/Documents/school/Plasma/LAPD Plasma Analysis/HDF5 Files/March_2022_HDF5 and NetCDF/"
 
 # hdf5_folder = "/Users/leomurphy/lapd-data/November_2022/"
 # hdf5_folder = "/Users/leomurphy/lapd-data/April_2018/"

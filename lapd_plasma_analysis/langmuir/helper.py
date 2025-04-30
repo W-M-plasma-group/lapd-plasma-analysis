@@ -16,7 +16,6 @@ ion_temperature = 1 * u.eV
 
 def value_safe(quantity_or_scalar):
     """ Get the scalar value of a scalar, Quantity, or string representing a Quantity without raising an error. """
-
     return u.Quantity(quantity_or_scalar).value
 
 

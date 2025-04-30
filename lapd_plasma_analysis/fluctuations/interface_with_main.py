@@ -41,7 +41,26 @@ def ask_about_plots(data_list, plot_save_folder=None):
         shot = get_plotting_params("shot")
         for i in choice_indices:
             for data in data_list:
-                get_psd_from_data(data[quantities[i]], x=x, bin=bin, shot=shot, plot=True, plot_save_folder=plot_save_folder)
+                get_spectrum_from_data(data[quantities[i]], x=x, bin=bin, shot=shot, plot=True,
+                                 scaling="psd", plot_save_folder=plot_save_folder)
+
+    if ask_yes_or_no("Plot power spectrum (y/n)?"):
+        x = get_plotting_params("x")
+        bin = get_plotting_params("bin")
+        shot = get_plotting_params("shot")
+        for i in choice_indices:
+            for data in data_list:
+                get_spectrum_from_data(data[quantities[i]], x=x, bin=bin, shot=shot, plot=True,
+                                 scaling="power spectrum", plot_save_folder=plot_save_folder)
+
+    if ask_yes_or_no("Plot amplitude spectrum (y/n)?"):
+        x = get_plotting_params("x")
+        bin = get_plotting_params("bin")
+        shot = get_plotting_params("shot")
+        for i in choice_indices:
+            for data in data_list:
+                get_spectrum_from_data(data[quantities[i]], x=x, bin=bin, shot=shot, plot=True,
+                                 scaling="amplitude", plot_save_folder=plot_save_folder)
 
     if ask_yes_or_no("Make contour plot(s) (y/n)?"):
         x = get_plotting_params("x")
@@ -68,6 +87,15 @@ def ask_about_plots(data_list, plot_save_folder=None):
         ax.set_ylabel('integrated PSD (cm^-6/Hz I think)')
         #ax.plot(lns, integrated_psds, marker='o', linestyle='', color='black')
         fig.show()
+
+    if ask_yes_or_no("Plot radial amplitude spectrogram (y/n)?"):
+        x = get_plotting_params("x")
+        bin = get_plotting_params("bin")
+        shot = get_plotting_params("shot")
+        for i in choice_indices:
+            for data in data_list:
+                get_radial_spectrogram(data[quantities[i]], x=x, bin=bin, shot=shot, plot=True,
+                                       plot_save_folder=plot_save_folder)
 
 def get_plotting_params(parameter_as_string):
     """
