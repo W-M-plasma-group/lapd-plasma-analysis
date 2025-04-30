@@ -67,17 +67,6 @@ def make_characteristic_array(bias, current, ramp_bounds):
                         current[loc, shot, ramp_slices[ramp]])
                     pbar.update(1)
 
-    # for russ
-    chara_array_for_russ = np.empty((num_loc, num_shot, len(ramp_slices))).tolist()
-    with tqdm(total=num_characteristics, unit="characteristic", file=sys.stdout, desc='russ') as pbar:
-        for loc in range(num_loc):
-            for shot in range(num_shot):
-                for ramp in range(num_ramp):
-                    chara_array_for_russ[loc][shot][ramp] = [
-                        bias[loc, shot, ramp_slices[ramp]],
-                        current[loc, shot, ramp_slices[ramp]]]
-                    pbar.update(1)
-
     return chara_array
 
 

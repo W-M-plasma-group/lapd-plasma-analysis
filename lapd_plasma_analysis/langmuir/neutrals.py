@@ -10,7 +10,14 @@ def get_neutral_density(gas_pressure):
 
     # LAPD parameters from MATLAB code
     neutral_temperature = 300. * u.K
-    neutral_pressure = gas_pressure.to(u.Pa)
+    try:
+        neutral_pressure = gas_pressure.to(u.Pa)
+        print("tried")
+    except: #todo removed u.UnitConversionError
+        neutral_pressure = value_safe(gas_pressure)*133.322*u.Pa
+        print("excepted")
+
+    print(neutral_pressure)
 
     # Correction factor for electron density measurements from ion gauge
     correction_factor = 0.18  # from MATLAB
