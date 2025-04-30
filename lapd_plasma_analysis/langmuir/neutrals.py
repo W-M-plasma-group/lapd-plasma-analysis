@@ -12,10 +12,8 @@ def get_neutral_density(gas_pressure):
     neutral_temperature = 300. * u.K
     try:
         neutral_pressure = gas_pressure.to(u.Pa)
-        print("tried")
     except: #todo removed u.UnitConversionError
         neutral_pressure = value_safe(gas_pressure)*133.322*u.Pa
-        print("excepted")
 
     print(neutral_pressure)
 

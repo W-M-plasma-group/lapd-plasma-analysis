@@ -110,11 +110,6 @@ def get_langmuir_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder
     # Calculate neutral density
     for i in range(len(datasets)):
         # change units of saved fill pressure to Pa?
-        print(datasets[i].attrs['Fill pressure'])
-        print(type(datasets[i].attrs['Fill pressure']))
-        print(value_safe(datasets[i].attrs['Fill pressure']))
-        print(type(value_safe(datasets[i].attrs['Fill pressure'])))
-        print(value_safe(datasets[i].attrs['Fill pressure'])*u.Torr)
         neutral_density = get_neutral_density(value_safe(datasets[i].attrs['Fill pressure'])) #todo removed * u.Torr
         datasets[i] = datasets[i].assign_attrs({"Neutral density": neutral_density})
 
