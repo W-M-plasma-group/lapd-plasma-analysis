@@ -20,9 +20,15 @@ from scipy.optimize import curve_fit
 from scipy.signal import welch
 from datetime import datetime
 from time import sleep
-from nmmn.plots import parulacmap
 
-parula = parulacmap()
+try:
+    from nmmn.plots import parulacmap
+    parula = parulacmap()
+    cmap = parula
+except:
+    cmap = "plasma"
+
+
 
 
 SMALL_SIZE = 12 # font size code from Pedro Duarte on stack exchange
@@ -258,7 +264,7 @@ def get_cross_phase_spectrogram(data1, data2, bin, plot=False, axis=None):
             ax = fig.add_subplot(111)
         else:
             ax = axis
-        plt.contourf(x_positions, freq, np.transpose(cross_phases), cmap='plasma')
+        plt.contourf(x_positions, freq, np.transpose(cross_phases), cmap=cmap)
         plt.colorbar()
         ax.set_yscale('log')
         ax.set_ylabel('frequency (Hz)')
@@ -299,7 +305,7 @@ def get_cross_spectrogram(data1, data2, bin, plot=False, axis=None):
             ax = fig.add_subplot(111)
         else:
             ax = axis
-        plt.contourf(x_positions, freq, np.transpose(cross_spectra), locator = ticker.LogLocator(), cmap='plasma')
+        plt.contourf(x_positions, freq, np.transpose(cross_spectra), locator = ticker.LogLocator(), cmap=cmap)
         plt.colorbar()
         ax.set_yscale('log')
         ax.set_ylabel('frequency (Hz)')
@@ -528,7 +534,7 @@ def get_radial_spectrogram(data, x=None, shot=None, bin=None, scaling="amplitude
                 x_positions.min(), x_positions.max(),
                 freq.min(), freq.max()
             ),
-            cmap=parula,
+            cmap=cmap,
             norm=LogNorm()
         )
         fig.colorbar(im, ax=ax, label='amplitude spectrum ('+data.attrs['units']+')')

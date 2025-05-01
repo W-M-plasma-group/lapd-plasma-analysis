@@ -43,7 +43,7 @@ def get_isat_vf(filename, hdf5_path, flux_nc_folder):
     """
     print("File name: ", filename)
     assert os.path.exists(filename)
-    assert get_config_id(lapd.File(filename).info['exp name']) in [1, 2]
+    assert get_config_id(lapd.File(filename).info['exp name']) in [1, 2, 3]
 
     file = lapd.File(filename)
 
@@ -57,11 +57,26 @@ def get_isat_vf(filename, hdf5_path, flux_nc_folder):
         vf_board = 2
         vftop_channel = 2
         vfbot_channel = 3
+        isat_resistance = 15 #Ohm
+        isat_scaling = 1/isat_resistance
 
     if config_id == 2:
         isat_receptacle = 1
         isat_board = 2
         isat_channel = 3
+
+        # vf_receptacle = 2
+        # vf_board = 2
+        # vftop_channel = 2
+        # vfbot_channel = 3
+
+    if config_id == 3:
+        isat_receptacle = 1
+        isat_board = 2
+        isat_channel = 1
+        isat_resistance = 7.36
+        isat_gain = 0.96
+        isat_scaling = 1/(isat_resistance*isat_gain)
         # vf_receptacle = 2
         # vf_board = 2
         # vftop_channel = 2
@@ -79,13 +94,13 @@ def get_isat_vf(filename, hdf5_path, flux_nc_folder):
     x_array.append(isat_data[0][2][0])
     for discharge in isat_data:
         if abs(discharge[2][0] - x_array[x_index]) <= 0.01:
-            isat_vs_x[x_index].append(discharge[1]/15) # 15 ohm resistance
+            isat_vs_x[x_index].append(discharge[1]*isat_scaling)
 
         else:
             x_index += 1
             isat_vs_x.append([])
             x_array.append(discharge[2][0])
-            isat_vs_x[x_index].append(discharge[1]/15)
+            isat_vs_x[x_index].append(discharge[1]*isat_scaling)
 
 
     isat_vs_x = np.array(isat_vs_x)
@@ -215,7 +230,7 @@ def get_density_data(filename, hdf5_folder, isat_data_array, shot_array):
     sound_speed_data_array.coords['time'].attrs['units'] = 'ms'
     sound_speed_data_array.coords['x'].attrs['units'] = 'cm'
 
-    area = 5 * u.mm ** 2  # area of probe, I think -- Leo said 1, Phil suggested off by x5 (circle vs cylinder)
+    area = 8 * u.mm ** 2  # area of probe, I think -- Leo said 1, Phil suggested off by x5 (circle vs cylinder)
     area = area.to(u.m ** 2) # but i feel like there was an extra factor of 2
     e_plus = 1.60217663e-19*u.C
     e = np.exp(1)
