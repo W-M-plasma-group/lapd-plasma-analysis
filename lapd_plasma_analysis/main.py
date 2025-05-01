@@ -223,7 +223,7 @@ if __name__ == "__main__":
                                                scale_length_mode="exponential")  # 'linear' or 'exponential'
 
     if ask_yes_or_no("Generate grid line plots for selected diagnostics? (y/n) "):
-        time_unit = unit_safe(steady_state_times_runs[0])
+        # time_unit = unit_safe(steady_state_times_runs[0])
         for x_dim in ("x", "time"):
             plot_grid(datasets, diagnostics_to_plot_list, steady_state_times_runs,
                       probes_faces_midplane, probes_faces_parallel, "mean", core_radius, x_dim,

@@ -15,17 +15,15 @@ ion_temperature = 1 * u.eV
 
 
 def value_safe(quantity_or_scalar):
-    """ Get value of quantity or scalar, depending on type, without raising an error. """
+    """ Get the scalar value of a scalar, Quantity, or string representing a Quantity without raising an error. """
     return u.Quantity(quantity_or_scalar).value
 
 
 def unit_safe(quantity_or_scalar):
-    """ Get unit of quantity or scalar, if it exists, without raising an error. """
-    try:
-        unit = quantity_or_scalar.unit      # input is a quantity with dimension and value
-    except AttributeError:
-        unit = None                         # The input data is dimensionless
-    return unit
+    """ Get the unit of a scalar, Quantity, or string representing a Quantity, if it exists,
+    without raising an error. """
+
+    return u.Quantity(quantity_or_scalar).unit
 
 
 def unpack_bimaxwellian(diagnostics):
