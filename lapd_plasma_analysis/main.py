@@ -21,10 +21,13 @@ import xarray as xr
 
 # HDF5 file directory; end path with a slash                            # TODO user adjust
 # ----------------------------------------------------------------------------------------
-hdf5_folder = "/home/michael/Documents/school/Plasma/LAPD Plasma Analysis/HDF5 Files/March_2022_HDF5 and NetCDF/"
-hdf5_folder = "/home/michael/Documents/school/Plasma/LAPD Plasma Analysis/HDF5 Files/January_2024_HDF5 and NetCDF/"
+# hdf5_folder = "/home/michael/Documents/school/Plasma/LAPD Plasma Analysis/HDF5 Files/March_2022_HDF5 and NetCDF/"
+# hdf5_folder = "/home/michael/Documents/school/Plasma/LAPD Plasma Analysis/HDF5 Files/January_2024_HDF5 and NetCDF/"
 # hdf5_folder = "/home/michael/Documents/school/Plasma/LAPD Plasma Analysis/HDF5 Files/November_2022_HDF5 and NetCDF/"
 # hdf5_folder = "/home/michael/Documents/school/Plasma/LAPD Plasma Analysis/HDF5 Files/March_2022_HDF5 and NetCDF/"
+
+
+hdf5_folder = "/Users/lukec/Downloads/HTF5 file test/"
 
 # hdf5_folder = "/Users/leomurphy/lapd-data/November_2022/"
 # hdf5_folder = "/Users/leomurphy/lapd-data/April_2018/"
@@ -75,7 +78,7 @@ display_core_steady_state_lines = True                                  # user c
 # Optional directory to save plots; end path with a slash.              # TODO user adjust
 
 # ----------------------------------------------------------------------------------------
-plot_save_folder = ("/home/michael/PycharmProjects/LAPD-plasma-analysis/plots/")
+plot_save_folder = ("/Users/lukec/Downloads/HTF5 file test/Saved/")
 
 assert plot_save_folder.endswith("/")
 assert os.path.exists(plot_save_folder)
