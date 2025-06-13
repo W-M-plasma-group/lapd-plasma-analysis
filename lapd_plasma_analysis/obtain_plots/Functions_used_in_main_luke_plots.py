@@ -1,4 +1,4 @@
-from pty import slave_open
+# from pty import slave_open
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -167,12 +167,14 @@ def plot_iv_sweep(filepath,bias_to_plot,current_to_plot,port_face_string,IV_plot
         start_time = (first_index * dt.to(u.ms).value)
         end_time = end_ramp_times_to_plot[i].to(u.ms).value
         mask = ((time_array >= start_time) & (time_array <= end_time))
+        sorted_bias = bias_to_plot[mask][np.argsort(bias_to_plot[mask])]
+        sorted_current = current_to_plot[mask][np.argsort(bias_to_plot[mask])]
 
         # Get the ion saturation current
-        i_ion_sat = get_ion_isat(bias_to_plot[mask], current_to_plot[mask])
+        i_ion_sat = get_ion_isat(sorted_bias, sorted_current)
         if 2 in IV_plots_choice:
             if i_ion_sat is not None:
-                plt.plot(bias_to_plot[mask], [i_ion_sat.to(u.A).value] * len(bias_to_plot[mask]), 'r',
+                plt.plot(sorted_bias, [i_ion_sat.to(u.A).value] * len(bias_to_plot[mask]), 'r',
                          label="Ion Isat")
 
             plt.scatter(bias_to_plot[mask], current_to_plot[mask])
@@ -198,11 +200,68 @@ def plot_iv_sweep(filepath,bias_to_plot,current_to_plot,port_face_string,IV_plot
         if 3 in IV_plots_choice:
             # Plot the natural log of the current shifted up by the ion saturation current to get rid of the negative
             # values
-            adjusted_current = np.log(current_to_plot[mask].to(u.A).value +
-                                      abs(min(current_to_plot[mask].to(u.A).value)))
-            # May want to add the addition of *10^-9 or so after the absolute value - but there are significant outliers
+            adjusted_current = np.log(sorted_current.to(u.A).value +
+                                      abs(min(sorted_current.to(u.A).value))+1e-9)
 
-            plt.scatter(bias_to_plot[mask], adjusted_current)
+            # Now
+            # May want to add the addition of *10^-9 or so after the absolute value - but there are significant outliers
+            # Need to fit a line to the straight region of the curve.
+
+            # Build an array of 5 slopes and calculate the mean and standard deviation if the standard deviation is bigger
+            # than the tolerance (which should be derived from the mean) then that should be the slope we use.
+            # Plot the calculated slope on the log plot using point slope form from the first point of the median slope value
+
+            skip = 20
+            elem_in_array = 4
+            found_slope = False
+            j = 0 # set the start index
+            while not found_slope and j+(elem_in_array+1)*skip < len(adjusted_current):
+                slopes_to_use =[]
+                for h in range(0,elem_in_array):
+                    slopes_to_use.append((adjusted_current[j+skip*h]-
+                                          adjusted_current[j+skip*(h+1)])/
+                                         (sorted_bias[j+skip*h]-
+                                          sorted_bias[j+skip*(h+1)]))
+                mean = u.Quantity(slopes_to_use).mean()
+                standard_dev = u.Quantity(slopes_to_use).std()
+                tolerance  = 0.25 * mean
+                # print('tolerance:', tolerance)
+                # print('standard deviation:', standard_dev)
+                if standard_dev < tolerance:
+                    slope = mean
+                    x_point = np.median(sorted_bias[j:j+skip*(elem_in_array+1)])
+                    y_point = np.median(adjusted_current[j:j+skip*(elem_in_array+1)])
+                    found_slope = True
+                else:
+                    j+=skip
+                if j+skip*(elem_in_array+1) > len(adjusted_current):
+                    slope = 0
+                    x_point = 0 * u.V
+                    y_point = 0
+                    print('No T_e slope found')
+            # If no slope is found the loop returns a 0 slope and prints an error message
+
+            # Point slope form
+            slope_current_array = slope*(sorted_bias-x_point)+y_point
+
+            # Find index of minimum current value
+            min_idx = np.argmin(adjusted_current)
+
+            # Create masks that exclude the min value index
+            mask_no_min = np.arange(len(adjusted_current)) != min_idx
+
+            # Filter bias and current arrays without the min value
+            bias_no_min = sorted_bias[mask_no_min]
+            adjusted_current_no_min = adjusted_current[mask_no_min]
+
+            plt.plot(sorted_bias, slope_current_array, 'r')
+
+
+
+
+
+
+            plt.scatter(bias_no_min, adjusted_current_no_min)
             plt.title(f"Run: {exp_params_dict['Exp name']}, {exp_params_dict['Run name']}\n"
                       f"Probe port and face: {port_face_string}, "
                       f"x: {loc_shot[0]}, y: {loc_shot[1]}, shot: {loc_shot[2]}\n\n"
@@ -210,6 +269,7 @@ def plot_iv_sweep(filepath,bias_to_plot,current_to_plot,port_face_string,IV_plot
                       f"Sweep at [ms]: {dt.to(u.ms).value * first_index}")
             plt.xlabel("Voltage [V]")
             plt.ylabel("ln(Current)")
+            plt.ylim([-5,1])
 
             plt.tight_layout()
 
@@ -234,7 +294,8 @@ def plot_iv_sweep(filepath,bias_to_plot,current_to_plot,port_face_string,IV_plot
             plt.show()
 
 
-def plot_ion_isat_vs_time(dt,ramp_times,bias_to_plot,current_to_plot,exp_params_dict,port_face_string,loc_shot,save_plots):
+def plot_ion_isat_vs_time(dt,ramp_times,bias_to_plot,current_to_plot,exp_params_dict,port_face_string,loc_shot,save_plots,
+                          filepath):
     """
 
     Parameters
@@ -291,6 +352,13 @@ def plot_ion_isat_vs_time(dt,ramp_times,bias_to_plot,current_to_plot,exp_params_
     plt.xlabel("Time [ms]")
     plt.ylabel("Ion Saturation Current [A]")
     plt.tight_layout()
+
+    if save_plots:
+        ensure_directory(filepath + "Ion_sat_current_vs_time/")
+        ensure_directory(filepath + "Ion_sat_current_vs_time/" + f"Port_{port_face_string}/")
+        plt.savefig(filepath + "/Ion_sat_current_vs_time/" + f"Port_{port_face_string}/" +
+                    f"x_{loc_shot[0]},y_{loc_shot[1]},shot_{loc_shot[2]},probe_{port_face_string}.png")
+
     plt.show()
 
 

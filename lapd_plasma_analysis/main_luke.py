@@ -1,3 +1,5 @@
+# from pty import slave_open
+
 from lapd_plasma_analysis.file_access import ask_yes_or_no, choose_multiple_from_list, ensure_directory
 from lapd_plasma_analysis.fluctuations.interface_with_main import ask_about_plots
 from lapd_plasma_analysis.fluctuations.analysis import get_isat_vf
@@ -13,7 +15,7 @@ from lapd_plasma_analysis.mach.analysis import get_mach_datasets, get_velocity_d
 import os
 import xarray as xr
 
-from lapd_plasma_analysis.main import hdf5_folder, mach_nc_folder, flux_nc_folder
+# from lapd_plasma_analysis.main import hdf5_folder, mach_nc_folder, flux_nc_folder
 from obtain_plots.Functions_used_in_main_luke_plots import *
 
 '''
@@ -26,7 +28,9 @@ Goals of this main:
 4. Perform a dimensionless comparison between hydrogen and helium plasmas
 '''
 # User parameters in original main that are useful as global variables
-hdf5_folder = "/Users/lukec/Downloads/HTF5 file test/"
+# hdf5_folder = "/Users/lukec/Downloads/HTF5 file test/"
+hdf5_folder = "C:\LAPD_HDF5_files/"
+
 # TODO make a GUI so the user can select the folder in their directory?
 assert hdf5_folder.endswith("/")
 
@@ -149,7 +153,7 @@ if __name__ == "__main__":
                     # If the user wants to plot the ion saturation current vs time
                     if 4 in IV_plots_choice:
                         plot_ion_isat_vs_time(dt,ramp_times,bias_to_plot[h],current_to_plot[h],exp_params_dict,
-                                            port_face_string,loc_shot[h],save_plots)
+                                            port_face_string,loc_shot[h],save_plots,filepath)
 
 
 

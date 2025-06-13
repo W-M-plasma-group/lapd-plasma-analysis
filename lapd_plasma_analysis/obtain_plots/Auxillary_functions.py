@@ -1,4 +1,4 @@
-from pty import slave_open
+# from pty import slave_open
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -103,7 +103,7 @@ def find_sweep_indices(time_array,end_time,search_times,bias,dt):
 
     return i,last_index
 
-def get_ion_isat(bias,current):
+def get_ion_isat(sorted_bias,sorted_current):
     '''
 
     Parameters
@@ -117,16 +117,14 @@ def get_ion_isat(bias,current):
     '''
 
     # Sort the current from being arranged by lowest time to being arranged by lowest bias
-    sorted_current = current[np.argsort(bias)]
-    sorted_bias = bias[np.argsort(bias)]
-    # Get the mean of the first 5 elements of the sorted current array
-    avg_current = np.mean(sorted_current[:5])
+    # Get the mean of the first 500 elements of the sorted current array
+    avg_current = np.mean(sorted_current[:500])
     tolerance = .3
-    step = 200
+    step = 50
     i = step
 
     # Look for when the percent difference between the test average (mean) and the full current average is less than 5%
-    while i+step < len(bias):
+    while i+step < len(sorted_bias):
         # print(i)
         mean = np.mean(sorted_current[i:i+step])
         if abs((mean - avg_current)/avg_current) >= tolerance:
