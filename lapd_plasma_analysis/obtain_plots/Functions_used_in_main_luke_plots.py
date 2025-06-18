@@ -172,10 +172,14 @@ def plot_iv_sweep(filepath,bias_to_plot,current_to_plot,port_face_string,IV_plot
 
         # Get the ion saturation current
         i_ion_sat = get_ion_isat(sorted_bias, sorted_current)
+        i_electron_sat = get_electron_isat(sorted_bias, sorted_current)
         if 2 in IV_plots_choice:
             if i_ion_sat is not None:
                 plt.plot(sorted_bias, [i_ion_sat.to(u.A).value] * len(bias_to_plot[mask]), 'r',
                          label="Ion Isat")
+            if i_electron_sat is not None:
+                plt.plot(sorted_bias,[i_electron_sat.to(u.A).value] * len(bias_to_plot[mask]), 'g',
+                         label="Electron Isat")
 
             plt.scatter(bias_to_plot[mask], current_to_plot[mask])
             plt.title(f"Run: {exp_params_dict['Exp name']}, {exp_params_dict['Run name']}\n"

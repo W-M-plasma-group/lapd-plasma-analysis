@@ -18,6 +18,7 @@ from lapd_plasma_analysis.langmuir.neutrals import get_neutral_density
 from lapd_plasma_analysis.langmuir.interferometry import interferometry_calibration
 from lapd_plasma_analysis.langmuir.plots import get_title
 from lapd_plasma_analysis.langmuir.metadata_for_dataset import get_supplemental_metadata
+import astropy.units as u
 
 
 def find_sweep_indices(time_array,end_time,search_times,bias,dt):
@@ -137,4 +138,98 @@ def get_ion_isat(sorted_bias,sorted_current):
     print("Failed to find an ion Isat")
     return None
 
+def get_electron_isat(sorted_bias,sorted_current):
+    """
 
+    Parameters
+    ----------
+    sorted_bias
+    sorted_current
+
+    Returns
+    -------
+    electron_isat - float in Amps corresponding to the electron saturation current
+
+    This function aims to find the knee in the IV curve for a Langmuir probe by searching for when there is a drastic
+    shift in the slope of the IV sweep. It starts sampling from the last element in the current array
+
+    """
+
+    tolerance = 7
+    step = min(10,len(sorted_bias)-2)
+    k = 0
+    electron_isat = min(sorted_current)
+    # Calculate the average slope of the last step elements in the current and bias arrays
+    slope_array = []
+    # May take a lot of time -> Test and see if its worth the extra time if not go back to calculating slope as in
+    # the slope of the exponential part of the curve calculation
+    while electron_isat < .7 * max(sorted_current):
+        slope_array = []
+        nans = 0
+
+        for i in range(step):
+            try:
+                delta_current = sorted_current[-(i + 1)] - sorted_current[-(i + 2)]
+                delta_bias = sorted_bias[-(i + 1)] - sorted_bias[-(i + 2)]
+                if np.isclose(delta_bias.value, 0):
+                    nans += 1
+                    continue
+                slope_array.append(delta_current / delta_bias)
+            except IndexError:
+                break  # Avoid crashing if out of bounds
+            except ZeroDivisionError:
+                continue  # Avoid division by zero
+
+        if len(slope_array) == 0:
+            raise ValueError("Not enough data points to compute slope.")
+        slope_array = [s for s in slope_array if np.isfinite(s.value)]
+        check_slope = u.Quantity(slope_array).mean()
+
+        test_slope = check_slope
+        h = 1
+        while step * (h+1) <= len(sorted_bias):
+            slope_array = []
+            for j in range(step):
+                try:
+                    delta_current = sorted_current[-(h * step + (j + 1))] - sorted_current[-(h * step + (j + 2))]
+                    delta_bias = sorted_bias[-(h * step + (j + 1))] - sorted_bias[-(h * step + (j + 2))]
+                    # Don't add an inf or nan value to the slope array
+                    if np.isclose(delta_bias.value, 0):
+                        nans +=1
+                        continue
+                    slope_array.append(delta_current / delta_bias)
+                except IndexError:
+                    break  # Avoid crashing if out of bounds
+                except ZeroDivisionError:
+                    continue  # Avoid division by zero
+            h += 1
+            slope_array = [s for s in slope_array if np.isfinite(s.value)]
+            if len(slope_array) == 0:
+                break
+            test_slope = u.Quantity(slope_array).mean()
+            if k == 0:
+                last_index_condition = step * (h + 1) >= 0.25 * len(sorted_bias)
+            elif k == 1:
+                last_index_condition = step * (h + 1) >= 0.1 * len(sorted_bias)
+            elif k == 2:
+                last_index_condition = True
+
+
+            if abs(test_slope - check_slope) >= tolerance * abs(check_slope) and last_index_condition:
+                break
+            check_slope = test_slope
+
+            # Return none if we've searched the entire current array and found nothing
+            if step * (h + 1) >= len(sorted_bias):
+                print("Failed to find an electron Isat")
+                return None
+
+        # Return the current of the last tested value
+        electron_isat = sorted_current[-(h * step - 1)]
+        # if electron_isat > .7*max(sorted_current):
+        #     break
+        k += 1
+        if k > 2:
+            break
+
+    return electron_isat
