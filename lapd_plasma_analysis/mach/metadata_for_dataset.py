@@ -4,14 +4,13 @@ Provide messages to add to each saved dataset (WIP) # todo
 
 from lapd_plasma_analysis.langmuir.plots import get_title
 
-
 # General metadata
 
 general = """
 General information
 
 This object is a dataset containing data from one experiment at the Large Plasma Device (LAPD) at UCLA.
-This dataset is in the NetCDF format and contains Langmuir (and maybe Mach) probe diagnostic data.
+This dataset is in the NetCDF format and contains Mach probe data.
 This data can be accessed through Python, for example, by using the xarray library's open_dataset function.
 Diagnostic data was calculated from experiments using the online lapd-plasma-analysis library.
 For more information, see the 'contents', 'structure', 'use', and 'source' elements 
@@ -32,7 +31,7 @@ def get_supplemental_metadata(dataset):
 contents = """
 Contents information
 
-This dataset is an instance of `xarray.Dataset`. It contains the following variables, referred to by
+This dataset is an instance of `xarray.Dataset`. It contains the following variable(s), referred to by
 their Dataset variable (short) name followed by their descriptive (long) name:
     {variables_list_string} 
 Visit https://docs.xarray.dev/en/stable/index.html for documentation and information on xarray Datasets and DataArrays.
@@ -154,15 +153,10 @@ def get_use_metadata(dataset):
 source = """
 Source information
 
-Langmuir diagnostic values were calculated using lapd-plasma-analysis 
-with the help of the diagnostics toolkit of the PlasmaPy library.
+Mach number values were calculated using lapd-plasma-analysis.
 Documentation for the lapd-plasma-analysis library is available online at this link: 
     https://lapd-plasma-analysis.readthedocs.io/en/index.html
-Documentation for the PlasmaPy library is available online at these links: 
-    https://docs.plasmapy.org/en/stable/
-    https://docs.plasmapy.org/en/stable/ad/diagnostics/langmuir.html
-
-Further information on lapd-plasma-analysis is not yet complete. (WIP)
+Further information on Mach number calculations is not yet complete. (WIP)
 """
 
 # TODO most important part - how was this data calculated?

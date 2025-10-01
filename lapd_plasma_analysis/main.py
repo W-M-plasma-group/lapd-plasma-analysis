@@ -41,7 +41,7 @@ interferometry_folder = ("/Users/leomurphy/lapd-data/November_2022/uwave_288_GHz
 
 # Interferometry & Mach access modes. Options are "skip", "append", "overwrite"; recommended is "append".
 interferometry_mode = "skip"                                            # TODO user adjust
-mach_velocity_mode = "skip"                                           # not fully implemented
+mach_velocity_mode = "append"                                           # not fully implemented
 
 # ----------------------------------------------------------------------------------------
 
