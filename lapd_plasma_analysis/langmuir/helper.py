@@ -60,7 +60,10 @@ def get_diagnostic_keys_units(probe_area=1.*u.mm**2, ion_type="He-4+", bimaxwell
                        "P_ei_cal": str(u.Pa),
                        "nu_ei": str(u.Hz),
                        "v_para": str(u.m / u.s),
-                       "v_perp": str(u.m / u.s)})
+                       "v_perp": str(u.m / u.s),
+                       "ion_isat": str(u.A),
+                       "electron_isat": str(u.A)})
+
     return keys_units
 
 
@@ -164,6 +167,7 @@ def core_steady_state(da_input, core_rad=None, steady_state_times=None, operatio
     """
 
     da = da_input.copy()
+
     if core_rad is not None:
         da = da.where(np.logical_and(np.abs(da.coords['x']) < core_rad.to(u.cm).value,
                                      np.abs(da.coords['y']) < core_rad.to(u.cm).value), drop=True)

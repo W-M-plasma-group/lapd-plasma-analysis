@@ -55,6 +55,9 @@ def multiplot_linear_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_dia
     if attribute is None:
         attribute = [attr for attr in diagnostics_datasets[0].attrs if "Nominal" in attr]
     attributes = np.atleast_1d(attribute)
+
+    # print('time attributes: ', diagnostics_datasets[0].coords['time'].attrs)
+
     if len(attributes) > 2:
         # TODO detect/fix
         warn(f"Can currently only categorize line plots by two attributes. Selecting last two: {attributes[-2:]}")
@@ -102,12 +105,23 @@ def multiplot_linear_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_dia
                 inner_val = ds.attrs[attributes[0]]
 
                 da = ds[plot_diagnostic]
+                for dim_name in list(da.dims):
+                    if dim_name in ds.dims:
+                        try:
+                            da.coords[dim_name] = ds.coords[dim_name]
+                        except ValueError:
+                            da.coords[dim_name] = xr.DataArray(
+                                da.coords[dim_name].data,
+                                dims=(dim_name,),  # 👈 This is key!
+                                attrs=ds.coords[dim_name].attrs
+                                )
 
                 core_steady_state_params = []
                 # below: only consider steady state
                 core_steady_state_params += [core_rad] if x_dim == 'time' else [None]
                 core_steady_state_params += [steady_state_times[inner_index]] if x_dim in ('x', 'y') else [None]
                 # above: only consider core region
+                # print(da.coords['time'].attrs)
                 da = core_steady_state(da, *core_steady_state_params)
 
                 dims_to_average_out = ['shot'] + [dim for dim in x_dims if dim != x_dim]
@@ -133,6 +147,7 @@ def multiplot_linear_diagnostic(diagnostics_datasets: list[xr.Dataset], plot_dia
                     ax.errorbar(da_mean.coords[x_dim], da_mean, yerr=linear_da_error, linestyle="none",
                                 color=color_map[inner_index], marker=marker_styles[i],
                                 label=str(inner_val) + f" ({probe_face_eq_str})")
+                print('x_dim: ', x_dim)
                 ax.set_xlabel(da_mean.coords[x_dim].attrs['units'])
                 ax.set_ylabel(da_mean.attrs['units'])
 
@@ -226,15 +241,15 @@ def plot_linear_diagnostic(diagnostics_dataset: xr.Dataset, probe_face_coefficie
                 linear_ds_1d = core_steady_state(linear_ds_s[d], steady_state_times=steady_state, operation="mean",
                                                  dims_to_keep=linear_dimensions[d])
                 linear_plot_1d(linear_ds_1d[key], linear_dimensions[d])
-            # probe_eq_string = probe_face_choice_to_eq_string(probe_face_coefficients[d], ports, faces)
-            plot_title = (f"{run_names[0]}"  # , {probe_eq_string}"
-                          f"\n{get_title(key)} {plot_type} plot")
+                probe_eq_string = probe_face_choice_to_eq_string(probe_face_coefficients[d], ports, faces)
+                plot_title = (f"{run_names[0]}"  # , {probe_eq_string}"
+                              f"\n{get_title(key)} {plot_type} plot")
             # TODO change
             """
             if hasattr(linear_ds_s_1d[0], "facevector"):
                 plot_title += f"\nLinear combination of faces: {linear_ds_s_1d[0].attrs['facevector']}"
             """
-            plt.title(plot_title)
+            # plt.title(plot_title)
             plt.tight_layout()
             plt.show()
     # 2D plot type
@@ -268,7 +283,8 @@ def plot_linear_diagnostic(diagnostics_dataset: xr.Dataset, probe_face_coefficie
                         plt.savefig(save_directory + "2D_plot_" + diagnostic + ".pdf", bbox_inches="tight")
                     plt.show()
                 except ValueError as e:
-                    print(f"Problem plotting {key} for {linear_ds_s[d].attrs['Run name']}:"
+                    print(f"Problem plotting {key} "
+                          # f"for {linear_ds_s[d].attrs['Run name']}:"
                           f"\n{repr(e)}")
 
 
@@ -288,10 +304,23 @@ def plot_parallel_diagnostic(datasets, steady_state_times_runs, probes_faces_mid
 
         if diagnostic not in datasets[i]:  # TODO needs testing
             continue
-        diagnostic_means = core_steady_state(datasets[i][diagnostic], core_radius,
+        da = datasets[i][diagnostic]
+        ds = datasets[i]
+        for dim_name in list(da.dims):
+            if dim_name in ds.dims:
+                try:
+
+                    da.coords[dim_name] = ds.coords[dim_name]
+                except ValueError:
+                    da.coords[dim_name] = xr.DataArray(
+                        da.coords[dim_name].data,
+                        dims=(dim_name,),  # 👈 This is key!
+                        attrs=ds.coords[dim_name].attrs
+                    )
+        diagnostic_means = core_steady_state(da, core_radius,
                                              steady_state_times_runs[i], operation,
                                              dims_to_keep=("probe", "face"))
-        diagnostic_std_errors = core_steady_state(datasets[i][diagnostic], core_radius,
+        diagnostic_std_errors = core_steady_state(da, core_radius,
                                                   steady_state_times_runs[i], "std_error",
                                                   dims_to_keep=("probe", "face"))
 
@@ -306,7 +335,7 @@ def plot_parallel_diagnostic(datasets, steady_state_times_runs, probes_faces_mid
             if diagnostic_value > max_diagnostic:
                 max_diagnostic = diagnostic_value
         zs = anode_z - (zs * u.Unit(diagnostic_means.coords['z'].attrs['units'])).to(u.m)  # convert to meters
-        diagnostic_units = datasets[i][diagnostic].attrs['units']
+        # diagnostic_units = datasets[i][diagnostic].attrs['units']
 
         plt.errorbar(zs, diagnostic_values, yerr=diagnostic_errors, marker=marker_styles[i],
                      color=color_map[i], linestyle=line_style)
@@ -388,7 +417,19 @@ def plot_parallel_inverse_scale_length(datasets, steady_state_times_runs, diagno
 
     for i in range(len(datasets)):
         probes_faces = probes_faces_parallel[i]
-        diagnostic_means = core_steady_state(datasets[i][diagnostic], core_radius,
+        da = datasets[i][diagnostic]
+        ds = datasets[i]
+        for dim_name in list(da.dims):
+            if dim_name in ds.dims:
+                try:
+                    da.coords[dim_name] = ds.coords[dim_name]
+                except ValueError:
+                    da.coords[dim_name] = xr.DataArray(
+                        da.coords[dim_name].data,
+                        dims=(dim_name,),  # 👈 This is key!
+                        attrs=ds.coords[dim_name].attrs
+                    )
+        diagnostic_means = core_steady_state(da, core_radius,
                                              steady_state_times_runs[i], operation,
                                              dims_to_keep=("probe", "face"))
 
@@ -474,6 +515,16 @@ def plot_grid(datasets, diagnostics_to_plot_list, steady_state_times_runs, probe
                 # """
                 for ds in ds_s:  # ds for upstream (cathode) and downstream (anti-cathode)
                     da = ds[plot_diagnostic]
+                    for dim_name in list(da.dims):
+                        if dim_name in ds.dims:
+                            try:
+                                da.coords[dim_name] = ds.coords[dim_name]
+                            except ValueError:
+                                da.coords[dim_name] = xr.DataArray(
+                                    da.coords[dim_name].data,
+                                    dims=(dim_name,),  # 👈 This is key!
+                                    attrs=ds.coords[dim_name].attrs
+                                )
 
                     core_steady_state_params = []
                     # below: only consider steady state
@@ -644,7 +695,9 @@ def get_valid_linear_dimension(diagnostics_dataset_sizes):
     else:
         raise ValueError("x and y dimensions have lengths " + str(diagnostics_dataset_sizes[:2]) +
                          " both greater than 1. A linear plot cannot be made. Areal plots are not yet supported.")
-    if diagnostics_dataset_sizes['time'] == 1:
+    # if diagnostics_dataset_sizes['time'] == 1 or diagnostics_dataset_sizes['sweep'] == 1:
+    if (('time' in diagnostics_dataset_sizes and diagnostics_dataset_sizes['time'] == 1) or
+            ('sweep' in diagnostics_dataset_sizes and diagnostics_dataset_sizes['sweep'] == 1)):
         raise ValueError("Single-time profiles are not supported")
 
     return linear_dimension
@@ -737,7 +790,20 @@ def get_colormap_normalizer(datasets, core_radius, steady_state_times_runs, prob
 
     diagnostic_values = []
     for i in range(len(datasets)):
-        diagnostic_value = core_steady_state(datasets[i][diagnostic], core_radius,
+        da = datasets[i][diagnostic]
+        ds = datasets[i]
+        for dim_name in list(da.dims):
+            if dim_name in ds.dims:
+                try:
+                    da.coords[dim_name] = ds.coords[dim_name]
+                except ValueError:
+                    da.coords[dim_name] = xr.DataArray(
+                        da.coords[dim_name].data,
+                        dims=(dim_name,),  # 👈 This is key!
+                        attrs=ds.coords[dim_name].attrs
+                    )
+
+        diagnostic_value = core_steady_state(da, core_radius,
                                              steady_state_times_runs[i], operation,
                                              dims_to_keep=("probe", "face")
                                              )[{"probe": probe_face_midplane[i][0],
