@@ -2,6 +2,7 @@
 
 import matplotlib.pyplot as plt
 import numpy as np
+import time
 from IPython.core.pylabtools import figsize
 from plasmapy.analysis.swept_langmuir import find_ion_saturation_current
 
@@ -76,6 +77,7 @@ def obtain_data(hdf5_path, bias, current, positions, langmuir_config, exp_params
     langmuir_config: Array yielding key parameters for langmuir analysis
     exp_params_dict: Dictionary of experiment parameters
     save_plots: Boolean - whether to save the figure
+    select_sweeps: Boolean - whether the user wants to manually select sweeps
 
     Returns
     -------
@@ -157,30 +159,143 @@ def obtain_data(hdf5_path, bias, current, positions, langmuir_config, exp_params
 
     return bias_to_plot,current_to_plot,loc_shot,filepath
 
-def plot_iv_sweep(filepath,bias_to_plot,current_to_plot,port_face_string,IV_plots_choice,save_plots,
-                  how_many_plots,ramp_times,exp_params_dict,loc_shot,dt):
-    # This runs if the user selects to plot logarithmic or raw IV sweeps
-    # Choose sweeps to plot based on the integer how many plots that the user inputs
-    # Set figure siz
-    plt.rcParams['figure.figsize'] = (9, 5)
-    end_ramp_times_to_plot = []
-    run_identifier = f_run_identifier(exp_params_dict['Run name'])
-    print('run identifier: ', run_identifier)
-    for h in range(how_many_plots):
-        end_ramp_times_to_plot.append(ramp_times[(h + 1) * int(len(ramp_times) / (how_many_plots + 1))])
+def plot_bias_vs_time(bias_to_plot, loc_shot, exp_params_dict, dt):
+    '''
 
-    # Plot each of these subsets
+    Parameters
+    ----------
+    bias_to_plot - Quantity List (V) - Full array with bias values associated with a location shot combination.
+    Each indexed list corresponds to a different shot - position combination
+    loc_shot - Three element array where idx 0 is the x-position, idx 1 is the y-position, idx 2 is the shot index
+    exp_params_dict - Dictionary of experiment parameters see experimental for more details
+    dt - Float - Time step for the bias array
+
+    Returns
+    -------
+
+    '''
+    for bias_array in bias_to_plot:
+        bias_array = bias_array.value
+        time_array = np.arange(len(bias_array)) * dt.to(u.ms).value
+
+        plt.plot(time_array, bias_array)
+        # TODO Add axes and titles
+        # TODO Add Save Plots
+        plt.show()
+def plot_current_vs_time(bias_to_plot, current_to_plot, loc_shot, exp_params_dict, dt):
+    '''
+
+    Parameters
+    ----------
+    bias_to_plot - Quantity List (V) - Full array with bias values associated with a location shot combination.
+    Each indexed list corresponds to a different shot - position combination
+    current_to_plot - Quantity Array (A) - Full array with current values associated with a location shot combination
+    Works exactly the same way as bias_to_plot
+    loc_shot - Three element array where idx 0 is the x-position, idx 1 is the y-position, idx 2 is the shot index
+    exp_params_dict - Dictionary of experiment parameters. (See experimental for more details)
+    dt - Float - Time step for the bias array
+
+    Returns
+    -------
+
+    '''
+    for i in range(len(bias_to_plot)):
+        bias_array = bias_to_plot[i].value
+        time_array = np.arange(len(bias_array)) * dt.to(u.ms).value
+        current_array = current_to_plot[i].value
+
+        plt.plot(time_array, current_array)
+        # TODO Add axes and titles
+        # TODO Add save plots
+        plt.show()
+
+
+def plot_iv_sweep(filepath, bias_to_plot, current_to_plot, port_face_string, plot_choices, save_plots,
+                  ramp_times,exp_params_dict,loc_shot,dt):
+    '''
+
+    Parameters
+    ----------
+    filepath - String - Location of hdf5 file on the user's device
+    bias_to_plot - Quantity List (V) - Full array with bias values associated with a location shot combination.
+    Each indexed list corresponds to a different shot - position combination
+    current_to_plot Quantity Array (A) - Full array with current values associated with a location shot combination
+    Works exactly the same way as bias_to_plot
+    port_face_string - String - Indicates the port and the face for the probe that is currently being plotted.
+    plots_choices - List of str - Indicates which plots the user wants to see
+    save_plots - Boolean - Indicates whether to save the plot
+    ramp_times - Quantity array (ms) - Array of times where the IV sweep ends
+    exp_params_dict - Dictionary of experiment parameters. (See experimental for more details)
+    loc_shot - Three element array where idx 0 is the x-position, idx 1 is the y-position, idx 2 is the shot index
+    dt - Float - Time step for the bias array
+
+    Returns
+    -------
+
+    Runs if the user selects that they want to see a logarithmic or a raw IV sweep
+    '''
+
+    # Set figure size
+    plt.rcParams['figure.figsize'] = (9, 5)
+    # Obtains the run number, Date and Ion type to be used in the plot title
+    run_identifier = f_run_identifier(exp_params_dict['Run name'])
+
+    # Allows the user to choose whether they want to automatically choose evenly spaced sweeps or choose individual
+    # sweeps to look at
+    user_choice = ask_yes_or_no('Do you want to choose specific times (y/n)? ')
+    if user_choice:
+        # This loop prompts the user to select the time values of the sweeps they are interested.
+        # It handles improper inputs and repeated values
+        end_times = list(ramp_times[1:].to(u.ms).value)
+
+        times_proper_input = False
+        time_choice = None  # For Py Charm warning handling
+        while not times_proper_input:
+            try:
+                time_choice = choose_multiple_from_list(end_times, 'Select ramp end times',
+                                                        null_action= 'end selection')
+                time_choice = list(set(time_choice))
+                if (time_choice == [] or
+                        any(i >= len(end_times) or i < 0 for i in time_choice)):
+                    print('Invalid input - Ensure all selected letters correspond to a listed time')
+                    time.sleep(1)
+                    continue
+
+                times_proper_input = True
+            except ValueError:
+                print('Invalid input - please input a LETTER associated with an end time in the list.')
+                time.sleep(1)
+        end_ramp_times_to_plot = [end_times[choice] * u.ms for choice in time_choice]
+
+    else:
+        # Allows user to select how many individual IV sweeps they want to look at
+        how_many_plots = 0
+        valid_input = False
+        while not valid_input:
+            try:
+                how_many_plots = int(input("How many IV sweeps would you like to see? "))
+                valid_input = True
+            except ValueError:
+                print("")
+        end_ramp_times_to_plot = []
+        for h in range(how_many_plots):
+            end_ramp_times_to_plot.append(ramp_times[(h + 1) * int(len(ramp_times) / (how_many_plots + 1))])
+
+    # Plot each individual sweep based off of the end times selected in the previous section
     time_array = np.arange(len(bias_to_plot)) * dt.to(u.ms).value
     for i in range(len(end_ramp_times_to_plot)):
-        # Obtain the time slice values for the sweep
-        search_times = ((time_array >= ramp_times[(i + 1) * int(len(ramp_times) / (how_many_plots + 1)) - 1].to(
-            u.ms).value) &
-                        (time_array <= end_ramp_times_to_plot[i].to(u.ms).value))
+        # Create a broad range to search for the sweep
+        end_time = end_ramp_times_to_plot[i].to(u.ms)
+        previous_end_time = ramp_times[np.where(ramp_times.to(u.ms) < end_time)[0][-1]].to(u.ms)
 
-        # Find the indices where the sweep starts and ends
+        search_times = ((time_array >= previous_end_time.value) &
+                            (time_array <= end_time.value))
+
+        # Narrow the time range to more accurately determine where the sweep begins and ends
         first_index, last_index = find_sweep_indices(time_array, end_ramp_times_to_plot[i],
                                                      search_times, bias_to_plot, dt)
-        # Build the time series that will be plotted against the bias
+
+        # Mask bias and current based off of the narrowed time for the sweep
         start_time = (first_index * dt.to(u.ms).value)
         end_time = end_ramp_times_to_plot[i].to(u.ms).value
         mask = ((time_array >= start_time) & (time_array <= end_time))
@@ -191,50 +306,31 @@ def plot_iv_sweep(filepath,bias_to_plot,current_to_plot,port_face_string,IV_plot
         # i_ion_sat = get_ion_isat(sorted_bias, sorted_current)
         # i_ion_sat_min,_ = get_ion_isat_min(sorted_current,sorted_bias)
 
+        # Find the floating potential and the plasma potential
         v_f_bias, v_f_current,v_f_index = get_floating_potential(sorted_bias, sorted_current)
         v_p_bias_pp, v_p_index_pp = pp_get_plasma_potential(sorted_bias, sorted_current, return_arg=True)
 
-        # i_electron_sat,I_esat_index = get_electron_isat_end(sorted_bias, sorted_current,get_V_P=True)
-        # i_electron_sat,I_esat_index = get_electron_isat_v_f(sorted_bias, sorted_current,v_f_index,get_V_P=True)
-        # i_electron_sat_max,i_esat_index_max = get_electron_isat_max(sorted_current,sorted_bias)
-        # i_electron_sat_curve, i_esat_index_curve = get_electron_isat_curve_fit(sorted_bias, sorted_current, v_f_index,
-        #                                                                        v_p_index, return_arg = True)
-        # v_f_bias, v_f_current, v_f_index = get_floating_potential(sorted_bias, sorted_current)
-        if 2 in IV_plots_choice:
-            # if i_ion_sat is not None:
-            #     plt.plot(sorted_bias, [i_ion_sat.to(u.A).value] * len(sorted_bias), 'r',
-            #              label="Ion Isat")
-            #     plt.plot(sorted_bias,[i_ion_sat_min.value]*len(sorted_bias), label="Ion Sat New")
-            #
-            # if i_electron_sat is not None:
-            #     plt.plot(sorted_bias,[i_electron_sat.to(u.A).value] * len(sorted_bias), 'g',
-            #              label="Electron Isat")
-            #     plt.plot(sorted_bias,[i_electron_sat_max.value]*len(sorted_bias), color = 'c', label="Electron Sat New")
-            #     plt.plot(sorted_bias, [i_electron_sat_curve.value]*len(sorted_bias),color = 'm', label="Electron Sat Curve")
-            #
-            #     v_p_bias, v_p_current, _ = get_plasma_potential(sorted_bias, sorted_current, I_esat_index)
-            #     _,v_p_index_new = get_plasma_potential_slope(sorted_bias, sorted_current, v_f_index, i_esat_index_max)
-            #     _,v_p_index_pp = pp_get_plasma_potential(sorted_bias, sorted_current, return_arg=True)
-            #
-            # plt.plot(v_p_bias,v_p_current,marker = 'D',color = 'm', label="Plasma Potential")
+        if 'Plot individual raw IV sweeps for a position-shot combination' in plot_choices:
+            # Plot the plasma potential and the floating potential
             plt.plot(sorted_bias[v_p_index_pp],sorted_current[v_p_index_pp],marker = 'D',color = 'r',
-                     label="Plasma Potential",markersize=12)
-            #     if v_p_index_new is not None:
-            #         plt.plot(sorted_bias[v_p_index_new],sorted_current[v_p_index_new],marker = 'D',color = 'y', label="Plasma Potential New")
-            #
-            plt.plot(v_f_bias,v_f_current,marker ='o',color = 'r', label="Floating Potential",markersize=12)
-            plt.legend(loc='best')
+                     label="Plasma Potential",markersize=10)
+            plt.plot(v_f_bias,v_f_current,marker ='o',color = 'r', label="Floating Potential",markersize=10)
+            plt.legend(loc='upper left')
 
+            # Plot the raw IV sweep
             plt.scatter(sorted_bias, sorted_current,color = 'b')
+
+
             plt.title(f"Langmuir sweep I vs V, Run: {run_identifier}\n"
                       f"Probe port and face: {port_face_string}, "
                       f"x: {loc_shot[0]}, y: {loc_shot[1]}, shot: {loc_shot[2]}\n\n"
                       f"Sweep at [ms]: {dt.to(u.ms).value * first_index}",fontsize = 'x-large')
             plt.xlabel("Voltage [V]",fontsize = 'x-large')
             plt.ylabel("Current [A]",fontsize = 'x-large')
-            # plt.legend()
+            plt.legend()
             plt.tight_layout()
 
+            # Save the plots to a directory labeled by the specific run
             if save_plots:
                 ensure_directory(filepath + "IV_sweep_curves/")
                 ensure_directory(filepath + "IV_sweep_curves/" + f"Port_{port_face_string}/")
@@ -244,65 +340,18 @@ def plot_iv_sweep(filepath,bias_to_plot,current_to_plot,port_face_string,IV_plot
 
             plt.show()
 
-        if 3 in IV_plots_choice:
+        if 'Plot log plot of IV sweeps for a position-shot combination' in plot_choices:
             # Plot the natural log of the current shifted up by the ion saturation current to get rid of the negative
             # values
+
+            # Shift the current up and take the logartihm
             adjusted_current = np.log(sorted_current.to(u.A).value +
                                       abs(min(sorted_current.to(u.A).value))+1e-9)
 
-            # Now
-            # May want to add the addition of *10^-9 or so after the absolute value - but there are significant outliers
-            # Need to fit a line to the straight region of the curve.
-
-            # _,_,v_p_index = get_plasma_potential(sorted_bias, sorted_current, I_esat_index)
-            # _,v_p_index_new = get_plasma_potential_slope(sorted_bias, sorted_current, v_f_index, i_esat_index_max)
-            _, v_p_index_pp = pp_get_plasma_potential(sorted_bias, sorted_current, return_arg=True)
-            _, _, v_f_index = get_floating_potential(sorted_bias, sorted_current)
-            # test_slope, beginning_index, end_index = get_te_speed(sorted_bias,sorted_current,v_f_index,v_p_index, get_indices = True)
-            # if v_p_index_new is not None:
-            #     test_slope_new,beginning_index_new,end_index_new = get_te_speed(sorted_bias,sorted_current,v_f_index,v_p_index_new, get_indices = True)
-            # else:
-            #     test_slope_new = None
-
-            # print('Temperature from function: ', test_slope_new)
-
-            # if test_slope is None:
-            #     test_slope = 0 * 1/ u.V
-            #     test_current = 0
-            #     test_bias = 0 * u.V
-            # else:
-            #     test_slope = 1/(test_slope.to(u.eV).value * u.V)
-            #     test_index = int((v_f_index + v_p_index)/2)
-            #     test_current = adjusted_current[test_index]
-            #     test_bias = sorted_bias[test_index]
-
-            # if test_slope_new is None:
-            #     test_slope_new = 0 * 1 / u.V
-            #     test_current_new = 0
-            #     test_bias_new = 0 * u.V
-            # else:
-            #     test_slope_new = 1/(test_slope_new.to(u.eV).value * u.V)
-            #     test_index_new = int((v_f_index + v_p_index_new)/2)
-            #     test_current_new = adjusted_current[test_index_new]
-            #     test_bias_new = sorted_bias[test_index_new]
-
-            # test_current_array = test_slope * (sorted_bias - test_bias) + test_current
-            # test_current_array_new = test_slope_new * (sorted_bias - test_bias_new) + test_current_new
-            #
-            exponential_section_b, exponential_section_c = pp_extract_exponential_section(sorted_bias, sorted_current)
-            l_T_e = pp_get_electron_temperature(exponential_section_b,exponential_section_c)
-            T_e = l_T_e[0][0]
-            pp_slope = 1/T_e.to(u.eV).value * 1/u.V
+            # Create a test point to plot the fitted curve on
             test_index = int((v_f_index + v_p_index_pp) / 2)
             test_current = adjusted_current[test_index]
             test_bias = sorted_bias[test_index]
-            # pp_v_f = pp_get_floating_potential(sorted_bias, sorted_current)
-            # pp_v_p = pp_get_plasma_potential(sorted_bias, sorted_current)
-            # _filter = (sorted_bias > pp_v_f) & (sorted_bias < pp_v_p)
-            # pp_test_current_array = adjusted_current[_filter]
-            #pp_test_bias_array = sorted_bias[_filter]
-            #
-
 
             # Find index of minimum current value
             min_idx = np.argmin(adjusted_current)
@@ -314,56 +363,24 @@ def plot_iv_sweep(filepath,bias_to_plot,current_to_plot,port_face_string,IV_plot
             bias_no_min = sorted_bias[mask_no_min]
             adjusted_current_no_min = adjusted_current[mask_no_min]
 
-            # if v_p_index_new is not None:
-            #     vp_vf_slope = (adjusted_current[v_p_index_new] - adjusted_current[v_f_index]) / (sorted_bias[v_p_index_new] - sorted_bias[v_f_index])
-            #     vp_vf_array = vp_vf_slope * (sorted_bias - test_bias_new) + test_current_new
-            #     print('Temperature from line: ', 1/vp_vf_slope.value * u.eV)
             if v_p_index_pp is not None:
-                # pp_vp_vf_slope = (adjusted_current[v_p_index_pp] - adjusted_current[v_f_index]) / (sorted_bias[v_p_index_pp] - sorted_bias[v_f_index])
+                # Get the temperature by fitting a line to the section of the curve between the floating and the
+                # plasma potential
                 t_e_vp_vf, y_int,_ = get_te_v_p_vf(sorted_bias, sorted_current, v_f_index, v_p_index_pp, fit_curve=True,
                                   return_intercept=True)
                 slope = 1/t_e_vp_vf.to(u.eV).value
-                # print('slope: ', slope)
-                # test_index_pp = int((v_f_index + v_p_index_pp)/2)
-                # test_current_pp = adjusted_current[test_index_pp]
-                # test_bias_pp = sorted_bias[test_index_pp]
-                # pp_vp_vf_array = pp_vp_vf_slope * (sorted_bias - test_bias_pp) + test_current_pp
-                pp_vp_vf_array = slope * 1/u.V * sorted_bias + y_int
-                pp_current_array = pp_slope * (sorted_bias - test_bias) + test_current
-                # print('pp_vp_vf_array: ', pp_vp_vf_array)
-                # print('pp Temperature from line: ', 1 / pp_vp_vf_slope.value * u.eV)
+                vp_vf_array = slope * 1/u.V * sorted_bias + y_int
 
-            # plt.plot(sorted_bias, pp_current_array, color='r',label='PlasmaPy')
-            # plt.plot(pp_test_bias_array[0], pp_test_current_array[0], color='r',marker='x')
-            # plt.plot(pp_test_bias_array[-1], pp_test_current_array[-1], color='r', marker= 'x')
+                # Plot the fitted line
+                plt.plot(sorted_bias, vp_vf_array, color = 'g', label=r'1/$T_e$')
 
-            # plt.plot(sorted_bias, test_current_array, color='g', label='original adjustment')
-
-           #  plt.plot(sorted_bias,test_current_array_new, color='m', label='new adjustment')
-
-            # if v_p_index_new is not None:
-            #     plt.plot(sorted_bias, vp_vf_array, color='y', label = 'v_f v_p line')
-            #     plt.plot(sorted_bias[v_p_index_new], adjusted_current[v_p_index_new], color='m', marker='x')
-            #     plt.plot(sorted_bias[v_f_index], adjusted_current[v_f_index], color = 'm', marker='x')
-            if v_p_index_pp is not None:
-                plt.plot(sorted_bias, pp_vp_vf_array, color = 'g', label=r'1/$T_e$ - New analysis')
-                plt.plot(sorted_bias, pp_current_array, color = 'r', label=r'1/$T_e$ - Old analysis')
+                # Plot the plasma potential and the floating potential
                 plt.plot(sorted_bias[v_f_index],adjusted_current[v_f_index], color = 'y', label=r'V_f', marker='o',
-                         markersize=12)
+                         markersize=10)
                 plt.plot(sorted_bias[v_p_index_pp],adjusted_current[v_p_index_pp], color = 'y', label=r'V_p', marker='D',
-                         markersize=12)
+                         markersize=10)
 
-
-            # if beginning_index is not None:
-            #      plt.plot(sorted_bias[beginning_index],adjusted_current[beginning_index],color='g',marker='x')
-            #      plt.plot(sorted_bias[end_index],adjusted_current[end_index],color='g',marker='x')
-
-
-
-
-
-
-
+            # Plot the logarithmic data
             plt.scatter(bias_no_min, adjusted_current_no_min)
 
             plt.title(f"Langmuir sweep log(I) vs V, Run: {run_identifier}\n"
@@ -378,6 +395,7 @@ def plot_iv_sweep(filepath,bias_to_plot,current_to_plot,port_face_string,IV_plot
 
             plt.tight_layout()
 
+            # Save the plots in the user's directory of choice if it was selected
             if save_plots:
                 ensure_directory(filepath + "IV_sweep_curves/")
                 ensure_directory(filepath + "IV_sweep_curves/" + f"Port_{port_face_string}/")
@@ -386,20 +404,6 @@ def plot_iv_sweep(filepath,bias_to_plot,current_to_plot,port_face_string,IV_plot
                             f"probe_{port_face_string}_log_plot.png")
 
             plt.show()
-
-        # To test IV sweep start and end time accuracy
-
-        # If we get none of the Ion saturation current show the whole thing
-        # if i_ion_sat is None:
-        #     plt.scatter(time_array[search_times], bias_to_plot[search_times])
-        #     plt.title(f"bias [V] vs time [ms] for the selected run (Testing)")
-        #     plt.xlabel("time[ms]")
-        #     plt.ylabel("Bias [V]")
-        #     plt.tight_layout()
-        #     plt.show()
-
-
-
 
 def plot_ion_isat_vs_time(dt,ramp_times,bias_to_plot,current_to_plot,exp_params_dict,port_face_string,loc_shot,save_plots,
                           filepath):
@@ -446,7 +450,7 @@ def plot_ion_isat_vs_time(dt,ramp_times,bias_to_plot,current_to_plot,exp_params_
         plot_times.append(start_time)
 
         # Get the ion saturation current
-        i_ion_sat.append(get_ion_isat(bias_to_plot[mask], current_to_plot[mask]).to(u.A).value)
+        i_ion_sat.append(get_ion_isat_min(bias_to_plot[mask], current_to_plot[mask]).to(u.A).value)
     # print("plot times: ", plot_times)
     # print("i_ion_sat: ", i_ion_sat)
     plt.rcParams['figure.figsize'] = (8, 3)

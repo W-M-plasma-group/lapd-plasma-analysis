@@ -6,6 +6,10 @@ import math
 from lapd_plasma_analysis.file_access import ask_yes_or_no
 from lapd_plasma_analysis.obtain_plots.Auxillary_functions import filter_data, find_steady_state, filter_ne_data
 from scipy.optimize import curve_fit
+from plasmapy.particles import *
+from astropy import constants as c
+from astropy import units as u
+from astropy.units import Unit
 
 
 def polynomial_function(x, *coeffs):
@@ -867,6 +871,107 @@ def create_gradient_plot(ds, run_identifier, gradient_times_dict):
     return gradient_times_dict, d_probe_gradients
 
 
+def dim_num_params(run_identifier, filename):
+    particle_name = run_identifier.split(' ')[-1]
+    part = Particle(particle_name)
+
+    e_charge = c.e.si
+
+    ion_mass = part.mass
+
+    z_eff = part.charge_number
+
+    split_filename = filename.split('_')
+    b_field = 0 * u.kG
+    for snippet in split_filename:
+        if 'kG' in snippet:
+            b_field = float(snippet.split('kG')[0]) * u.kG
+
+    b_field = b_field.to(u.T)
+
+    return ion_mass.to(u.kg), z_eff, e_charge.to(u.C), b_field
+
+def compute_dimesionless_plots(dataset, ion_mass, z_eff, e_charge, b_field, a, run_identifier):
+    fig1, axes, range_tot = plot_time_series(dataset, 0, run_identifier, return_range=True)
+    plt.show()
+    while True:
+        user_input = input("Guess a center time for the steady state: ")
+        try:
+            int_user_input = int(user_input)
+            break
+
+        except ValueError:
+            print("Please enter an integer.")
+    plt.close('all')
+    ds = dataset
+    probe_dict = {}
+    for probe in range(ds.sizes['probe']):
+        probe_dict[probe] = {}
+        mean_data = ds['t_e'].sel(probe=probe).mean('shot')
+        std_data = ds['t_e'].sel(probe=probe).std('shot')
+
+        t_e_filtered_data = filter_data(mean_data, std_data)
+        where_nans = t_e_filtered_data.isnull()
+        n_e_filtered_data = ds['n_e'].sel(probe=probe).mean('shot').where(~where_nans)
+        nu_ei_filtered_data = ds['nu_ei'].sel(probe=probe).mean('shot').where(~where_nans)
+        zero_index = range_tot.index(0)
+        if len(range_tot) >= 5:
+            search_range = range_tot[(zero_index - 2): (zero_index + 3)]
+        elif len(range_tot) >= 3:
+            search_range = range_tot[(zero_index - 1): (zero_index + 2)]
+        else:
+            search_range = range_tot[zero_index]
+
+        t_e_data_arrays = [t_e_filtered_data.sel(x=x_val, y=0) for x_val in search_range]
+        n_e_data_arrays = [n_e_filtered_data.sel(x=x_val, y=0) for x_val in search_range]
+        min_time, max_time = find_steady_state(t_e_data_arrays, n_e_data_arrays, int_user_input)
+        filtered_ne_mean_profile, filtered_ne_std_profile = filter_ne_data(n_e_filtered_data, min_time, max_time)
+
+        t_e_mask = (t_e_filtered_data['time'] >= min_time) & (t_e_filtered_data['time'] <= max_time)
+        n_e_mask = (n_e_filtered_data['time'] >= min_time) & (n_e_filtered_data['time'] <= max_time)
+        nu_ei_mask = (nu_ei_filtered_data['time'] >= min_time) & (nu_ei_filtered_data['time'] <= max_time)
+
+
+        t_e_to_plot = t_e_filtered_data.sel(sweep=ds['sweep'][t_e_mask]).mean('sweep')
+        t_e_std_to_plot = t_e_filtered_data.sel(sweep=ds['sweep'][t_e_mask]).std('sweep')
+
+        nu_ei_to_plot = nu_ei_filtered_data.sel(sweep=ds['sweep'][nu_ei_mask]).mean('sweep')
+        nu_ei_std_to_plot = nu_ei_filtered_data.sel(sweep=ds['sweep'][nu_ei_mask]).std('sweep')
+
+        # Format everything for matplot.lib plotting
+        # print('t_e: ', t_e_to_plot)
+        # print('nu_ei: ', nu_ei_to_plot)
+        t_x_vals = t_e_filtered_data['x'].values
+        nu_x_vals = nu_ei_filtered_data['x'].values
+        t_e_to_plot_vals = t_e_to_plot.squeeze().values
+        t_e_std_to_plot_vals = t_e_std_to_plot.squeeze().values
+        nu_ei_to_plot_vals = nu_ei_to_plot.squeeze().values
+        nu_ei_std_to_plot_vals = nu_ei_std_to_plot.squeeze().values
+        t_e_units = ds['t_e'].units
+        nu_units = ds['nu_ei'].units
+
+        t_e_w_units = t_e_to_plot_vals * u.Unit(t_e_units)
+        nu_ei_w_units = nu_ei_to_plot_vals * u.Unit(nu_units)
+        if t_e_w_units.unit == Unit('eV'):
+            t_e_joules = t_e_w_units.to(u.J, equivalencies=u.temperature_energy())
+        elif t_e_w_units.unit == Unit('K'):
+            t_e_joules = t_e_w_units.to(u.J, equivalencies=u.temperature_energy())
+        else:
+            t_e_joules = t_e_w_units
+
+
+        rhostar = ((ion_mass * t_e_joules) ** 0.5/(e_charge * b_field * a)).to(u.dimensionless_unscaled)
+        nu_eff = ((z_eff * nu_ei_w_units ** 2 * a ** 2 * ion_mass)/t_e_joules).to(u.dimensionless_unscaled)
+
+        probe_dict[probe]['rhostar'] = rhostar
+        probe_dict[probe]['nu_eff'] = nu_eff
+        probe_dict[probe]['x_vals'] = t_x_vals
+        probe_dict[probe]['run identifier'] = run_identifier
+
+
+    return probe_dict
+
+
 
 
 def f_run_identifier(filename):
@@ -892,9 +997,9 @@ def f_run_identifier(filename):
         run_identifier = "Jan 24 run " + str(addition)
 
         if "H2" in filename:
-            run_identifier = run_identifier + " H2"
+            run_identifier = run_identifier + " H+"
         else:
-            run_identifier = run_identifier + " He"
+            run_identifier = run_identifier + " He+"
 
     else:
         run_identifier = "filename not yet supported"
@@ -905,5 +1010,7 @@ def f_run_identifier(filename):
         run_identifier = 'Adj V_P ' + run_identifier
 
     return run_identifier
+
+
 
 
