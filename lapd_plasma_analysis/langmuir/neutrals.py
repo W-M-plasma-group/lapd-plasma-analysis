@@ -15,8 +15,6 @@ def get_neutral_density(gas_pressure):
     except: #todo removed u.UnitConversionError
         neutral_pressure = value_safe(gas_pressure)*133.322*u.Pa
 
-    print(neutral_pressure)
-
     # Correction factor for electron density measurements from ion gauge
     correction_factor = 0.18  # from MATLAB
 

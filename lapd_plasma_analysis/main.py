@@ -18,12 +18,14 @@ from lapd_plasma_analysis.mach.analysis import get_mach_datasets, get_velocity_d
 import os
 import xarray as xr
 
+from tqdm import tqdm
 
 # HDF5 file directory; end path with a slash                            # TODO user adjust
 # ----------------------------------------------------------------------------------------
-hdf5_folder = "/home/michael/Documents/school/Plasma/LAPD Plasma Analysis/HDF5 Files/March_2022_HDF5 and NetCDF/"
-hdf5_folder = "/home/michael/Documents/school/Plasma/LAPD Plasma Analysis/HDF5 Files/January_2024_HDF5 and NetCDF/"
-# hdf5_folder = "/home/michael/Documents/school/Plasma/LAPD Plasma Analysis/HDF5 Files/November_2022_HDF5 and NetCDF/"
+march_folder = "/home/michael/Documents/school/Plasma/LAPD Plasma Analysis/HDF5 Files/March_2022_HDF5 and NetCDF/"
+november_folder = "/home/michael/Documents/school/Plasma/LAPD Plasma Analysis/HDF5 Files/November_2022_HDF5 and NetCDF/"
+january_folder = "/home/michael/Documents/school/Plasma/LAPD Plasma Analysis/HDF5 Files/January_2024_HDF5 and NetCDF/"
+hdf5_folder = january_folder
 # hdf5_folder = "/home/michael/Documents/school/Plasma/LAPD Plasma Analysis/HDF5 Files/March_2022_HDF5 and NetCDF/"
 
 # hdf5_folder = "/Users/leomurphy/lapd-data/November_2022/"
@@ -51,7 +53,7 @@ interferometry_folder = ("/Users/leomurphy/lapd-data/November_2022/uwave_288_GHz
 
 # Interferometry & Mach access modes. Options are "skip", "append", "overwrite"; recommended is "append".
 interferometry_mode = "skip"                                            # TODO user adjust
-mach_velocity_mode = "skip"                                           # not fully implemented
+mach_velocity_mode = "append"                                           # not fully implemented
 
 # ----------------------------------------------------------------------------------------
 
@@ -112,8 +114,12 @@ if __name__ == "__main__":
     # TODO do both non-bimaxwellian and bimaxwellian analysis and store in same NetCDF file?
 
     print("\n===== Flux probe analysis =====")
-    print("Only data from March 2022 is currently supported.")
     files_in_flux_nc = os.listdir(flux_nc_folder)
+
+    combined_files = (os.listdir(march_folder + "flux_nc/") + os.listdir(november_folder + "flux_nc/") +
+                      os.listdir(january_folder + "flux_nc/"))
+
+    files_in_flux_nc = combined_files
     print("Choose one of the following NetCDF files to analyze,\n"
           "or press Enter to retrieve data from HDF5 files")
     choice_indices = choose_multiple_from_list(files_in_flux_nc, "Flux NetCDF file", null_action="retrieve data "
@@ -121,7 +127,12 @@ if __name__ == "__main__":
     if choice_indices != []:
         datasets = []
         for index in choice_indices:
-            datasets.append(xr.open_dataset(flux_nc_folder + files_in_flux_nc[index]))
+            for folder in [march_folder, november_folder, january_folder]:
+                try:
+                    flux_nc_folder = folder + "flux_nc/"
+                    datasets.append(xr.open_dataset(flux_nc_folder + files_in_flux_nc[index]))
+                except:
+                    pass
         ask_about_plots(datasets, plot_save_folder=plot_save_folder)
     if choice_indices == []:
         print("Choose one of the following HDF5 files to extract data from.\n"
@@ -129,13 +140,9 @@ if __name__ == "__main__":
         files_in_hdf5_folder = os.listdir(hdf5_folder)
         choice_indices = choose_multiple_from_list(files_in_hdf5_folder, "HDF5 file", null_action="not retrieve data from "
                                                                                     "HDF5 files.")
-
         if choice_indices != []:
-            assert len(choice_indices) == 1, "Only one HDF5 file is currently supported."
-            print(" !! Important !! (to be fixed later)")
-            print("You will be asked to selected another file shortly-- make sure you select the same one.")
-            print(" !! Important !!")
-            get_isat_vf(hdf5_folder + files_in_hdf5_folder[choice_indices[0]], hdf5_folder, flux_nc_folder)
+            for index in tqdm(choice_indices, desc="Processing data from fluctuation probes..."):
+                get_isat_vf(hdf5_folder + files_in_hdf5_folder[index], hdf5_folder, flux_nc_folder)
 
     print("\n===== Langmuir probe analysis =====")
     print_user_file_choices(hdf5_folder, langmuir_nc_folder, interferometry_folder, interferometry_mode, isweep_choices)
