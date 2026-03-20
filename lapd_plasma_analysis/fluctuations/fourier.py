@@ -9,7 +9,7 @@ from lapd_plasma_analysis.langmuir.configurations import get_config_id, get_lang
 import matplotlib.pyplot as plt
 from matplotlib import ticker
 from scipy.fft import fft, fftfreq, ifft
-from lapd_plasma_analysis.langmuir.analysis import get_langmuir_datasets
+from lapd_plasma_analysis.langmuir.analysis import get_langmuir_datasets, print_user_file_choices
 from lapd_plasma_analysis.experimental import get_exp_params
 from lapd_plasma_analysis.langmuir.configurations import get_ion
 import xarray as xr
@@ -51,7 +51,7 @@ def get_time():
     """
     return datetime.now().strftime("%Y%m%d_%H%M%S")
 
-def get_fft(time_series, scaling="spectrum", dt=1, bin=None, plot=False):
+def get_fft(time_series, scaling="spectrum", dt=1, bin=None, plot=False, returnError=False):
     """
     Performs a 1D, one-sided FFT of given time series data.
 
@@ -100,9 +100,14 @@ def get_fft(time_series, scaling="spectrum", dt=1, bin=None, plot=False):
             #len_fts = []
             for b in range(bin[0], bin[1]):
                 ft, freq= get_fft(time_series, dt=dt, bin=b, plot=False, scaling=scaling)
-                fts.append(ft)
+                if not np.isnan(ft).all():
+                    fts.append(ft)
                 #len_fts.append(len(ft))
+            if len(fts) <= 1:
+                raise ValueError("Bad spectrum")
             ft=np.mean(fts, axis=0)
+
+            ft_err = np.std(fts, axis=0)
 
             if plot:
                 fig = plt.figure()
@@ -110,6 +115,8 @@ def get_fft(time_series, scaling="spectrum", dt=1, bin=None, plot=False):
                 plt.yscale('log')
                 plt.xscale('log')
                 fig.show()
+            if returnError:
+                return ft, freq, ft_err
             return ft, freq
 
     if isinstance(time_series, xr.DataArray) or isinstance(time_series, xr.Dataset):
@@ -117,6 +124,10 @@ def get_fft(time_series, scaling="spectrum", dt=1, bin=None, plot=False):
         dt = (times[1]-times[0])/1000 #converts to seconds
         time_series = time_series.values
 
+    if np.isnan(time_series).any():
+        print(time_series)
+        print("All nan: ", np.isnan(time_series).all())
+        raise ValueError("Bad time series")
     ft = fft(time_series)
     freq = fftfreq(len(time_series), dt)
     ft_index = int(len(ft) / 2)
@@ -143,13 +154,13 @@ def get_fft(time_series, scaling="spectrum", dt=1, bin=None, plot=False):
         spec = 2*spec
         spec[0], spec[-1] = dc, nyquist
 
-    # print("other dt: ", dt)
-    # print("length of time: ", len(time_series)*dt)
-    # freq, spec = welch(time_series, 1/dt, scaling=scaling, nperseg=len(time_series)//32, detrend="linear")
-    # var = np.var(time_series)
-    # total_power = np.trapezoid(spec, freq)
-    # print("variance: ", np.var(time_series))
-    # print(var, total_power, total_power / var)
+        # print("---validation---")
+        # mom2 = np.mean(time_series**2)
+        # int_psd = np.sum(spec)*(freq[1]-freq[0])
+        # print("2nd moment", mom2)
+        # print("integrated psd", int_psd)
+        # print("2nd moment/int psd (should be 1)", mom2/int_psd)
+        # print("----------------")
 
     if plot:
         fig = plt.figure()
@@ -315,7 +326,7 @@ def get_cross_spectrogram(data1, data2, bin, plot=False, axis=None):
             fig.show()
     return cross_spectra, x_positions, freq
 
-def get_fft_from_data(data, time=None, shot=None, x=None, bin=None, plot=False, axis=None, plot_save_folder=None):
+def get_fft_from_data(data, time=None, shot=None, x=None, bin=None, scaling="amplitude", plot=False, axis=None, plot_save_folder=None):
     """
         Performs a 1D, one-sided FFT of given time series data, given just the `xarray.DataArray` from the
         NetCDF file.
@@ -358,7 +369,7 @@ def get_fft_from_data(data, time=None, shot=None, x=None, bin=None, plot=False, 
     """
     time_series, params_desc, std = get_time_series(data, time=time, shot=shot, x=x)
     dt = (data.coords['time'].values[1] - data.coords['time'].values[0]) / 1000
-    ft, freq, dt = get_fft(time_series, dt=dt, bin=bin)
+    ft, freq, ft_err = get_fft(time_series, dt=dt, scaling=scaling, bin=bin, returnError=True)
 
     if plot:
         if axis is None:
@@ -377,7 +388,17 @@ def get_fft_from_data(data, time=None, shot=None, x=None, bin=None, plot=False, 
         if axis is None:
             fig.show()
 
-def get_spectrum_from_data(data, time=None, shot=None, x=None, bin=None, plot=False, plot_power_law=None,
+    return ft, freq, ft_err
+
+def lowpass(ft, freq, cutoff_freq=250000):
+    """Takes in two arrays of numbers, ft and freq, and returns the same
+    arrays but with all values after a certain freq value removed."""
+    filter_array = freq > cutoff_freq
+    cutoff_index = np.where(filter_array)[0][0]
+    return ft[:cutoff_index], freq[:cutoff_index]
+
+
+def get_spectrum_from_data(data, time=None, shot=None, x=None, bin=None, z=None, plot=False, plot_power_law=None,
                       scaling="power spectrum", power_law_freq=None, axis=None, plot_save_folder=None):
     """
         Performs a 1D, one-sided PS of given time series data, given just the `xarray.DataArray` from the
@@ -441,7 +462,7 @@ def get_spectrum_from_data(data, time=None, shot=None, x=None, bin=None, plot=Fa
     """
     dt = (data.coords['time'].values[1] - data.coords['time'].values[0])/1000 #todo hardcoded to change to seconds
 
-    tseries, params_desc, _ = get_time_series(data, time=time, shot=shot, x=x)
+    tseries, params_desc, _ = get_time_series(data, time=time, shot=shot, x=x, z=z)
     err = None
 
     if x is not None and not isinstance(x, tuple):
@@ -506,19 +527,25 @@ def get_spectrum_from_data(data, time=None, shot=None, x=None, bin=None, plot=Fa
 
     return spec, freq, err
 
-def get_radial_spectrogram(data, x=None, shot=None, bin=None, scaling="amplitude", plot=False, axis=None,
+def get_radial_spectrogram(data, x=None, shot=None, bin=None, z=None, scaling="amplitude", plot=False, axis=None,
                            plot_save_folder=None):
     spectra = []
+    valid_x = []
     assert isinstance(x, tuple) or x is None, "x should be a tuple"
     if x is None:
         x1, x2 = data.coords['x'].values.min(), data.coords['x'].values.max()
         x = (int(x1+0.3), int(x2+0.1))
     x_positions = np.array(range(x[0], x[1]+1))
     for x_pos in x_positions:
-        spectrum, freq, err = get_spectrum_from_data(data, x=x_pos, shot=shot, bin=bin, scaling=scaling)
-        spectrum = spectrum[1:]
-        freq = freq[1:]
-        spectra.append(spectrum)
+        try:
+            spectrum, freq, err = get_spectrum_from_data(data, x=x_pos, shot=shot, bin=bin, scaling=scaling)
+            spectrum, freq = lowpass(spectrum, freq)
+            spectrum = spectrum[1:]
+            freq = freq[1:]
+            spectra.append(spectrum)
+            valid_x.append(x_pos)
+        except ValueError:
+            print(f"Probably bad time series at x={x_pos}")
 
     if plot:
         if axis is None:
@@ -526,29 +553,80 @@ def get_radial_spectrogram(data, x=None, shot=None, bin=None, scaling="amplitude
             ax = fig.add_subplot(111)
         else:
             ax = axis
-        im = ax.imshow(
-            np.transpose(spectra),
-            aspect='auto',
-            origin='lower',
-            extent=(
-                x_positions.min(), x_positions.max(),
-                freq.min(), freq.max()
-            ),
+        # im = ax.imshow(
+        #     np.transpose(spectra),
+        #     aspect='auto',
+        #     origin='lower',
+        #     extent=(
+        #         x_positions.min(), x_positions.max(),
+        #         freq.min(), freq.max()
+        #     ),
+        #     cmap=cmap,
+        #     norm=LogNorm()
+        # )
+        # fig.colorbar(im, ax=ax, label='amplitude spectrum ('+data.attrs['units']+')')
+        X, Y = np.meshgrid(valid_x, freq)
+        vmin = np.min(spectra)
+        vmax = np.max(spectra)
+        levels = np.logspace(np.log10(vmin), np.log10(vmax), 100)
+        cs = ax.contourf(
+            X, Y, np.transpose(spectra),
+            levels=levels,
             cmap=cmap,
-            norm=LogNorm()
+            norm=LogNorm(vmin=vmin, vmax=vmax)
         )
-        fig.colorbar(im, ax=ax, label='amplitude spectrum ('+data.attrs['units']+')')
+        # ax.colorbar(cs, ax=ax, label='amplitude spectrum ('+data.attrs['units']+')')
         ax.set_yscale('log')
         ax.set_ylabel('frequency (Hz)')
         ax.set_xlabel('x position (cm)')
-        ax.set_title('radial '+scaling+' spectrogram (' + data.name +')')
+        ax.set_title('radial '+scaling+' spectrogram (' + data.name +f') (z={z})')
+
+        # to superimpose vertical lines for cutoff radii
+        # r1, r2, r3, r4, r5 = -25, 17, 22, 28, 31
+        # ax.plot([r1, r1], [min(freq), max(freq)], color='black')
+        # ax.plot([r2, r2], [min(freq), max(freq)], color='black')
+        # ax.plot([r3, r3], [min(freq), max(freq)], color='black')
+        # ax.plot([r4, r4], [min(freq), max(freq)], color='black')
+        # ax.plot([r5, r5], [min(freq), max(freq)], color='black')
+
         if axis is None:
             fig.show()
             if plot_save_folder is not None:
                 fig.savefig(plot_save_folder+data.name+'_'+scaling+'_spectrogram_'+get_time()+'.png', dpi=150)
     return spectra, x_positions, freq
 
-def get_profile(data, time=None, shot=None, x=None, plot=False, axis=None, plot_save_folder=None):
+
+def timesplitter(time, correction=0):
+    t1, t2 = time
+    t1 += -1.0*correction
+    t2 += -1.0*correction
+    assert t2 > t1
+    if t2 - t1 < 0.02:
+        assert t1 - int(t1) > 0.02 and t2 - int(t2) > 0.02
+    new_times = []
+    if t1 - int(t1) > 0.02:
+        if int(t1) != int(t2):
+            new_times.append((t1 + correction, int(t1) + 1 - 0.02 + correction))
+
+    for bin in range(int(t1) + 1, int(t2)):
+        new_times.append((bin + 0.02 + correction, bin + 1 - 0.02 + correction))
+
+    if t2 - int(t2) > 0.02:
+        if int(t1) == int(t2):
+            new_times.append((max(t1, int(t1) + 0.02) + correction, t2 + correction))
+        else:
+            new_times.append((int(t2) + 0.02 + correction, t2 + correction))
+
+    weights = []
+    for bin in new_times:
+        weights.append(bin[1] - bin[0])
+
+    weights = np.array(weights)
+    weights = weights / np.sum(weights)
+
+    return new_times, weights
+
+def get_profile(data, time=None, shot=None, x=None, z=None, plot=False, axis=None, plot_save_folder=None):
     """
         Given the data from an `xarray.DataArray` object (from the NetCDF file), obtains and plots
         the radial profile of the data.
@@ -595,19 +673,63 @@ def get_profile(data, time=None, shot=None, x=None, plot=False, axis=None, plot_
     #if time and shot are none, average over both
     #if time or shot are some number, then it will be a specific time or shot
     #if time or shot are tuples, then it will averaged over the range specified by the tuple
+
+    # print(data.mean(dim=["time", "shot"]).values)
+    params_desc = f'at z={z}'
     if axis is not None and not plot: plot = True
     if time is None:
         profile = data.mean(dim = ['time'])
-        params_desc = 'averaged over all time'
+        time_var_avg = data.std(dim = ['time'])
+        params_desc = params_desc + ' averaged over all time'
     elif isinstance(time, tuple):
-        profile = data.sel(time=slice(time[0], time[1])).mean(dim=['time'])
-        params_desc = 'averaged over times: '+str(time)+'ms'
+        new_times, weights = timesplitter(time)
+
+        profiles_mean = []
+        profiles_std = []
+        weights_used = []
+
+        for (t1, t2), w in zip(new_times, weights):
+
+            sel = data.sel(time=slice(t1, t2))
+
+            p_mean = sel.mean(dim="time", skipna=True)
+            p_std = sel.std(dim="time", ddof=1)  # <-- this is the time std you want
+
+            if np.all(np.isnan(p_mean)):
+                continue
+
+            profiles_mean.append(p_mean)
+            profiles_std.append(p_std)
+
+            # weight bins by # of valid time samples
+            n_valid = sel.count(dim="time")
+            if n_valid.size > 0:
+                weights_used.append(float(n_valid.max().item()))
+            else:
+                weights_used.append(0.0)
+
+        weights_used = np.array(weights_used, dtype=float)
+        weights_used /= weights_used.sum()
+        weights_da = xr.DataArray(weights_used, dims=["bin"])
+
+        mean_stack = xr.concat(profiles_mean, dim="bin")
+        std_stack = xr.concat(profiles_std, dim="bin")
+
+        profile = (mean_stack * weights_da).sum(dim="bin")
+        mean_diff_sq = (mean_stack - profile) ** 2
+        time_var = (weights_da * (std_stack ** 2 + mean_diff_sq)).sum(dim="bin")
+
+        time_std = np.sqrt(time_var)
+
+        time_var_avg = (time_std ** 2).mean(dim="shot")
+
+        params_desc += f' averaged over times: {time} ms'
     else:
         profile = data.sel(time=time, method='nearest')
-        params_desc = 'at time: '+str(time)+'ms'
+        params_desc = params_desc + ' at time: '+str(time)+'ms'
     if shot is None:
         #calculates error bar
-        std = profile.std(dim = ['shot'], ddof=1)
+        std = np.sqrt(profile.std(dim = ['shot'], ddof=1)**2 + time_var_avg)
         profile = profile.mean(dim = ['shot'])
         params_desc = params_desc+'\naveraged over all shot'
     elif isinstance(shot, tuple):
@@ -628,6 +750,7 @@ def get_profile(data, time=None, shot=None, x=None, plot=False, axis=None, plot_
         profile = profile.sel(x=slice(x[0], x[1]))
 
     if plot:
+        print("PLOTTING PROFILE")
         if axis is None:
             fig = plt.figure()
             ax = fig.add_subplot(111)
@@ -636,6 +759,9 @@ def get_profile(data, time=None, shot=None, x=None, plot=False, axis=None, plot_
         ax.set_xlabel('x position (cm)')
         ax.set_ylabel(data.name+" ("+data.attrs['units']+")")
         ax.set_title('radial '+data.name+' profile\n'+params_desc)
+        print(x_array)
+        print(profile)
+        print(std)
         ax.errorbar(x_array, profile, yerr=std, color='black', linestyle='', marker='o', capsize=0, markersize=3)
         if axis is None:
             fig.show()
@@ -643,9 +769,13 @@ def get_profile(data, time=None, shot=None, x=None, plot=False, axis=None, plot_
                 fig.savefig(plot_save_folder+data.name+'_profile'+get_time()+'.png', dpi=150)
                 sleep(1)
 
+    # print("PROFILE")
+    # print(profile)
+    # print(std)
+    # print(params_desc)
     return profile, std, params_desc
 
-def get_time_series(data, time=None, shot=None, x=None, plot=False, axis=None, plot_save_folder=None):
+def get_time_series(data, time=None, shot=None, x=None, z=None, plot=False, axis=None, plot_save_folder=None):
     """
         Given the data from an `xarray.DataArray` object (from the NetCDF file), obtains and plots
         the data versus time.
@@ -689,15 +819,19 @@ def get_time_series(data, time=None, shot=None, x=None, plot=False, axis=None, p
             (over what values were averaged in each coordinate).
 
     """
+    params_desc = f"at z={z}, "
+    # if "z" in data.coords:
+    #     print(data.coords)
+    #     data = data.sel(z=z, method="nearest")
     if x is None:
         time_series = data.mean(dim = ['x'])
-        params_desc = 'averaged over all x'
+        params_desc = params_desc + 'averaged over all x'
     elif isinstance(x, tuple):
         time_series = data.sel(x=slice(x[0], x[1])).mean(dim=['x'])
-        params_desc = 'averaged over x: '+str(x)+'cm'
+        params_desc = params_desc + 'averaged over x: '+str(x)+'cm'
     else:
         time_series = data.sel(x=x, method='nearest')
-        params_desc = 'at x: '+str(x)+'cm'
+        params_desc = params_desc + 'at x: '+str(x)+'cm'
     if shot is None:
         std = time_series.std(dim = ['shot'], ddof=1)
         time_series = time_series.mean(dim = ['shot'])
@@ -737,7 +871,7 @@ def get_time_series(data, time=None, shot=None, x=None, plot=False, axis=None, p
 
     return time_series, params_desc, std
 
-def get_contour(data, time=None, shot=None, x=None, plot=True, axis=None, plot_save_folder=None):
+def get_contour(data, time=None, shot=None, x=None, z=None, plot=True, axis=None, plot_save_folder=None):
     """
         Given the data from an `xarray.DataArray` object (from the NetCDF file), obtains and plots
         how the profile changes over time on a 2D color plot.
@@ -772,17 +906,17 @@ def get_contour(data, time=None, shot=None, x=None, plot=True, axis=None, plot_s
             directory where the plot will be saved. The path should end with a `/`.
 
     """
-
+    params_desc = f"at z={z}, "
     data_unit = data.attrs['units']
     if shot is None:
         data = data.mean(dim = ['shot'])
-        params_desc = 'averaged over all shot'
+        params_desc = params_desc + 'averaged over all shot'
     elif isinstance(shot, tuple):
         data = data.sel(shot=slice(shot[0], shot[1])).mean(dim=['shot'])
-        params_desc = 'averaged over shot: '+str(shot)
+        params_desc = params_desc + 'averaged over shot: '+str(shot)
     else:
         data = data.sel(shot=shot, method='nearest')
-        params_desc = 'at shot: '+str(shot)
+        params_desc = params_desc + 'at shot: '+str(shot)
 
     if time is None:
         time_array = data.coords['time']
@@ -826,12 +960,7 @@ def get_avg_flux_amplitude(data, time=None, shot=None, x=None, bin=None, freq_sl
     return 2*np.sqrt(np.sum(psd)*df)
 
 def linear_fit_profile(data, x=(-30, -20), time=None, shot=None, plot=False, axis=None):
-    if data.name == 'density' and data.units == '$m^{-3}$':
-        print('adjusted units in fit profile')
-        data = 1e-6 * data
-        data.attrs['units'] = '$cm^{-3}$'
-    assert data.units == '$cm^{-3}$' or data.name != 'density'
-    profile,  std, params_desc = get_profile(data, time=time, shot=shot, plot=True)
+    profile,  std, params_desc = get_profile(data, time=time, shot=shot, plot=False)
     yerr = std.sel(x=slice(x[0], x[1]))
     ydata = profile.sel(x=slice(x[0], x[1]))
     x_array = ydata.coords['x'].values
@@ -844,11 +973,19 @@ def linear_fit_profile(data, x=(-30, -20), time=None, shot=None, plot=False, axi
     y_scale = np.mean(np.abs(y))
     x_scaled = x_array / x_scale
     y_scaled = y / y_scale
-    yerr_scaled = yerr / y_scale
+    y_err_scaled = y_err / y_scale
     slope_guess = 0.5 * np.mean((y_scaled[1:] - y_scaled[:-1]) / (x_scaled[1] - x_scaled[0]))
 
+    # print("y", y)
+    # print("yscale", y_scale)
+    # print("y_scaled", y_scaled)
+
     fit_params, covariance_matrix = curve_fit(linear_model, x_scaled, y_scaled, p0=[slope_guess, 0.0],
-                                              sigma=yerr_scaled, absolute_sigma=True)
+                                              sigma=y_err_scaled, absolute_sigma=True)
+
+    if np.isnan(covariance_matrix).any() or np.isinf(covariance_matrix).any():
+        return np.nan, np.nan, np.nan, np.nan, np.nan
+
     slope, intercept = fit_params
     cov_slope_intercept = covariance_matrix[1, 0]
     slope_err, intercept_err = np.sqrt(np.diag(covariance_matrix))
@@ -858,7 +995,8 @@ def linear_fit_profile(data, x=(-30, -20), time=None, shot=None, plot=False, axi
     slope_err *= y_scale/x_scale
     intercept_err *= y_scale
     cov_slope_intercept *= y_scale*y_scale/x_scale
-    print(cov_slope_intercept)
+    # print(covariance_matrix)
+    # print(cov_slope_intercept)
     # cov_slope_intercept = 0
 
     if plot:
@@ -869,32 +1007,33 @@ def linear_fit_profile(data, x=(-30, -20), time=None, shot=None, plot=False, axi
             ax = axis
         y_fit = linear_model(x_array, slope, intercept)
         ax.set_xlabel('x position (cm)')
-        ax.set_ylabel(data.name + " (" + data.attrs['units'] + ")")
+        try:
+            ax.set_ylabel(data.name + " (" + data.attrs['units'] + ")")
+        except KeyError:
+            ax.set_ylabel(data.name + " (unit fail) ")
         ax.set_title('radial ' + data.name + ' profile\n' + params_desc)
         ax.errorbar(profile.coords['x'].values, profile.values, yerr=std.values, color='black', linestyle='',
-                     marker='o', capsize=1, markersize=2 )
-        ax.plot(x_array, y_fit, color='fuchsia', linestyle = 'dotted', label='linear fit')
+                     marker='o', capsize=1, markersize=2, alpha=0.5)
+        ax.plot(x_array, y_fit, color='fuchsia', label='linear fit')
         ax.legend()
         if axis is None:
             fig.show()
 
     return slope, intercept, slope_err, intercept_err, cov_slope_intercept
 
-def get_data_over_grad_data(data, x=(-27, -19), time=None, shot=None, plot=False, axis=None):
-    if data.name == 'density' and data.units == '$m^{-3}$':
-        print('adjusted units in get_dogd')
-        data = 1e-6*data
-        data.attrs['units'] = '$cm^{-3}$'
+def get_data_over_grad_n(data, x=(-27, -19), time=None, shot=None, plot=False, axis=None):
     assert data.units == '$cm^{-3}$' or data.name != 'density'
     profile, profile_err, params_desc = get_profile(data, time=time, shot=shot, x=x, plot=False)
     grad, _, grad_err, ___, cov = linear_fit_profile(data, x=x, time=time, shot=shot, plot=False)
     d_grad_d = profile/grad
     d_grad_d_err = np.sqrt( (profile_err/grad)**2 + (profile*grad_err/(grad**2))**2
-                            -2*profile*cov/(grad**3))
+                            -2*profile*cov/(grad**3)*0) # don't know how to handle error yet
 
-    print((profile_err/grad)**2)
-    print((profile*grad_err/(grad**2))**2)
-    print(-2*profile*cov/(grad**3))
+    # print("d_grad_d_err", d_grad_d_err)
+
+    # print((profile_err/grad)**2)
+    # print((profile*grad_err/(grad**2))**2)
+    # print(-2*profile*cov/(grad**3))
 
     if plot:
         if axis is None:
@@ -912,21 +1051,61 @@ def get_data_over_grad_data(data, x=(-27, -19), time=None, shot=None, plot=False
 
     return d_grad_d, d_grad_d_err
 
-def plot_total_flux_vs_Ln(data, x=(-27, -19), time=None, shot=None, bin=(7,14), plot=False, axis=None):
-    if data.name == 'density' and data.units == '$m^{-3}$':
-        print('adjusted units in plot')
-        data = 1e6*data
-        data.attrs['units'] = '$cm^{-3}$'
-    assert data.units == '$cm^{-3}$' or data.name != 'density'
-    d_grad_d, d_grad_d_err = get_data_over_grad_data(data, x=x, time=time, shot=shot, plot=False)
-    profile, _, __ = get_profile(data, time=time, shot=shot, x=x, plot=False)
+
+def plot_total_flux_vs_Ln(data, quantity, x=(-28, -19), Ln_range=(-28, -23), time=None, shot=None, bin=(7,14), plot=False, axis=None):
+    """
+    flux here is short for fluctuations! not magnetic flux
+
+    Parameters
+    ----------
+    data
+    quantity
+    x
+    time
+    shot
+    bin
+    plot
+    axis
+
+    Returns
+    -------
+
+    """
+    assert data["density"].units == '$cm^{-3}$'
+    data_density = data["density"]
+    data = data[quantity]
+    slope, intercept, slope_err, intercept_err, cov_slope_intercept =\
+        linear_fit_profile(data_density, x=x, time=time, shot=shot, plot=False)
+    profile, _, __ = get_profile(data, time=time, shot=shot, x=Ln_range, plot=False)
+
+    Ln = intercept/slope + 0.5*(Ln_range[1] + Ln_range[0])
+    Ln_err = np.sqrt((intercept_err/slope)**2 + (intercept*slope_err/(slope**2))**2 - 2*cov_slope_intercept/(slope)**2)
+    # check this is right
+    # average_quantity = profile.mean(dim=["x"], skipna=True).to_numpy()
+    # print("av quant", average_quantity)
     total_flux_list = []
-    for x_value in d_grad_d.coords['x'].values:
-        psd, freq = get_ps_from_data(data, time=time, shot=shot, x=x_value, plot=False, bin=bin)
-        dfreq = freq[1]-freq[0]
-        total_flux = np.sum(psd)*dfreq
-        total_flux_list.append(total_flux)
-    normalized_total_flux = np.array(total_flux_list)/profile
+    total_flux_err_list = []
+    good_x = []
+    for x_value in profile.coords['x'].values:
+        try:
+            psd, freq, psd_err = get_fft_from_data(data, time=time, shot=shot, x=x_value, plot=False, bin=bin, scaling="psd")
+            psd, freq = lowpass(psd, freq)
+            dfreq = freq[2]-freq[1]
+            total_flux = np.sqrt(np.sum(psd[1:])*dfreq)
+            total_flux_err = 0.5*np.sum(psd_err[1:])*dfreq/total_flux
+            total_flux_list.append(total_flux)
+            total_flux_err_list.append(total_flux_err)
+            good_x.append(x_value)
+        except ValueError:
+            pass
+
+    middle_range_density = intercept + 0.5*slope*(np.max(good_x) + np.min(good_x))
+    if quantity == "density":
+        normalized_total_flux = np.array(total_flux_list)/middle_range_density
+        normalized_total_flux_err = np.array(total_flux_err_list)/middle_range_density
+    else:
+        normalized_total_flux = np.array(total_flux_list)/np.mean(profile.to_numpy())
+        normalized_total_flux_err = np.array(total_flux_err_list)/np.mean(profile.to_numpy())
 
     if plot:
         if axis is None:
@@ -935,7 +1114,7 @@ def plot_total_flux_vs_Ln(data, x=(-27, -19), time=None, shot=None, bin=(7,14), 
         else:
             ax = axis
 
-        ax.errorbar(d_grad_d, normalized_total_flux, xerr=d_grad_d_err, markersize=3, linestyle='', capsize=1,
+        ax.errorbar(abs(Ln), normalized_total_flux, yerr=normalized_total_flux_err, xerr=Ln_err, markersize=3, linestyle='', capsize=1,
                     marker = 'o', color='black')
         #todo hardcoded plot axes
         ax.set_xlabel(r'$L_n = \frac{n_e}{\nabla n_e}$ ($cm$)')
@@ -945,7 +1124,162 @@ def plot_total_flux_vs_Ln(data, x=(-27, -19), time=None, shot=None, bin=(7,14), 
         if axis is None:
             fig.show()
 
-    return np.mean(d_grad_d), np.mean(normalized_total_flux)
+    # print(Ln, normalized_total_flux)
+    print("IN plot total_Flux_vs_ln")
+    print(abs(Ln), abs(np.mean(normalized_total_flux)), Ln_err, abs(np.mean(normalized_total_flux_err)))
+    return abs(Ln), abs(np.mean(normalized_total_flux)), Ln_err, abs(np.mean(normalized_total_flux_err))
+
+
+def get_langmuir_profiles(data, name, z, x=None, time=None, shot=None, plot=False, axis=None):
+    """
+    Plot a Langmuir probe profile as a function of x, averaging over time and shot,
+    with error bars from the standard deviation.
+
+    Parameters
+    ----------
+    data : xr.Dataset
+        The xarray dataset containing the data.
+    name : str
+        The name of the variable to plot (e.g. "T_e").
+    z : float
+        The z position to select (nearest available).
+    x : None, tuple (a, b), or None
+        The x range to plot. None = all x.
+    time : None, tuple (a, b), or float
+        Time range or specific time. None = average over all time.
+    shot : None, tuple (a, b), or int
+        Shot range or specific shot. None = average over all shots.
+    """
+
+    da = data[name].sel(z=z, method="nearest")
+
+    if x is not None:
+        if isinstance(x, tuple):
+            x_min = da.x.sel(x=x[0], method="nearest").item()
+            x_max = da.x.sel(x=x[1], method="nearest").item()
+            if x_min == x_max:
+                da = da.sel(x=x_min)
+            else:
+                da = da.sel(x=slice(x_min, x_max))
+        else:
+            raise ValueError("x must be None or a tuple (a, b)")
+
+    if time is not None:
+        if isinstance(time, tuple):
+            t_min = da.time.sel(time=time[0], method="nearest").item()
+            t_max = da.time.sel(time=time[1], method="nearest").item()
+            if t_min == t_max:
+                da = da.sel(time=t_min)
+            else:
+                da = da.sel(time=slice(t_min, t_max))
+        else:
+            t_sel = da.time.sel(time=time, method="nearest").item()
+            da = da.sel(time=t_sel)
+    else:
+        pass
+
+    if shot is not None:
+        if isinstance(shot, tuple):
+            s_min = da.shot.sel(shot=shot[0], method="nearest").item()
+            s_max = da.shot.sel(shot=shot[1], method="nearest").item()
+            if s_min == s_max:
+                da = da.sel(shot=s_min)
+            else:
+                da = da.sel(shot=slice(s_min, s_max))
+        else:
+            s_sel = da.shot.sel(shot=shot, method="nearest").item()
+            da = da.sel(shot=s_sel)
+    else:
+        pass
+
+    avg_dims = []
+    if "time" in da.dims and (time is None or isinstance(time, tuple)):
+        avg_dims.append("time")
+    if "shot" in da.dims and (shot is None or isinstance(shot, tuple)):
+        avg_dims.append("shot")
+
+    mean_da = da.mean(dim=avg_dims)
+    std_da = da.std(dim=avg_dims)
+
+    if plot:
+        if axis is not None:
+            ax = axis
+        else:
+            fig=plt.figure(figsize=(6, 4))
+            ax = fig.add_subplot()
+        if "x" in mean_da.dims:
+            ax.errorbar(mean_da.x, mean_da, yerr=std_da, fmt="o-", capsize=3, label=f"z={z:.2f}")
+            ax.set_xlabel("x")
+        else:
+            ax.errorbar([0], [mean_da.item()], yerr=[std_da.item()], fmt="o")
+            ax.set_xlabel("(no x dimension)")
+
+        ax.set_ylabel(name)
+        ax.set_title(f"{name} profile at z={z:.2f}")
+        ax.legend()
+        if axis is None:
+            fig.tight_layout()
+            fig.show()
+
+    return mean_da, std_da
+
+def get_linear_fit_langmuir(data, name, z, x=None, time=None, shot=None, plot=False, axis=None):
+    mean, std = get_langmuir_profiles(data, name, z, x=x, time=time, shot=shot, plot=False)
+    full_mean, full_std = get_langmuir_profiles(data, name, z, x=None, time=time, shot=shot, plot=False)
+    x_array = mean.coords['x'].values
+
+    y = mean.values
+    y_err = std.values
+    linear_model = lambda x, slope, intercept: slope * x + intercept
+
+    x_scale = np.mean(np.abs(x_array))
+    y_scale = np.mean(np.abs(y))
+    x_scaled = x_array / x_scale
+    y_scaled = y / y_scale
+    y_err_scaled = y_err / y_scale
+    slope_guess = 0.5 * np.mean((y_scaled[1:] - y_scaled[:-1]) / (x_scaled[1] - x_scaled[0]))
+
+    # print("y", y)
+    # print("yscale", y_scale)
+    # print("y_scaled", y_scaled)
+
+    fit_params, covariance_matrix = curve_fit(linear_model, x_scaled, y_scaled, p0=[slope_guess, 0.0],
+                                              sigma=y_err_scaled, absolute_sigma=True)
+
+    if np.isnan(covariance_matrix).any() or np.isinf(covariance_matrix).any():
+        return np.nan, np.nan, np.nan, np.nan, np.nan
+
+    slope, intercept = fit_params
+    cov_slope_intercept = covariance_matrix[1, 0]
+    slope_err, intercept_err = np.sqrt(np.diag(covariance_matrix))
+
+    slope *= y_scale / x_scale
+    intercept *= y_scale
+    slope_err *= y_scale / x_scale
+    intercept_err *= y_scale
+    cov_slope_intercept *= y_scale * y_scale / x_scale
+
+    if plot:
+        if axis is None:
+            fig = plt.figure()
+            ax = fig.add_subplot(111)
+        else:
+            ax = axis
+        y_fit = linear_model(x_array, slope, intercept)
+        ax.set_xlabel('x position (cm)')
+        ax.set_ylabel(f"{name} (unspecified units)")
+        ax.set_title('radial ' + name + ' profile\n' + "unspecified params_desc")
+        ax.errorbar(full_mean.coords['x'].values, full_mean.values, yerr=full_std.values, color='black', linestyle='',
+                     marker='o', capsize=1, markersize=2, alpha=0.5)
+        ax.plot(x_array, y_fit, color='fuchsia', label='linear fit')
+        ax.legend()
+        if axis is None:
+            fig.show()
+
+    return slope, intercept, slope_err, intercept_err, cov_slope_intercept
+
+
+
 
 if __name__ == "__main__":
     x = np.linspace(0, 8*np.pi, 10000)
