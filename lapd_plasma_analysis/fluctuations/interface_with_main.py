@@ -5,7 +5,7 @@ import ast
 
 
 
-def ask_about_plots(data_list, plot_save_folder=None):
+def ask_about_plots(data_list, plot_save_folder=None, langmuir_folder=None, filenames = None):
     """
     Lets the user interface with the fluctuation data when `main.py` is run.
     Asks the user to ask which data they would like visualized and over which coordinates.
@@ -19,6 +19,7 @@ def ask_about_plots(data_list, plot_save_folder=None):
     quantities = ['density', 'isat', 'vf', 'dvf']
     choice_indices = choose_multiple_from_list(quantities, "Quantities to plot")
 
+    # Checked and good for main_luke so long as you input a time to average over
     if ask_yes_or_no("Plot profiles (y/n)?"):
         x = get_plotting_params("x")
         time = get_plotting_params("time")
@@ -29,6 +30,7 @@ def ask_about_plots(data_list, plot_save_folder=None):
                     get_profile(data[quantities[i]].sel(z=z), x=x, time=time, shot=shot, z=z,
                                 plot=True, plot_save_folder=plot_save_folder)
 
+    # Checked and good for main_luke so long as you input a time to average over
     if ask_yes_or_no("Plot time series (y/n)?"):
         x = get_plotting_params("x")
         time = get_plotting_params("time")
@@ -114,6 +116,7 @@ def ask_about_plots(data_list, plot_save_folder=None):
                             #ax.plot(ln2, psd2, marker='o')
                             ax.errorbar(ln2, psd2, psd2_err, ln2_err, marker='>', markerfacecolor=cmap(norm(z)),
                                         markeredgecolor="black", ecolor="black", capsize=1.5, elinewidth=0.5, capthick=0.5)
+
             norm = plt.Normalize(vmin=vmin, vmax=vmax)
             sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
             cbar = plt.colorbar(sm, ax=ax)
@@ -223,10 +226,13 @@ def ask_about_plots(data_list, plot_save_folder=None):
         bin = get_plotting_params("bin")
         shot = get_plotting_params("shot")
         for i in choice_indices:
+            j = 0
             for data in data_list:
                 for z in data.coords["z"].values:
                     get_radial_spectrogram(data[quantities[i]].sel(z=z), x=x, bin=bin, shot=shot, z=z, plot=True,
-                                       plot_save_folder=plot_save_folder)
+                                       plot_save_folder=plot_save_folder,
+                                           filename = filenames[j])
+                j += 1
 
 def get_plotting_params(parameter_as_string):
     """

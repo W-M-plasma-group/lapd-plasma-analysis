@@ -1,14 +1,22 @@
 import numpy as np
+import os
 import astropy.units as u
 from bapsflib import lapd
 from warnings import warn
+from collections import Counter
+import matplotlib as mpl
+import matplotlib.patches as mpatches
+from scipy.integrate import trapezoid
 
+from matplotlib.ticker import LogLocator, NullLocator, LogFormatterMathtext
 from numpy.random import normal
+from soupsieve import closest
 
 from lapd_plasma_analysis.langmuir.configurations import get_config_id, get_langmuir_config
 import matplotlib.pyplot as plt
 from matplotlib import ticker
 from scipy.fft import fft, fftfreq, ifft
+from lapd_plasma_analysis.obtain_plots.xarray_plots import build_subplots
 from lapd_plasma_analysis.langmuir.analysis import get_langmuir_datasets, print_user_file_choices
 from lapd_plasma_analysis.experimental import get_exp_params
 from lapd_plasma_analysis.langmuir.configurations import get_ion
@@ -99,6 +107,10 @@ def get_fft(time_series, scaling="spectrum", dt=1, bin=None, plot=False, returnE
             fts = []
             #len_fts = []
             for b in range(bin[0], bin[1]):
+                current_window = time_series.sel(time=slice(b + 0.02, b + 1 - 0.02))
+                # if np.isnan(current_window.values).any():
+                    # print(f"!!! Found NaN values in Bin: {b}")
+                    # print(f"Affected coordinates: {current_window.coords}")
                 ft, freq= get_fft(time_series, dt=dt, bin=b, plot=False, scaling=scaling)
                 if not np.isnan(ft).all():
                     fts.append(ft)
@@ -125,8 +137,8 @@ def get_fft(time_series, scaling="spectrum", dt=1, bin=None, plot=False, returnE
         time_series = time_series.values
 
     if np.isnan(time_series).any():
-        print(time_series)
-        print("All nan: ", np.isnan(time_series).all())
+        # print(time_series)
+        # print("All nan: ", np.isnan(time_series).all())
         raise ValueError("Bad time series")
     ft = fft(time_series)
     freq = fftfreq(len(time_series), dt)
@@ -399,7 +411,8 @@ def lowpass(ft, freq, cutoff_freq=250000):
 
 
 def get_spectrum_from_data(data, time=None, shot=None, x=None, bin=None, z=None, plot=False, plot_power_law=None,
-                      scaling="power spectrum", power_law_freq=None, axis=None, plot_save_folder=None):
+                      scaling="power spectrum", power_law_freq=None, axis = None, plot_save_folder=None, dataset_color = None,
+                           make_presentable = False, run_identifier = None, q_shortname = None, integrate_psd = False):
     """
         Performs a 1D, one-sided PS of given time series data, given just the `xarray.DataArray` from the
         NetCDF file.
@@ -460,41 +473,91 @@ def get_spectrum_from_data(data, time=None, shot=None, x=None, bin=None, z=None,
             domain
 
     """
+
+    if dataset_color is None:
+        line_clor = 'black'
+        error_edge_clor = 'olivedrab'
+        error_face_clor = 'olive'
+    else:
+        line_clor = dataset_color
+        error_edge_clor = dataset_color
+        error_face_clor = dataset_color
+
+    # print('plot function call', plot)
     dt = (data.coords['time'].values[1] - data.coords['time'].values[0])/1000 #todo hardcoded to change to seconds
 
-    tseries, params_desc, _ = get_time_series(data, time=time, shot=shot, x=x, z=z)
+    tseries, params_desc, _ = get_time_series(data, time=time, shot=shot, x=x, z=z, plot=False)
     err = None
 
     if x is not None and not isinstance(x, tuple):
         if shot is not None and not isinstance(shot, tuple):
+            # print('shot is not none')
             spec, freq = get_fft(tseries, dt=dt, bin=bin, scaling=scaling)
         if shot is None:
             shot = (0, 7) #todo potentially hardcoded- must be changed if the number of shots at each position is not 8
         if isinstance(shot, tuple):
+            # print('shot tuple')
             spectra = []
             for s in range(shot[0], shot[1]):
                 tseries, _, _ = get_time_series(data, time=time, shot=s, x=x)
                 spec, freq = get_fft(tseries, dt=dt, bin=bin, scaling=scaling)
                 spectra.append(spec)
-            spec = np.mean(spectra, axis=0)
+            spec = np.nanmean(spectra, axis=0)
             err = np.std(spectra, axis=0)
 
     if isinstance(x, tuple):
+        # print('x tuple')
         spectra = []
         errors = []
         for xval in tqdm(range(x[0], x[1]+1), desc="Averaging..."):
             spec, freq, err = get_spectrum_from_data(data, time=time, shot=shot, x=xval, bin=bin, scaling=scaling)
             spectra.append(spec)
             errors.append(err)
-        spec = np.mean(spectra, axis=0)
-        err = np.sqrt(np.mean(errors, axis=0)**2 + np.var(spectra, axis=0))
+        spec = np.nanmean(spectra, axis=0)
+        err = np.sqrt(np.nanmean(errors, axis=0)**2 + np.nanvar(spectra, axis=0))
+
+    delta = None
+    delta_err = None
+    if integrate_psd:
+        f_max = 250000.0
+        mask = (freq > 0.0) & (freq <= f_max)
+
+        freq_band = freq[mask]
+        spec_band = spec[mask]
+
+        # 1. Calculate the integrated variance (delta^2)
+        delta_2 = trapezoid(spec_band, x=freq_band)
+
+        # 2. Calculate the square root (delta)
+        delta = np.sqrt(delta_2)
+
+        if err is not None:
+            err_band = err[mask]
+            # Calculate the error (sigma_{delta^2}) using quadrature
+            dx = np.diff(freq_band)
+            weights = np.zeros_like(freq_band)
+            weights[0] = 0.5 * dx[0]
+            weights[-1] = 0.5 * dx[-1]
+            if len(freq_band) > 2:
+                weights[1:-1] = 0.5 * (dx[:-1] + dx[1:])
+
+            delta_2_err = np.sqrt(np.sum((weights * err_band) ** 2))
+
+            # Propagate the error for the square root (sigma_{delta} = sigma_{delta^2} / 2*delta)
+            delta_err = delta_2_err / (2 * delta)
+
+        else:
+            delta_err = None
 
     if plot_power_law is not None:
+        # print('power law')
         assert power_law_freq is not None, 'give a frequency in the range the power law should apply'
         print('fi', np.where(abs(freq-power_law_freq)<100)[0][0])
         spec_start = spec[np.where(abs(freq-power_law_freq)<100)[0][0]]
         line = spec_start * (freq/power_law_freq)**(plot_power_law)
 
+    # print('plot where freq issue: ', plot)
+    # print('freq: ', freq)
     if plot:
         if axis is None:
             fig = plt.figure()
@@ -504,19 +567,28 @@ def get_spectrum_from_data(data, time=None, shot=None, x=None, bin=None, z=None,
         if err is not None:
             # ax.plot(freq, spec+err/2, linestyle='dashed', color='black')
             # ax.plot(freq, spec-err/2, linestyle='dashed', color='black')
-            ax.fill_between(freq, spec+err, spec-err, edgecolor='olivedrab', facecolor='olive', alpha=0.6)
-        ax.plot(freq, spec, color='black')
-        ax.set_xlabel('frequency (Hz)')
-        ylabel1 = scaling+' ('+data.attrs['units']
+            ax.fill_between(freq, spec+err, spec-err, edgecolor=error_edge_clor, facecolor=error_face_clor, alpha=0.6)
+        ax.plot(freq, spec, color=line_clor, label = run_identifier)
+        ax.set_xlabel('Frequency [Hz]')
+        ylabel1 = scaling.upper() +' ['+data.attrs['units']
         if scaling != "amplitude":
-            ylabel2 = '^2)'
+            ylabel2 = f'[({data.attrs.get("units")})^2/Hz]'
         else:
             ylabel2 = ')'
-        ax.set_ylabel(ylabel1+ylabel2)
+
+        print('ylabel2 ', ylabel2)
         if plot_power_law is not None:
             ax.plot(freq, line, 'darkgreen', label=str(plot_power_law)+' power scaling')
             ax.legend()
-        ax.set_title(data.name+' '+ scaling + '\n time series '+params_desc+'\n bin: '+str(bin))
+        if not make_presentable:
+            ax.set_title(data.name+' '+ scaling + '\n time series '+params_desc+'\n bin: '+str(bin))
+            ax.set_ylabel(ylabel1 + ylabel2)
+        else:
+            if q_shortname is not None:
+                ax.set_ylabel(fr'$(\delta{q_shortname})^2$ ${ylabel2}$')
+            else:
+                ax.set_ylabel(fr'$(\text{{PSD}})\ \mathregular{{{ylabel2}}}$')
+
         ax.set_xscale('log')
         ax.set_yscale('log')
         if axis is None:
@@ -525,10 +597,13 @@ def get_spectrum_from_data(data, time=None, shot=None, x=None, bin=None, z=None,
                 fig.savefig(plot_save_folder+data.name+'_'+scaling+'_'+get_time()+'.png', dpi=150)
                 sleep(1)
 
+    if integrate_psd:
+        return spec, freq, err, delta, delta_err
     return spec, freq, err
 
 def get_radial_spectrogram(data, x=None, shot=None, bin=None, z=None, scaling="amplitude", plot=False, axis=None,
-                           plot_save_folder=None):
+                           plot_save_folder=None, filename=None, return_x=False, gradient_regions = None,
+                           make_presentable = False, cax = None, gradient_region_colors=None, q_shortname=None,):
     spectra = []
     valid_x = []
     assert isinstance(x, tuple) or x is None, "x should be a tuple"
@@ -547,12 +622,14 @@ def get_radial_spectrogram(data, x=None, shot=None, bin=None, z=None, scaling="a
         except ValueError:
             print(f"Probably bad time series at x={x_pos}")
 
+    xs_to_plot = []
     if plot:
         if axis is None:
             fig = plt.figure()
             ax = fig.add_subplot(111)
         else:
             ax = axis
+
         # im = ax.imshow(
         #     np.transpose(spectra),
         #     aspect='auto',
@@ -568,6 +645,12 @@ def get_radial_spectrogram(data, x=None, shot=None, bin=None, z=None, scaling="a
         X, Y = np.meshgrid(valid_x, freq)
         vmin = np.min(spectra)
         vmax = np.max(spectra)
+        spectra_arr = np.array(spectra)
+
+        if vmin <= 0:
+            # Now the boolean mask [spectra_arr > 0] will work perfectly
+            vmin = np.min(spectra_arr[spectra_arr > 0])
+
         levels = np.logspace(np.log10(vmin), np.log10(vmax), 100)
         cs = ax.contourf(
             X, Y, np.transpose(spectra),
@@ -575,11 +658,78 @@ def get_radial_spectrogram(data, x=None, shot=None, bin=None, z=None, scaling="a
             cmap=cmap,
             norm=LogNorm(vmin=vmin, vmax=vmax)
         )
-        # ax.colorbar(cs, ax=ax, label='amplitude spectrum ('+data.attrs['units']+')')
+
+        if q_shortname is not None:
+            colorb = ax.figure.colorbar(cs, cax = cax, ax=ax if cax is None else None,
+                                        label=fr"{q_shortname} Spectrum [{data.attrs.get('units', 'A.U.')}]")
+        else:
+            colorb = ax.figure.colorbar(cs, cax=cax, ax=ax if cax is None else None,
+                                        label=fr"Amplitude Spectrum [{data.attrs.get('units', 'A.U.')}]")
+        colorb.ax.yaxis.set_major_locator(LogLocator(subs = (1.0, 2.0, 5.0)))
+        colorb.ax.yaxis.set_major_formatter(LogFormatterMathtext())
+        colorb.ax.yaxis.set_minor_locator(NullLocator())
+
+
+        if gradient_regions is not None:
+            temp_color = gradient_region_colors['c_temp']
+            density_color = gradient_region_colors['c_dens']
+            dt_opp_color = gradient_region_colors['c_opp']
+            dt_same_color = gradient_region_colors['c_same']
+            box_linewidth = 2
+
+            temp_grads = gradient_regions['temp_grads']
+            density_grads = gradient_regions['density_grads']
+            dt_opposite = gradient_regions['dt_opposite']
+            dt_same = gradient_regions['dt_same']
+            legend_handles = []
+            temp_grads_handle = mpatches.Patch(facecolor='none', edgecolor=temp_color, linewidth=box_linewidth,
+                                               label=r'$\nabla{T} \neq 0, \nabla{n} \approx 0$')
+            density_grads_handle =  mpatches.Patch(facecolor='none', edgecolor=density_color, linewidth=box_linewidth,
+                                                   label=r'$\nabla{T} \approx 0, \nabla{n} \neq 0$')
+            dt_opposite_handle = mpatches.Patch(facecolor='none', edgecolor=dt_opp_color, linewidth=box_linewidth,
+                                                label=r'$\nabla{T}/\nabla{n} < 0$')
+            dt_same_handle = mpatches.Patch(facecolor='none', edgecolor=dt_same_color, linewidth=box_linewidth,
+                                            label=r'$\nabla{T}/\nabla{n} > 0$')
+            for pair_list in temp_grads:
+                if pair_list == temp_grads[0]:
+                    legend_handles.append(temp_grads_handle)
+                ax.axvspan(pair_list[0], pair_list[1], facecolor='none', edgecolor = temp_color,
+                           linewidth=box_linewidth, zorder = 10)
+            for pair_list in density_grads:
+                if pair_list == density_grads[0]:
+                    legend_handles.append(density_grads_handle)
+                ax.axvspan(pair_list[0], pair_list[1], facecolor='none', edgecolor=density_color,
+                           linewidth=box_linewidth, zorder=10)
+            for pair_list in dt_opposite:
+                if pair_list == dt_opposite[0]:
+                    legend_handles.append(dt_opposite_handle)
+                ax.axvspan(pair_list[0], pair_list[1], facecolor='none', edgecolor=dt_opp_color,
+                           linewidth=box_linewidth, zorder=10)
+            for pair_list in dt_same:
+                if pair_list == dt_same[0]:
+                    legend_handles.append(dt_same_handle)
+                ax.axvspan(pair_list[0], pair_list[1], facecolor='none', edgecolor=dt_same_color,
+                           linewidth=box_linewidth, zorder=10)
+
+            if not make_presentable:
+                leg = ax.legend(handles = legend_handles, loc = 'upper left', framealpha = 0.8)
+                leg.set_zorder(20)
+
+
+
         ax.set_yscale('log')
-        ax.set_ylabel('frequency (Hz)')
-        ax.set_xlabel('x position (cm)')
-        ax.set_title('radial '+scaling+' spectrogram (' + data.name +f') (z={z})')
+        ax.set_ylabel('Frequency [Hz]')
+        ax.set_xlabel('x [cm]')
+
+        if not make_presentable:
+            filename = filename.split('.nc')[0]
+            exp_name = filename.split('_')[0]
+            run_num = filename.split('_')[1]
+            ion_type = filename.split('_')[-1]
+
+            ax.set_title(f'{exp_name}, Run: {run_num}, Ion: {ion_type} \n'
+                         + 'radial '+scaling+' spectrogram (' + data.name +f') (z={z}) \n'
+                         + f'Between times {bin} ms')
 
         # to superimpose vertical lines for cutoff radii
         # r1, r2, r3, r4, r5 = -25, 17, 22, 28, 31
@@ -590,10 +740,15 @@ def get_radial_spectrogram(data, x=None, shot=None, bin=None, z=None, scaling="a
         # ax.plot([r5, r5], [min(freq), max(freq)], color='black')
 
         if axis is None:
+            fig.tight_layout()
             fig.show()
             if plot_save_folder is not None:
                 fig.savefig(plot_save_folder+data.name+'_'+scaling+'_spectrogram_'+get_time()+'.png', dpi=150)
-    return spectra, x_positions, freq
+
+    if not return_x:
+        return spectra, x_positions, freq
+    else:
+        return spectra, x_positions, freq, xs_to_plot
 
 
 def timesplitter(time, correction=0):
@@ -775,26 +930,27 @@ def get_profile(data, time=None, shot=None, x=None, z=None, plot=False, axis=Non
     # print(params_desc)
     return profile, std, params_desc
 
-def get_time_series(data, time=None, shot=None, x=None, z=None, plot=False, axis=None, plot_save_folder=None):
+def get_time_series(data, time=None, shot=None, x=None, z=None, plot=False, axis=None, plot_save_folder=None,
+                    main_luke = False, lang_ds = None):
     """
         Given the data from an `xarray.DataArray` object (from the NetCDF file), obtains and plots
         the data versus time.
 
         Parameters
         ----------
-        data : `xarray.DataArray`
+        data: `xarray.DataArray`
             Time series data array.
 
-        time : `tuple` or `None`
+        time: `tuple` or `None`
             The range of time values over which to plot the data. `None` will adjust the domain to be as long as
             possible, but a smaller range may be specified with a tuple.
 
-        shot : `int` or `tuple` or `None`
+        shot: `int` or `tuple` or `None`
             Determines which shots to use in averaging. If `None`, all 8 are used. If an integer `n`, then
             the `n-1`th shot is used. If a tuple, uses all shots in between the bounds specified by the tuple.
             ex. `(1, 4)` will use shots 2, 3, 4, 5. (Indexing starts at 0).
 
-        x : `tuple` or `float` or `None`
+        x: `tuple` or `float` or `None`
             Determines the span of the position data over which to average. Give a tuple to
             provide a range, or a float to obtain the profile at a given location. The `None` option will
             automatically average over the entire range of x values.
@@ -802,13 +958,20 @@ def get_time_series(data, time=None, shot=None, x=None, z=None, plot=False, axis
         plot: `bool`
             If true, it will plot the time series as it is obtained.
 
-        axis : `matplotlib.axes.Axes` or `None`
+        axis: `matplotlib.axes.Axes` or `None`
             If `None`, this function will create its own figure. Supply axis if the output will be a smaller part of
             an existing figure.
 
         plot_save_folder: `str` or `None`
             If `None`, the plot will not be saved. The `string`, if provided, should be the file path to the
             directory where the plot will be saved. The path should end with a `/`.
+
+        main_luke: `bool`
+            Lets the function know if it is interacting with the new main that Luke built or the old main that
+            Leo/ Michael worked with
+
+        lang_ds: `xarray.DataArray` or `None`
+            Langmuir dataset used to show the current steady state region on the updated dataset.
 
         Returns
         -------
@@ -819,54 +982,67 @@ def get_time_series(data, time=None, shot=None, x=None, z=None, plot=False, axis
             (over what values were averaged in each coordinate).
 
     """
+
     params_desc = f"at z={z}, "
-    # if "z" in data.coords:
-    #     print(data.coords)
-    #     data = data.sel(z=z, method="nearest")
+
     if x is None:
-        time_series = data.mean(dim = ['x'])
+        # We keep skipna=True here so spatial averaging doesn't completely fail
+        # if only one probe position is missing data.
+        time_series = data.mean(dim=['x'], skipna=True)
         params_desc = params_desc + 'averaged over all x'
     elif isinstance(x, tuple):
-        time_series = data.sel(x=slice(x[0], x[1])).mean(dim=['x'])
-        params_desc = params_desc + 'averaged over x: '+str(x)+'cm'
+        time_series = data.sel(x=slice(x[0], x[1])).mean(dim=['x'], skipna=True)
+        params_desc = params_desc + 'averaged over x: ' + str(x) + 'cm'
     else:
         time_series = data.sel(x=x, method='nearest')
-        params_desc = params_desc + 'at x: '+str(x)+'cm'
+        params_desc = params_desc + 'at x: ' + str(x) + 'cm'
+
     if shot is None:
-        std = time_series.std(dim = ['shot'], ddof=1)
-        time_series = time_series.mean(dim = ['shot'])
-        params_desc = params_desc+', averaged over all shot'
+        std = time_series.std(dim=['shot'], ddof=1, skipna=True)
+        time_series = time_series.mean(dim=['shot'], skipna=True)
+        params_desc = params_desc + ', averaged over all shot'
     elif isinstance(shot, tuple):
-        std = time_series.sel(shot=slice(shot[0], shot[1])).std(dim=['shot'], ddof=1)
-        time_series = time_series.sel(shot=slice(shot[0], shot[1])).mean(dim=['shot'])
-        params_desc = params_desc + ', averaged over shot: '+str(shot)
+        std = time_series.sel(shot=slice(shot[0], shot[1])).std(dim=['shot'], ddof=1, skipna=True)
+        time_series = time_series.sel(shot=slice(shot[0], shot[1])).mean(dim=['shot'], skipna=True)
+        params_desc = params_desc + ', averaged over shot: ' + str(shot)
     else:
         std = None
         time_series = time_series.sel(shot=shot, method='nearest')
-        params_desc = params_desc + ' at shot: '+str(shot)
+        params_desc = params_desc + ' at shot: ' + str(shot)
 
-    if time is None:
-        time_array = data.coords['time']
-    else:
-        time_array = data.coords['time'].sel(time=slice(time[0], time[1]))
-        std = std.sel(time=slice(time[0], time[1]))
+    # Slice by time if requested
+    if time is not None:
         time_series = time_series.sel(time=slice(time[0], time[1]))
+        if std is not None:
+            std = std.sel(time=slice(time[0], time[1]))
+
+    # --- RAW DATA ---
+    # No interpolation, no dropping, no filling.
+    # The array length remains perfectly uniform, but contains NaNs where data is missing.
+    time_array = time_series.coords['time']
+    # ----------------
 
     if plot:
         if axis is None:
-            fig = plt.figure()
-            ax = fig.add_subplot(111)
+            layout = [[1]]
+            fig, axes, letters = build_subplots(layout)
+            ax = axes[letters[0]]
         else:
             ax = axis
         ax.set_xlabel('time (ms)')
-        ax.set_ylabel(data.name+" ("+data.attrs['units']+")")
-        ax.set_title(data.name+' time series\n'+params_desc)
-        ax.errorbar(time_array, time_series, yerr=std, color='fuchsia', linestyle='', capsize=1, alpha = 0.5)
+        ax.set_ylabel(data.name + " (" + data.attrs['units'] + ")")
+        ax.set_title(data.name + ' time series\n' + params_desc)
+        ax.errorbar(time_array, time_series, yerr=std, color='fuchsia', linestyle='', capsize=1, alpha=0.5)
+
+        # Note: If your original plot had linestyle='', you just see missing dots.
+        # If you want to see obvious breaks in a line, you can change linestyle='' to linestyle='-'
         ax.plot(time_array, time_series, color='black', linestyle='', marker='o', markersize=1)
+
         if axis is None:
             fig.show()
             if plot_save_folder is not None:
-                fig.savefig(plot_save_folder+data.name+'_time-series'+get_time()+'.png', dpi=150)
+                # Ensure get_time() is defined elsewhere in your module
+                fig.savefig(plot_save_folder + data.name + '_time-series.png', dpi=150)
                 sleep(1)
 
     return time_series, params_desc, std
@@ -1277,6 +1453,20 @@ def get_linear_fit_langmuir(data, name, z, x=None, time=None, shot=None, plot=Fa
             fig.show()
 
     return slope, intercept, slope_err, intercept_err, cov_slope_intercept
+
+def get_quantity_short_name(quantity):
+    if 'density' in quantity:
+        short_name = r'$n_e$'
+    elif 'isat' in quantity:
+        short_name = r'$I_{\text{sat}}$'
+    elif 'vf' in quantity:
+        short_name = r'$v_{f}$'
+    elif 'dvf' in quantity:
+        short_name = r'$dv_{f}$'
+    else:
+        short_name = None
+    return short_name
+
 
 
 

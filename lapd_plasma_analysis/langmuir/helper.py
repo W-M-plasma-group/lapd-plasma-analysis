@@ -60,7 +60,10 @@ def get_diagnostic_keys_units(probe_area=1.*u.mm**2, ion_type="He-4+", bimaxwell
                        "P_ei_cal": str(u.Pa),
                        "nu_ei": str(u.Hz),
                        "v_para": str(u.m / u.s),
-                       "v_perp": str(u.m / u.s)})
+                       "v_perp": str(u.m / u.s),
+                       "ion_isat": str(u.A),
+                       "electron_isat": str(u.A)})
+
     return keys_units
 
 
@@ -164,6 +167,7 @@ def core_steady_state(da_input, core_rad=None, steady_state_times=None, operatio
     """
 
     da = da_input.copy()
+
     if core_rad is not None:
         da = da.where(np.logical_and(np.abs(da.coords['x']) < core_rad.to(u.cm).value,
                                      np.abs(da.coords['y']) < core_rad.to(u.cm).value), drop=True)
@@ -218,15 +222,20 @@ def crunch_data(source_data, source_coord_name, destination_coord_da):
     # [density]   |__o__|__o__|__o__|__o__|__o__|   <-- measurements grouped by closest density measurement "o"
     # Take the mean of all interferometry measurements in the same "bucket" to match timescales
 
-    step = (destination_coord_da[-1] - destination_coord_da[0]) / len(destination_coord_da)
-    # Group input data "source_da" along the dimension specified by "source_coord_name"
-    #    by the coordinate in the xarray "destination_coord_da", assumed to have regular spacing "step", and take means
-    grouped_mean = source_data.groupby_bins(source_coord_name,
-                                            np.linspace(destination_coord_da[0] - step / 2,
-                                                        destination_coord_da[-1] + step / 2,
-                                                        len(destination_coord_da) + 1
-                                                        ), labels=destination_coord_da.data
-                                            ).mean()
+    destination_dimension = destination_coord_da.dims[0]  # The name of the dimension of the 1D destination coordinate
+    destination_coordinate_name = destination_coord_da.name  # The name of the destination coordinate
+
+    # --- DASK-FRIENDLY UPDATE ---
+    # We replace the groupby_bins with linear interpolation. This achieves the timescale
+    # matching conceptually described above, but keeps the task lazy to prevent memory crashes.
+    if source_coord_name != destination_coordinate_name:
+        source_data = source_data.rename({source_coord_name: destination_coordinate_name})
+
+    named_mean = source_data.interp(
+        {destination_coordinate_name: destination_coord_da},
+        method="linear",
+        kwargs={"fill_value": "extrapolate"}
+    )
 
     # This result has only one dimension, the input data "dimension" + "_bins", labeled with the destination coordinate.
     #    We want to return a DataArray with all the dimensions and coordinates (in this case: time dimension,
@@ -234,16 +243,8 @@ def crunch_data(source_data, source_coord_name, destination_coord_da):
     #    This involves renaming the "_bins" dimension to match the destination coordinate,
     #    creating a new coordinate identical to the destination coordinate's dimension coordinate,
     #    and swapping the two new coordinates to give the xarray the same dimension coordinate as the destination.
-
-    destination_dimension = destination_coord_da.dims[0]  # The name of the dimension of the 1D destination coordinate
-    destination_coordinate_name = destination_coord_da.name  # The name of the destination coordinate
-
-    # Rename position-time-"_bins" dimension name to match destination coordinate, for example "x_time_bins" to "time"
-    named_mean = grouped_mean.rename({source_coord_name + "_bins": destination_coordinate_name})
-    # Add the destination dimension coordinate to the output xarray as a new coordinate
-    named_mean = named_mean.assign_coords({destination_dimension: (destination_coordinate_name,
-                                                                   destination_coord_da[destination_dimension].data)})
-    # Make the new destination dimension coordinate the main (dimension) coordinate of the output as well
-    named_mean = named_mean.swap_dims({destination_coordinate_name: destination_dimension})
+    #
+    # (Note: xarray's .interp() handles the above dimension renaming and swapping
+    # natively, so the manual assignment code below is no longer needed to achieve this!)
 
     return named_mean

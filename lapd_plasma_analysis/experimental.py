@@ -83,8 +83,13 @@ def get_exp_params(hdf5_path):
                               get_nominal_gas_puff_3]
     # Units are given in MATLAB code
     exp_params_names_values = {}
+
+    # Open the file using BAPSFlib lapd File class
     with lapd.File(hdf5_path) as hdf5_file:
+
+        # .info gives a series of metadata about the file - Example metadata saved with Luke
         exp_name = hdf5_file.info['exp name']
+        # Obtain the date of the experiment from the experiment name
         config_id = get_config_id(exp_name)
         if config_id == 0:
             exp_params_functions += exp_params_functions_0
@@ -92,8 +97,15 @@ def get_exp_params(hdf5_path):
             exp_params_functions += exp_params_functions_12
         if config_id == 3:
             exp_params_functions += exp_params_functions_3
+
+        # Run each function in the exp_params_functions list -- each function returns a key-value pair that is added
+        # to the overall exp_params_names_values dictionary
         for exp_param_func in exp_params_functions:
             exp_params_names_values.update(exp_param_func(hdf5_file))
+
+        # Ensure the config id is included in the experimental parameters dictionary so that we don't have to re-run
+        # that function later
+        exp_params_names_values.update({'Config ID': config_id})
     return exp_params_names_values
 
 

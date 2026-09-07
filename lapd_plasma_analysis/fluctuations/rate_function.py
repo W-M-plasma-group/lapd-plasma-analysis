@@ -160,6 +160,3 @@ if __name__=="__main__":
     fig.show()
 
     get_ng(4.0, 0.4)
-
-
-

@@ -13,8 +13,8 @@ from lapd_plasma_analysis.fluctuations.rate_function import get_ng, lookup_ng
 keys = ["run", "series", "board", "channel", "z", "xrange", "trange", "grad_id", "in_core"]
 
 specifications_list = [
-    #format [run, name, board, channel, z,    (xmin, xmax), (tmin, tmax), sgn(grad t_e / grad n_e), is_in_core]
-    #ex.    [19, "Jan22",   2,       1, 860.1,  (-27, -25),      (7, 15),               -1,       True]
+    # format [run, name, board, channel, z,    (xmin, xmax), (tmin, tmax), sgn(grad t_e / grad n_e), is_in_core]
+    # ex.    [19, "Jan22",   2,       1, 860.1,  (-27, -25),      (7, 15),               -1,       True]
 
     [18, "Mar22", 2, 1, 831.0, (-29, -25), (8, 13), 1, False],
     [18, "Mar22", 2, 1, 831.0, (-25, -20), (7, 15), 1, False],
@@ -92,6 +92,7 @@ specifications_list = [
 
 specifications_dict = [{keys[i]: spec for i, spec in enumerate(spec)} for spec in specifications_list]
 
+
 def find_file(specs, hdf5_folder):
     for folder in os.listdir(hdf5_folder):
         if folder.startswith(specs["series"][:2]):
@@ -102,11 +103,13 @@ def find_file(specs, hdf5_folder):
                 if file.startswith(num_string):
                     return hdf5_folder + folder + "/flux_nc/" + file
 
+
 def get_flux_and_Ln(dataset, specs):
     Ln, flux, Ln_err, flux_err = plot_total_flux_vs_Ln(dataset.sel(z=specs["z"], method="nearest"), "density",
                                                        x=specs["xrange"], Ln_range=specs["xrange"],
                                                        time=specs["trange"], bin=specs["trange"])
     return Ln, flux, Ln_err, flux_err
+
 
 def get_flux(dataset, specs):
     x1, x2 = specs["xrange"]
@@ -123,52 +126,56 @@ def get_flux(dataset, specs):
     # spectrum = lowpass(spectrum, freqs)
 
     m, b, m_err, b_err, cov = linear_fit_profile(dataset["density"].sel(z=specs['z'], method="nearest"), x=(x1, x2),
-                                          time=specs['trange'])
+                                                 time=specs['trange'])
     x = 0.5 * (x1 + x2)
     n = m * x + b
     n_err = np.sqrt((x * m_err) ** 2 + (b_err) ** 2 + 2 * x * cov)
 
-    delta_n2 = np.sum(spectrum[1:]*(freqs[1]-freqs[0]))
-    delta_n2_err = np.sum(spectrum_err[1:]*(freqs[1]-freqs[0]))
+    delta_n2 = np.sum(spectrum[1:] * (freqs[1] - freqs[0]))
+    delta_n2_err = np.sum(spectrum_err[1:] * (freqs[1] - freqs[0]))
 
     delta_n = np.sqrt(delta_n2)
-    delta_n_err = abs(delta_n2_err/delta_n)
+    delta_n_err = abs(delta_n2_err / delta_n)
 
-    cov_delta_n_n = np.mean((delta_n - np.mean(delta_n))*(n - np.mean(n)))
+    cov_delta_n_n = np.mean((delta_n - np.mean(delta_n)) * (n - np.mean(n)))
 
-    normalized_fluctuations = delta_n/n
-    normalized_fluctuations_err = np.sqrt((delta_n_err/n)**2 + (delta_n*n_err/(n**2))**2 - 2*cov_delta_n_n*delta_n/(n**3))
+    normalized_fluctuations = delta_n / n
+    normalized_fluctuations_err = np.sqrt(
+        (delta_n_err / n) ** 2 + (delta_n * n_err / (n ** 2)) ** 2 - 2 * cov_delta_n_n * delta_n / (n ** 3))
 
     return normalized_fluctuations, normalized_fluctuations_err
+
 
 def get_Ln(dataset, specs, sign_conv=False):
     x1, x2 = specs["xrange"]
     m, b, m_err, b_err, cov = linear_fit_profile(dataset["density"].sel(z=specs['z'], method="nearest"), x=(x1, x2),
-                       time=specs['trange'])
-    x = 0.5*(x1+x2)
-    n = m*x + b
-    n_err = np.sqrt( (x*m_err)**2 + (b_err)**2 + 2*x*cov )
-    Ln_err = np.sqrt( (b*m_err/(m**2))**2 + (b_err/m)**2 -2*b/(m**3)*cov)
+                                                 time=specs['trange'])
+    x = 0.5 * (x1 + x2)
+    n = m * x + b
+    n_err = np.sqrt((x * m_err) ** 2 + (b_err) ** 2 + 2 * x * cov)
+    Ln_err = np.sqrt((b * m_err / (m ** 2)) ** 2 + (b_err / m) ** 2 - 2 * b / (m ** 3) * cov)
     if sign_conv:
-        m = m*x/abs(x)
+        m = m * x / abs(x)
     else:
         m = abs(m)
-    return n/m, n, Ln_err, n_err
+    return n / m, n, Ln_err, n_err
+
 
 def get_LT(dataset, specs):
     x1, x2 = specs["xrange"]
     lang_data = get_langmuir_dataset(dataset)
     m, b, m_err, b_err, cov = get_linear_fit_langmuir(lang_data, "T_e", specs['z'],
-                                               x=(x1, x2), time=specs['trange'])
+                                                      x=(x1, x2), time=specs['trange'])
     x = 0.5 * (x1 + x2)
     T = m * x + b
     T_err = np.sqrt((x * m_err) ** 2 + (b_err) ** 2 + 2 * x * cov)
     LT_err = np.sqrt((b * m_err / (m ** 2)) ** 2 + (b_err / m) ** 2 - 2 * b / (m ** 3) * cov)
-    return abs(T/m), T, LT_err, T_err
+    return abs(T / m), T, LT_err, T_err
+
 
 def get_pressure(dataset, specs, plot=False):
     x1, x2 = specs["xrange"]
-    t1, t2 = specs["trange"] # didn't really check to see if it was ok to average here
+    t1, t2 = specs["trange"]  # didn't really check to see if it was ok to average here
     lang_data = get_langmuir_dataset(dataset)
     pressure_data = lang_data["P_ei_from_n_i_OML"]
 
@@ -177,23 +184,24 @@ def get_pressure(dataset, specs, plot=False):
 
     pressure_data_err = pressure_data.std(dim=["x", "time", "shot"], skipna=True)
 
-    z1, z2 = pressure_data_mean.coords["z"].values # assumes two z positions only (valid for current data)
+    z1, z2 = pressure_data_mean.coords["z"].values  # assumes two z positions only (valid for current data)
     P1, P2 = pressure_data_mean.values
     P1_err, P2_err = pressure_data_err.values
-    Lp = abs(z1-z2 / np.log(P2/P1))
-    Lp_err = abs((z1-z2)/np.log(P2/P1)**2)*np.sqrt((P1_err/P1)**2 + (P2_err/P2)**2)
+    Lp = abs(z1 - z2 / np.log(P2 / P1))
+    Lp_err = abs((z1 - z2) / np.log(P2 / P1) ** 2) * np.sqrt((P1_err / P1) ** 2 + (P2_err / P2) ** 2)
 
     P = np.float64(pressure_data_mean.sel(z=specs['z'], method="nearest").values)
-    P_err =  np.float64(pressure_data_err.sel(z=specs['z'], method="nearest").values)
+    P_err = np.float64(pressure_data_err.sel(z=specs['z'], method="nearest").values)
 
-    dPdz = -abs(P/Lp)
-    dPdz_err = np.sqrt((P_err/Lp)**2 + (P*Lp_err/Lp**2)**2)
+    dPdz = -abs(P / Lp)
+    dPdz_err = np.sqrt((P_err / Lp) ** 2 + (P * Lp_err / Lp ** 2) ** 2)
 
     if plot:
         plt.plot([z1, z2], [P1, P2])
         plt.show()
 
     return P, P_err, dPdz, dPdz_err, Lp, Lp_err
+
 
 def get_parallel_flow(dataset, specs):
     x1, x2 = specs["xrange"]
@@ -207,6 +215,7 @@ def get_parallel_flow(dataset, specs):
     v_par_err = v_par_data.std(dim=["x", "time", "shot"], skipna=True).values
 
     return v_par_mean, v_par_err
+
 
 def test_plot(specs, hdf5_folder, plot_save_folder, plotname, showfig=False, istest=False):
     xmin, xmax = specs["xrange"]
@@ -232,7 +241,6 @@ def test_plot(specs, hdf5_folder, plot_save_folder, plotname, showfig=False, ist
     else:
         linear_fit_profile(data["density"].sel(z=z, method="nearest"), x=x, time=time, plot=True, axis=ax)
 
-
     # for i in [0,1,2,3,4,5,6,7]:
     #     get_langmuir_profiles(lang_data, "T_e", z, x=None, time=8, shot=i, plot=True)
 
@@ -244,7 +252,8 @@ def test_plot(specs, hdf5_folder, plot_save_folder, plotname, showfig=False, ist
         get_langmuir_profiles(lang_data, "T_e", z, x=None, time=None, plot=True, axis=ax)
 
     ax = fig.add_subplot(224)
-    _, __, freq = get_radial_spectrogram(data["density"].sel(z=z, method="nearest"), shot=None, bin=time, z=z, scaling="amplitude",
+    _, __, freq = get_radial_spectrogram(data["density"].sel(z=z, method="nearest"), shot=None, bin=time, z=z,
+                                         scaling="amplitude",
                                          plot=True, axis=ax, plot_save_folder=None)
     ax.plot([xmin, xmin], [min(freq), max(freq)], color='black')
     ax.plot([xmax, xmax], [min(freq), max(freq)], color='black')
@@ -253,11 +262,13 @@ def test_plot(specs, hdf5_folder, plot_save_folder, plotname, showfig=False, ist
         fig.savefig(plot_save_folder + f"test_range_{plotname}.png")
         print(f"\nFIGURE SAVED: test_range_{plotname}.png\n")
 
+
 if __name__ == "__main__":
 
     hdf5_folder = "/home/michael/Documents/school/Plasma/LAPD Plasma Analysis/HDF5 Files/"
 
     plot_save_folder = "/home/michael/PycharmProjects/LAPD-plasma-analysis/plots/"
+
 
     # for i, spec in enumerate(specifications_dict):
     #     if os.path.exists(plot_save_folder + f"test_range_{i}.png"):
@@ -282,14 +293,17 @@ if __name__ == "__main__":
     def gamma_1(dataset, specs):
         Ln, n, Ln_err, n_err = get_Ln(dataset, specs)
         LT, T, LT_err, T_err = get_LT(dataset, specs)
-        return n*np.sqrt(T)/(Ln)**2
+        return n * np.sqrt(T) / (Ln) ** 2
+
 
     gamma1_string = r"$nT_e^{1/2}L_n^{-2}$"
+
 
     def gamma_2(dataset, specs):
         Ln, n, Ln_err, n_err = get_Ln(dataset, specs)
         LT, T, LT_err, T_err = get_LT(dataset, specs)
-        return n*(T**(3/2))/(Ln**6)
+        return n * (T ** (3 / 2)) / (Ln ** 6)
+
 
     # def gamma_3(dataset, specs):
     #     Ln, n = get_Ln(dataset, specs)
@@ -298,17 +312,21 @@ if __name__ == "__main__":
 
     def gamma_3(dataset, specs):
         Ln, n, Ln_err, n_err = get_Ln(dataset, specs, sign_conv=False)
-        return 1/Ln, abs(Ln_err/Ln**2)
+        return 1 / Ln, abs(Ln_err / Ln ** 2)
+
 
     gamma3_string = r"$L_n^{-1}$"
 
+
     def encode_style(a, b, c, d):
         return str(a) + " " + str(b) + " " + str(c) + " " + str(d)
+
 
     def decode_style(a):
         a, b, c, d = a.split(" ")
         d = int(d)
         return a, b, c, d
+
 
     def marker_style(specs):
         if specs["z"] == 639.0:
@@ -335,6 +353,7 @@ if __name__ == "__main__":
             markersize = 6
 
         return encode_style(marker, color, markeredgecolor, markersize)
+
 
     def make_dataset():
         fluxes = []
@@ -410,28 +429,33 @@ if __name__ == "__main__":
         np.save("drawing_specs.npy", drawing_specs)
 
 
-    #make_dataset()
+    # make_dataset()
 
-    fluxes, flux_errs, ns, n_errs, Ts, T_errs, Lns, Ln_errs, LTs, LT_errs, zs, Ps, P_errs, dPdzs, dPdz_errs, Lps, Lp_errs = np.load("regression_data.npy", allow_pickle=True)
+    fluxes, flux_errs, ns, n_errs, Ts, T_errs, Lns, Ln_errs, LTs, LT_errs, zs, Ps, P_errs, dPdzs, dPdz_errs, Lps, Lp_errs = np.load(
+        "regression_data.npy", allow_pickle=True)
     drawing_specs = np.load("drawing_specs.npy", allow_pickle=True)
+
 
     def get_v_de(T, T_err, Ln, Ln_err):
         # e = 1.6e-19 #fundamental charge (handled automatically by units of T)
-        B = 0.1 #T, representative value in LAPD -- shouldn't vary across experiments? But not sure #todo check
-        cov = np.mean((T - np.mean(T))*(Ln - np.mean(Ln)))
+        B = 0.1  # T, representative value in LAPD -- shouldn't vary across experiments? But not sure #todo check
+        cov = np.mean((T - np.mean(T)) * (Ln - np.mean(Ln)))
         cov = 0
-        v_de = T/(B*Ln)
-        v_de_err = 1/(B)*np.sqrt( (T_err/Ln)**2 + (T*Ln_err/(Ln**2))**2 -2*T*cov/(Ln**3))
+        v_de = T / (B * Ln)
+        v_de_err = 1 / (B) * np.sqrt((T_err / Ln) ** 2 + (T * Ln_err / (Ln ** 2)) ** 2 - 2 * T * cov / (Ln ** 3))
         return v_de, v_de_err
+
 
     def get_nu_ei(n, n_err, T, T_err):
         # estimate of Coulomb logarithm
         CL = 16
-        cov = np.mean((T - np.mean(T))*(n - np.mean(n)))
+        cov = np.mean((T - np.mean(T)) * (n - np.mean(n)))
         cov = 0
-        nu_ei = 2.9e-6*CL*n/(T**(3/2))
-        nu_ei_err = 2.9e-6*CL*np.sqrt( (n_err/(T**(3/2)))**2 + (3*n*T_err/(2*T**(5/2)))**2 - 3*cov*n/(T**4))
+        nu_ei = 2.9e-6 * CL * n / (T ** (3 / 2))
+        nu_ei_err = 2.9e-6 * CL * np.sqrt(
+            (n_err / (T ** (3 / 2))) ** 2 + (3 * n * T_err / (2 * T ** (5 / 2))) ** 2 - 3 * cov * n / (T ** 4))
         return nu_ei, nu_ei_err
+
 
     v_de, v_de_err = get_v_de(Ts, T_errs, Lns, Ln_errs)
     nu_ei, nu_ei_err = get_nu_ei(ns, n_errs, Ts, T_errs)
@@ -444,7 +468,7 @@ if __name__ == "__main__":
         if v_de_errp < v_dep:
             marker, color, markeredgecolor, markersize = decode_style(drawing_specs[i])
             ax.errorbar(v_dep, flux, yerr=flux_err, xerr=v_de_errp,
-                    marker=marker, color=color, markeredgecolor=markeredgecolor, markersize=markersize)
+                        marker=marker, color=color, markeredgecolor=markeredgecolor, markersize=markersize)
     ax.set_xlabel("$v_{de}$ [m/s]")
     ax.set_ylabel(r"$\delta n/n$")
     ax.set_title("$v_{de}$ scaling")
@@ -481,19 +505,18 @@ if __name__ == "__main__":
     #     data = xr.open_dataset(find_file(specs, hdf5_folder))
     #     print(get_parallel_flow(data, specs))
 
-
     """
         datasets = []
         for specs in specifications_dict:
             datasets.append(xr.open_dataset(find_file(specs, hdf5_folder)))
-    
+
         # plot flux vs Ln
-    
+
         fig = plt.figure()
         ax = fig.add_subplot(111)
-    
+
         norm = plt.Normalize(600, 900)
-    
+
         fluxes = []
         flux_errs = []
         Lns = []
@@ -514,10 +537,10 @@ if __name__ == "__main__":
             if Ln <= 50 and Ln_err <= Ln:
                 ax.errorbar(Ln, flux, yerr=flux_err, xerr=Ln_err, linestyle="", marker="o",
                         color=cmap(norm(zpos)), ecolor="black")
-    
-    
+
+
         print("start")
-    
+
         sm = plt.cm.ScalarMappable(norm=norm, cmap=cmap)
         cbar = plt.colorbar(sm, ax=ax)
         cbar.set_label("$z$ position (cm)")
@@ -529,7 +552,7 @@ if __name__ == "__main__":
         fig.show()
         fig.savefig(plot_save_folder + "flux_vs_Ln.png")
         print("end fog")
-    
+
         print("start")
         fig = plt.figure()
         ax = fig.add_subplot(111)
@@ -561,10 +584,10 @@ if __name__ == "__main__":
     dPdzs = abs(dPdzs)
 
     mask = (
-        (fluxes > 0) &
-        (ns > 0) &
-        (Ts > 0) &
-        (Lns > 0)
+            (fluxes > 0) &
+            (ns > 0) &
+            (Ts > 0) &
+            (Lns > 0)
     )
 
     fluxes = fluxes[mask]
@@ -593,7 +616,6 @@ if __name__ == "__main__":
     XT_obs = np.log(np.clip(Ts, eps, None))
     Xng_obs = np.log(np.clip(get_ng(Ts), eps, None))
 
-
     sigma_Y = flux_errs / fluxes
     sigma_Xn = n_errs / ns
     sigma_XT = T_errs / Ts
@@ -615,7 +637,7 @@ if __name__ == "__main__":
         nu = pm.Normal("nu", mu=0, sigma=5)
         sigma_int = pm.HalfNormal("sigma_int", sigma=1)
 
-        #Xn_true = pm.Normal("Xn_true", mu=Xn_obs, sigma=sigma_Xn) #latent vars
+        # Xn_true = pm.Normal("Xn_true", mu=Xn_obs, sigma=sigma_Xn) #latent vars
         # XT_true = pm.Normal("XT_true", mu=XT_obs, sigma=sigma_XT)
         XT_true = pm.TruncatedNormal("XT_true", mu=XT_obs, sigma=sigma_XT, lower=eps)
         Xnu_ei_true = pm.Normal("Xnu_ei_true", mu=Xnu_ei_obs, sigma=sigma_Xnu_ei)
@@ -626,7 +648,7 @@ if __name__ == "__main__":
         Xng_true = pm.Deterministic("Xng_true", lookup_ng(XT_true))
         XLp_true = pm.Normal("XLp_true", mu=XLp_obs, sigma=sigma_XLp)
 
-        #mu = a + delta * Xn_true + zeta * XT_true + beta * XLn_true + nu*Xz_obs #model
+        # mu = a + delta * Xn_true + zeta * XT_true + beta * XLn_true + nu*Xz_obs #model
         # mu = a + delta * XLp_true + zeta * Xnu_ei_true + beta * XLn_true + nu * XT_true
         mu = a + delta * XLp_true + zeta * Xnu_ei_true + beta * XLn_true + nu * Xng_true
         # mu = a + zeta * XT_true + beta * XLn_true
@@ -639,7 +661,6 @@ if __name__ == "__main__":
             target_accept=0.99,
             return_inferencedata=True
         )
-
 
     print(az.summary(trace, var_names=["a", "delta", "zeta", "beta", "nu", "sigma_int"]))
     # print(az.summary(trace, var_names=["a", "zeta", "beta", "nu", "sigma_int"]))
@@ -660,11 +681,11 @@ if __name__ == "__main__":
     nu_mean = nu_samples.mean()
 
     log_flux_pred = (
-        a_mean
-         + delta_mean * XLp_obs
-        + zeta_mean * Xnu_ei_obs
-        + beta_mean * XLn_obs
-         + nu_mean * Xng_obs
+            a_mean
+            + delta_mean * XLp_obs
+            + zeta_mean * Xnu_ei_obs
+            + beta_mean * XLn_obs
+            + nu_mean * Xng_obs
     )
 
     flux_pred = np.exp(log_flux_pred)
