@@ -6,4 +6,4 @@ This GitHub page is managed by Michael Campagna and Leo Murphy as part of a rese
 ### Use
 Download all Python files. Download desired HDF5 files and note their file paths. Change necessary parameters inside main.py before running. Make sure plasmapy, bottleneck, PyQt5, bapsflib, sphinx-rtd-theme and numpydoc are installed. **In addition, certain files in the plasmapy module should be overwritten with versions which are modified to work with lapd-plasma-analysis. See replacement-files/readme.txt for more information.** This code was written in Python 3.11.
 
-Send an email to macampagna@wm.edu if you have any issues with installation or any other questions.
+Send an email to lcpayne@wm.edu if you have any issues with installation or any other questions.
