@@ -1,100 +1,152 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 import xarray as xr
 import math
+import colorsys
+import ast
+import json
 
-from lapd_plasma_analysis.file_access import ask_yes_or_no
-from lapd_plasma_analysis.obtain_plots.Auxillary_functions import filter_data, find_steady_state, filter_ne_data
+from astropy.units.quantity_helper.function_helpers import concatenate
+
+from lapd_plasma_analysis.file_access import *
+from lapd_plasma_analysis.obtain_plots.Auxillary_functions import filter_data
+from lapd_plasma_analysis.calculation_helpers import sound_speed_calculation
+from lapd_plasma_analysis.obtain_plots.plot_from_netcdf_helpers.process_temp_dens_data import process_variable_data
 from scipy.optimize import curve_fit
+from scipy.ndimage import binary_closing
 from plasmapy.particles import *
 from astropy import constants as c
 from astropy import units as u
-from astropy.units import Unit
+from astropy.units import Unit, Quantity
+
+from scipy.signal import savgol_filter, find_peaks
 
 
 def polynomial_function(x, *coeffs):
     return np.polyval(coeffs, x)
 
-def contour_plot(ds, diagnostic_to_plot, probe, run_identifier):
+
+def contour_plot(ds, diagnostic_to_plot, probe=0, run_identifier=None, figure_folder=None,
+                 plot_std = False, filt_data = False, save_plots = True, show_plot = False, check_shots = False,
+                 shots_to_plot = None
+                 ):
     """
+    Generate 2D contour plot(s) for a single xarray dataset across time and position.
 
     Parameters
     ----------
-    ds - xarray of diagnostics and their corresponding values indexed by probe, x, y, shot, sweep
-    diagnostic_to_plot
-    probe - Index of the probe to plot
-
-    Returns
-    -------
-
+    ds : xarray.Dataset
+        Dataset containing diagnostic measurements.
+    diagnostic_to_plot : str
+        Variable key inside ds to plot (e.g., 't_e', 'n_e').
+    probe : int, default=0
+        Probe index to plot.
+    run_identifier : str, optional
+        Custom identifier string. If None, generated via f_run_identifier.
+    figure_folder : str, optional
+        Folder path for saving plots.
+    plot_std : bool, default=False
+        Whether to plot standard deviation for the plot diagnostic in a separate subplot
+    filt_data : bool, default=False
+        Whether to include filtered data in a separate subplot.
+    save_plots : bool, default=True
+        Whether to save plots in an associated figure folder
+    show_plot : bool, default=False
+        Whether to show plots directly in this window
+    check_shots : bool, default=False
+        Whether to check shots individually
+    shots_to_plot : list, optional
+        List of shot numbers to plot, if check_shots is true this will be populated
     """
 
-    # print('diagnostic_to_plot: ', repr(diagnostic_to_plot))
-    if ask_yes_or_no("Also plot standard deviation? (y/n) "):
-        filt_data = ask_yes_or_no("Filter data? (y/n) ")
-        if filt_data:
-            fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(16, 9))
-        else:
-            fig, axes = plt.subplots(1, 2, figsize=(12, 5), constrained_layout=True)
-        axes = axes.flatten()
+    # Sort spatial and temporal coordinates monotonically for 2D plotting
+    coords_to_sort = [c for c in ['time', 'x'] if c in ds.coords]
+    if coords_to_sort:
+        ds = ds.sortby(coords_to_sort)
 
+    # PyCharm warning mitigation
+    if run_identifier is None:
+        run_identifier = f_run_identifier(ds=ds)
+
+    if save_plots:
+        figure_folder = ensure_directory(figure_folder + f'Contour/{diagnostic_to_plot}/{run_identifier}/')
+        if check_shots:
+            figure_folder = ensure_directory(figure_folder + f'Individual_shots/probe_{probe}/')
+        else:
+            figure_folder = ensure_directory(figure_folder + f'Averaged_over_shots/')
+
+    # PyCharm warning mitigation
+    if run_identifier is None:
+        run_identifier = f_run_identifier(ds=ds)
+
+    # Determine layout structure for build_subplots
+    if plot_std and filt_data:
+        layout = [[2], [2]]  # 2x2 grid (4 plots total)
+    elif plot_std:
+        layout = [[2]]  # 1x2 grid (2 plots total)
+    else:
+        layout = [[1]]  # 1x1 grid (1 plot total)
+
+
+
+    if not check_shots:
+        fig, ax, letters = build_subplots(layout=layout, fig_width=6.0, fig_height=4.5)
+        # Compute mean and standard deviation
         mean_data = ds[diagnostic_to_plot].sel(probe=probe).mean('shot')
         std_data = ds[diagnostic_to_plot].sel(probe=probe).std('shot')
-        if 't_e' in diagnostic_to_plot:
-            # Make a uniform color bar from 0 eV to 20 eV for Temperature plots
-            v_max = 15
-            v_min = 0
-            mean_plot = mean_data.plot(
-                ax = axes[0],
-                x='time',
-                y='x',
-                vmin=v_min,
-                vmax=v_max,
-                cmap = 'turbo',
-                add_colorbar = True
-            )
-        elif 'n_e' in diagnostic_to_plot or 'n_i' in diagnostic_to_plot:
-            v_max = 3e18
-            v_min = 0
-            mean_plot = mean_data.plot(
-                ax=axes[0],
-                x='time',
-                y='x',
-                vmin=v_min,
-                vmax = v_max,
-                cmap='turbo',
-                add_colorbar=True
-            )
 
-        else:
-            # TODO Other limits will be determined shortly
-            v_max = None
-            v_min = None
-            mean_plot = mean_data.plot(
-                ax = axes[0],
-                x='time',
-                y='x',
-                add_colorbar = True,
-                cmap = 'turbo'
-            )
 
-        axes[0].set_title('Mean')
-        mean_plot.colorbar.set_label(
-            f"{diagnostic_to_plot} ({ds[diagnostic_to_plot].attrs.get('units', diagnostic_to_plot)})"
+        # Dynamic colorbar bounds
+        vals = mean_data.values
+        v_min, v_max = np.nanpercentile(vals[~np.isnan(vals)], [2, 98]) if np.any(~np.isnan(vals)) else (0, 1)
+        print('Min and Max values', v_min, v_max)
+
+        # Force lower bound to 0 for non-negative physical diagnostics
+        negative_diagnostics = ['ion_isat', 'v_f']
+
+        # Force floor to 0.0 for positive physical quantities (t_e, n_e, n_i, etc.)
+        if not any(tag in diagnostic_to_plot for tag in negative_diagnostics):
+            v_min = max(0.0, v_min)
+
+        # Plot Mean values across shots
+        mean_ax = ax[letters[0]]
+        cp_mean = mean_data.plot(
+            ax=mean_ax,
+            x='time',
+            y='x',
+            vmin=v_min,
+            vmax=v_max,
+            cmap='turbo',
+            add_colorbar=True
         )
+        mean_ax.set_title("Mean", fontsize=16)
 
-        std_plot = std_data.plot(ax = axes[1], x = 'time', y = 'x',
-                                 vmin = 5,
-                                 vmax = 0,
-                                 add_colorbar = True,
-                                 cmap = 'turbo')
-        axes[1].set_title('Standard Deviation')
-        std_plot.colorbar.set_label(f"({ds[diagnostic_to_plot].attrs.get('units', diagnostic_to_plot)})")
+        # Plot Standard Deviation across shots (if requested)
+        if plot_std:
+            std_ax = ax[letters[1]]
+            std_vals = std_data.values
+            s_min, s_max = np.nanpercentile(std_vals[~np.isnan(std_vals)], [2, 98]) if np.any(
+                ~np.isnan(std_vals)) else (0,
+                                           1)
 
+            cp_std = std_data.plot(
+                ax=std_ax,
+                x='time',
+                y='x',
+                vmin=max(0.0, s_min),
+                vmax=s_max,
+                cmap='turbo',
+                add_colorbar=True
+            )
+            std_ax.set_title("Standard Deviation", fontsize=16)
+
+        # Plot Filtered Data (if requested)
         if filt_data:
-            filtered_data1 = filter_data(mean_data, std_data, first_filter = True)
-            filt_plot1 = filtered_data1.plot(
-                ax = axes[2],
+            filtered_data1 = filter_data(mean_data, std_data, first_filter=True)
+            filt_ax1 = ax[letters[2]]
+            filtered_data1.plot(
+                ax=filt_ax1,
                 x='time',
                 y='x',
                 vmin=v_min,
@@ -102,13 +154,12 @@ def contour_plot(ds, diagnostic_to_plot, probe, run_identifier):
                 cmap='turbo',
                 add_colorbar=True
             )
-            axes[2].set_title('First filter')
-            filt_plot1.colorbar.set_label(f"{diagnostic_to_plot} "
-                                         f"({ds[diagnostic_to_plot].attrs.get('units', diagnostic_to_plot)})")
+            filt_ax1.set_title("First Filter", fontsize=16)
 
             filtered_data2 = filter_data(mean_data, std_data, first_filter=False)
-            filt_plot2 = filtered_data2.plot(
-                ax=axes[3],
+            filt_ax2 = ax[letters[3]]
+            filtered_data2.plot(
+                ax=filt_ax2,
                 x='time',
                 y='x',
                 vmin=v_min,
@@ -116,763 +167,374 @@ def contour_plot(ds, diagnostic_to_plot, probe, run_identifier):
                 cmap='turbo',
                 add_colorbar=True
             )
-            axes[3].set_title('Second filter')
-            filt_plot2.colorbar.set_label(f"{diagnostic_to_plot} "
-                                         f"({ds[diagnostic_to_plot].attrs.get('units', diagnostic_to_plot)})")
+            filt_ax2.set_title("Second Filter", fontsize=16)
 
-
-        for ax in axes:
-            ax.set_xlabel(f'Time  ({ds.attrs.get("time_units")})')
-            ax.set_ylabel(f'x ({ds.attrs.get("x_units")})')
-
+        # Format labels across all active subplots
+        unit_str = ds[diagnostic_to_plot].attrs.get('units', diagnostic_to_plot)
+        for ltr in letters[:len(ax)]:
+            curr_ax = ax[ltr]
+            curr_ax.set_xlabel(f'Time ({ds.attrs.get("time_units", "s")})', fontsize=14)
+            curr_ax.set_ylabel(f'x ({ds.attrs.get("x_units", "cm")})', fontsize=14)
 
         diagnostic_name = ds[diagnostic_to_plot].attrs.get("long_name", diagnostic_to_plot)
-        probe_port = ds['port'].isel(probe=probe).item()
+        probe_port = ds['port'].isel(probe=probe).item() if 'port' in ds else "Unknown"
+        probe_z = ds['z'].isel(probe=probe).item() if 'z' in ds else "Unknown"
 
-        # print('diagnostic_name: ', diagnostic_name)
-        # print('probe_port: ', probe_port)
+        fig.suptitle(f"{run_identifier}\n{diagnostic_name} (z: {probe_z} m)", fontsize=20)
         plt.tight_layout()
-
-        fig.suptitle(f"{run_identifier} \n {diagnostic_name}\n  Port: {probe_port}")
-        # plt.tight_layout()
-
+        if save_plots:
+            plot_name = run_identifier + f"probe_{probe}_{diagnostic_to_plot}.png"
+            if plot_std:
+                plot_name += f"_std"
+            if filt_data:
+                plot_name += f"_filt"
+            plt.savefig(figure_folder + plot_name, bbox_inches='tight')
+            print('Figure saved to', figure_folder + plot_name)
+        if show_plot:
+            plt.show()
+        plt.close()
 
 
     else:
-        if 't_e' in diagnostic_to_plot:
-            # Make a uniform color bar from 0 eV to 20 eV for Temperature plots
-            cp = ds[diagnostic_to_plot].sel(probe=probe).mean('shot').plot(
-                x = 'time',
-                y = 'x',
-                vmin = 0,
-                vmax = 15,
-                cmap = 'turbo'
-                )
-        elif 'n_e' in diagnostic_to_plot or 'n_i' in diagnostic_to_plot:
-            cp = ds[diagnostic_to_plot].sel(probe=probe).mean('shot').plot(
+        for shot in shots_to_plot:
+
+            fig, ax, letters = build_subplots(layout=layout, fig_width=6.0, fig_height=4.5)
+            data = ds[diagnostic_to_plot].sel(shot=shot, probe = probe)
+            # Dynamic colorbar bounds
+            vals = data.values
+            v_min, v_max = np.nanpercentile(vals[~np.isnan(vals)], [2, 98]) if np.any(~np.isnan(vals)) else (0, 1)
+
+            # Force lower bound to 0 for non-negative physical diagnostics
+            negative_diagnostics = ['isat', 'v_f', 'vf']
+
+            # Check if current diagnostic belongs to negative quantities
+            is_neg = any(tag in diagnostic_to_plot for tag in negative_diagnostics)
+
+            if np.any(~np.isnan(vals)):
+                if not is_neg:
+                    # Positive diagnostics (T_e, n_e): isolate edge (0 to 75th percentile)
+                    v_min, v_max = np.nanpercentile(vals[~np.isnan(vals)], [0, 75])
+                    v_min = max(0.0, v_min)
+                else:
+                    # Negative diagnostics (I_sat, V_f): isolate edge (50th to 98th percentile)
+                    v_min, v_max = np.nanpercentile(vals[~np.isnan(vals)], [30, 98])
+                    v_max = min(0.0, v_max)
+            else:
+                # Safe fallbacks if array contains only NaNs
+                v_min, v_max = (-0.03, 0.0) if is_neg else (0.0, 1.0)
+
+            # Guard against v_min >= v_max (e.g., flat signals or identical percentiles)
+            if v_min >= v_max:
+                v_max = v_min + 1e-5
+
+            # Plot Mean values across shots
+            data_ax = ax[letters[0]]
+            cp_mean = data.plot(
+                ax=data_ax,
                 x='time',
                 y='x',
-                vmin=0,
+                vmin=v_min,
+                vmax=v_max,
                 cmap='turbo',
                 add_colorbar=True
             )
+            data_ax.set_title(f"Shot = {shot}", fontsize=16)
+            if save_plots:
+                plot_name = run_identifier + f'probe_{probe}_shot{shot}_{diagnostic_to_plot}.png'
+                plt.savefig(figure_folder + plot_name, bbox_inches='tight')
+                print('Figure saved to', figure_folder + plot_name)
+            if show_plot:
+                plt.show()
+            plt.close()
 
-        else:
-            # TODO Other limits will be determined shortly
-            cp = ds[diagnostic_to_plot].sel(probe=probe).mean('shot').plot(
-                x='time',
-                y='x',
-                cmap = 'turbo'
-            )
 
-        cbar = cp.colorbar
-        ax = plt.gca()
-        ax.set_xlabel(f'Time  ({ds.attrs.get("time_units")})')
-        ax.set_ylabel(f'x ({ds.attrs.get("x_units")})')
-        cbar.set_label(f'{diagnostic_to_plot} ({ds[diagnostic_to_plot].attrs.get("units",diagnostic_to_plot)})')
-
-        diagnostic_name = ds[diagnostic_to_plot].attrs.get("long_name", diagnostic_to_plot)
-        probe_port = ds['port'].isel(probe=probe).item()
-
-        # print('diagnostic_name: ', diagnostic_name)
-        # print('probe_port: ', probe_port)
-        ax.set_title(f"{run_identifier} \n {diagnostic_name}\n  Port: {probe_port}")
-
-    plt.subplots_adjust(top=0.85)
-    plt.show()
-
-def contour_subplots(datasets,diagnostic_to_plot,nc_list, nc_choice):
+def contour_subplots(datasets, diagnostic_to_plot):
     """
+    Generate a grid of contour subplots comparing multiple xarray datasets.
 
     Parameters
     ----------
-    datasets
-    diagnostics_to_plot_list
-    nc_list
-    nc_choice
-
-    Returns
-    -------
-
+    datasets : list of xarray.Dataset
+        List of dataset objects to evaluate and plot.
+    diagnostic_to_plot : str
+        Variable key inside datasets to plot.
     """
+    datasets = list(datasets)
     num_runs = len(datasets)
 
+    divide = ask_yes_or_no("Divide first two chosen datasets? (y/n) ")
+    total_plots = num_runs + (1 if divide else 0)
 
-    n_cols = math.ceil(math.sqrt(num_runs))
-    n_rows = math.ceil(num_runs / n_cols)
-    if ask_yes_or_no("Divide first two chosen datasets? (y/n) "):
-        n_rows += 1
-        divide = True
+    # Determine layout rows and columns for build_subplots
+    n_cols = math.ceil(math.sqrt(total_plots))
+    n_rows = math.ceil(total_plots / n_cols)
+
+    # Construct inner list representation for build_subplots (e.g. [[2], [1]])
+    layout = []
+    remaining_plots = total_plots
+    for _ in range(n_rows):
+        row_count = min(n_cols, remaining_plots)
+        layout.append([row_count])
+        remaining_plots -= row_count
+
+    fig, ax, letters = build_subplots(layout=layout, fig_width=5.5, fig_height=4.0)
+
+    # Global dynamic colorbar bounds (Across ALL compared datasets)
+    all_means = [ds[diagnostic_to_plot].sel(probe=0).mean('shot') for ds in datasets]
+    all_vals = np.concatenate([m.values.ravel() for m in all_means])
+    valid_vals = all_vals[~np.isnan(all_vals)]
+
+    if len(valid_vals) > 0:
+        v_min, v_max = np.nanpercentile(valid_vals, [2, 98])
     else:
-        divide = False
+        v_min, v_max = 0, 1
 
-    fig, axes = plt.subplots(n_rows, n_cols, figsize=(n_cols * 5, n_rows * 4))
-    axes = axes.flatten()
+    # Force lower bound to 0 for non-negative diagnostics
+    if any(tag in diagnostic_to_plot for tag in ['t_e', 'n_e', 'n_i', 'isat']) or v_min > 0:
+        v_min = 0.0
 
-    if ask_yes_or_no('Adjust any of the plasma py data (y/n) '):
-        while True:
-            try:
-                adj_idx_str = input('Insert the indices (from the selected .nc list) to adjust (multiple indices must be '
-                                    'comma separated): ').strip()
-                adj_idx = [int(idx.strip()) for idx in adj_idx_str.split(',')]
-            except ValueError:
-                print("Invalid input. Please enter numeric indices")
-
-            adjustments = []
-            for index in adj_idx:
-                try:
-                    if index < 0 or index >= num_runs:
-                        print(f"Index {index} is out of range.")
-                        adjustments.append(float(1))
-                        continue
-                    adj_str = input(f"Adjust the index {index} by this specified amount: ").strip()
-                    adjustments.append(float(adj_str))
-                except ValueError:
-                    print("Invalid input. Please enter float value")
-
-            break
-    else:
-        adj_idx = []
-        adjustments = []
-
-    full_adj_array = []
-    for j in range(len(datasets)):
-        if j in adj_idx:
-            idx = adj_idx.index(j)
-            full_adj_array.append(adjustments[idx])
-        else:
-            full_adj_array.append(float(1))
-
+    # Plot individual datasets
     for i, ds in enumerate(datasets):
-        ax = axes[i]
+        curr_ax = ax[letters[i]]
+        mean_data = all_means[i]
 
-        if diagnostic_to_plot == 't_e':
-            Min = 0
-            Max = 15
-        elif diagnostic_to_plot == 'electron_isat':
-            Min = 0
-            Max = 0.6
-        else:
-            Min = None
-            Max = None
-
-        cp = (ds[diagnostic_to_plot].sel(probe=0).mean('shot') * full_adj_array[i]).plot(
-        x='time',
-        y='x',
-        ax=ax,
-        vmin=Min,
-        vmax=Max,
-        cmap = 'turbo'
-        )
-        cbar = cp.colorbar
-        ax.set_xlabel(f'Time  ({ds.attrs.get("time_units")})')
-        ax.set_ylabel(f'x ({ds.attrs.get("x_units")})')
-        cbar.set_label(f'{diagnostic_to_plot} ({ds[diagnostic_to_plot].attrs.get("units", diagnostic_to_plot)})')
-
-        filename = nc_list[nc_choice[i]]
-
-        if "Mar" in filename:
-            run_identifier = "Mar 22 run " + filename.split("_")[1]
-        elif filename.split("_")[0].isdigit():
-            run_identifier = "Jan 24 run " + filename.split("_")[0]
-        else:
-            run_identifier = "filename not yet supported"
-
-        if "pp" in filename:
-            run_identifier = "Plasma Py " + run_identifier
-
-        if "adj" in filename:
-            run_identifier = "Adj v_p " + run_identifier
-
-        if full_adj_array[i] != 1.0:
-            run_identifier = run_identifier + f"( * {full_adj_array[i]})"
-
-        diagnostic_name = ds[diagnostic_to_plot].attrs.get("long_name", diagnostic_to_plot)
-        probe_port = ds['port'].isel(probe=0).item()
-
-        ax.set_title(f"{run_identifier} \n {diagnostic_name}\n  Port: {probe_port}")
-
-    if divide:
-        ax = axes[len(axes) - 1]
-        ds1 = datasets[0]
-        ds2 = datasets[1]
-        data_1 = ds1[diagnostic_to_plot].sel(probe = 0).mean('shot') * full_adj_array[0]
-        data_2 = ds2[diagnostic_to_plot].sel(probe = 0).mean('shot') * full_adj_array[1]
-        cp = (data_1/
-              data_2).plot(
+        cp = mean_data.plot(
+            ax=curr_ax,
             x='time',
             y='x',
-            ax=ax,
-            vmin=0,
-            vmax=2,
-            cmap = 'turbo'
+            vmin=v_min,
+            vmax=v_max,
+            cmap='turbo',
+            add_colorbar=True
         )
-        cbar = cp.colorbar
-        ax.set_xlabel(f'Time  ({ds.attrs.get("time_units")})')
-        ax.set_ylabel(f'x ({ds.attrs.get("x_units")})')
-        filename_a = filename = nc_list[nc_choice[0]]
-        filename_b = filename = nc_list[nc_choice[1]]
-        if "Mar" in filename_a:
-            run_identifier_a = "Mar 22 run " + filename_a.split("_")[1]
-        elif filename_a.split("_")[0].isdigit():
-            run_identifier_a = "Jan 24 run " + filename_a.split("_")[0]
-        else:
-            run_identifier_a = "filename not yet supported"
-        if "Mar" in filename_b:
-            run_identifier_b = "Mar 22 run " + filename_b.split("_")[1]
-        elif filename_b.split("_")[0].isdigit():
-            run_identifier_b = "Jan 24 run " + filename_b.split("_")[0]
-        else:
-            run_identifier_b = "filename not yet supported"
-        if "pp" in filename_a:
-            run_identifier_a = "Plasma Py " + run_identifier_a
-        if"pp" in filename_b:
-            run_identifier_b = "Plasma Py " + run_identifier_b
-        if full_adj_array[0] != 1.0:
-            run_identifier_a = run_identifier_a + f"( * {full_adj_array[0]})"
-        if full_adj_array[1] != 1.0:
-            run_identifier_b = run_identifier_b + f"( * {full_adj_array[1]})"
 
+        run_id = f_run_identifier(ds=ds)
         diagnostic_name = ds[diagnostic_to_plot].attrs.get("long_name", diagnostic_to_plot)
-        ax.set_title(f"{diagnostic_name} \n {run_identifier_a}/{run_identifier_b}")
-        print(f"Average divided value: {(data_1/data_2).mean('x').mean('sweep')}")
+        probe_port = ds['port'].isel(probe=0).item() if 'port' in ds else "Unknown"
 
+        curr_ax.set_title(f"{run_id}\n{diagnostic_name} (Port: {probe_port})", fontsize=12)
+        curr_ax.set_xlabel(f'Time ({ds.attrs.get("time_units", "s")})', fontsize=10)
+        curr_ax.set_ylabel(f'x ({ds.attrs.get("x_units", "cm")})', fontsize=10)
 
+    # Optional Division Plot (Ratio of Dataset 1 / Dataset 2)
+    if divide and num_runs >= 2:
+        div_ax = ax[letters[num_runs]]
+        data_1 = all_means[0]
+        data_2 = all_means[1]
+        ratio = data_1 / data_2
 
-    plt.subplots_adjust(top=0.85)
+        # Dynamic bounds for ratio plot (clipping extreme division artifacts)
+        r_vals = ratio.values.ravel()
+        valid_r = r_vals[~np.isnan(r_vals) & ~np.isinf(r_vals)]
+        r_min, r_max = np.nanpercentile(valid_r, [5, 95]) if len(valid_r) > 0 else (0.5, 2.0)
+
+        cp_div = ratio.plot(
+            ax=div_ax,
+            x='time',
+            y='x',
+            vmin=r_min,
+            vmax=r_max,
+            cmap='turbo',
+            add_colorbar=True
+        )
+
+        run_id_a = f_run_identifier(ds=datasets[0])
+        run_id_b = f_run_identifier(ds=datasets[1])
+
+        div_ax.set_title(f"Ratio: {run_id_a} / {run_id_b}", fontsize=12)
+        div_ax.set_xlabel(f'Time ({datasets[0].attrs.get("time_units", "s")})', fontsize=10)
+        div_ax.set_ylabel(f'x ({datasets[0].attrs.get("x_units", "cm")})', fontsize=10)
+
     plt.tight_layout()
-    plt.show()
-
-def michael_density_plots(ds, diagnostic_to_plot, probe, run_identifier):
-
-    ds_diag = ds[diagnostic_to_plot].sel(probe = probe).mean('shot')
-    mask = (ds['time'] >= 7.0) & (ds['time'] <= 15.0)
-    diag_to_plot = ds_diag.sel(sweep = ds['sweep'][mask]).mean('sweep')
-    std_to_plot = ds_diag.sel(sweep = ds['sweep'][mask]).std('sweep')
-
-    # Format everything for matplot.lib plotting
-    x_vals = diag_to_plot['x'].values
-    diag_to_plot_vals = diag_to_plot.squeeze().values
-    std_to_plot_vals = std_to_plot.squeeze().values
-
-    fig, ax = plt.subplots()
-    ax.errorbar(x_vals, diag_to_plot_vals, yerr=std_to_plot_vals, fmt='o', capsize=3)
-    ax.set_xlabel(f'x ({ds.attrs.get("x_units")})')
-
-    diagnostic_name = ds[diagnostic_to_plot].attrs.get("long_name", diagnostic_to_plot)
-    ax.set_ylabel(f'{diagnostic_name} ({ds[diagnostic_to_plot].attrs.get("units", diagnostic_to_plot)})')
-    probe_port = ds['port'].isel(probe=probe).item()
-
-    ax.set_title(f"{run_identifier} \n {diagnostic_name} Gradient plot \n Port: {probe_port}")
-    plt.subplots_adjust(top=0.85)
     plt.show()
 
 def show_steady_state(ds, probe, run_identifier):
     """
+    Purely visual function to display the currently saved steady state bounds.
 
     Parameters
     ----------
-    ds - xarray.DataArray
-    probe - Probe index so we can get the proper data out of the xarray.DataArray
-    run_identifier - Run identifier indicating which experiment day and run we are looking at
+    ds: xarray.Dataset
+        Data containing the time series the user wants to plot.
+    probe: int
+        Probe number in ds where the time series was saved.
+    run_identifier: str
+        Unique run identifier for the selected dataset
+
+    """
+
+    # Safely extract the saved bounds
+    start = ds.attrs.get(f'steady state start probe {probe}')
+    end = ds.attrs.get(f'steady state end probe {probe}')
+
+    if start is None or end is None:
+        print(f"No steady state bounds saved for probe {probe} yet.")
+        return
+
+    # Generate the plot
+    fig, axes, _ = plot_time_series(ds, probe, run_identifier, return_range = False)
+
+    temp_ax, dens_ax = axes
+
+    # Draw the saved lines
+    temp_ax.axvline(x=start, color='k', linestyle='--', linewidth=2, label='SS Start')
+    dens_ax.axvline(x=start, color='k', linestyle='--', linewidth=2, label='SS Start')
+
+    temp_ax.axvline(x=end, color='k', linestyle=':', linewidth=2, label='SS End')
+    dens_ax.axvline(x=end, color='k', linestyle=':', linewidth=2, label='SS End')
+
+    # Update legend
+    for ax in axes:
+        handles, labels = ax.get_legend_handles_labels()
+        by_label = dict(zip(labels, handles))
+        ax.legend(by_label.values(), by_label.keys(), loc='best', fontsize=14)
+
+    plt.show()
+
+
+def plot_time_series(ds, probe, run_identifier, return_range = False):
+    """
+
+    Parameters
+    ----------
+    ds: xarray.Dataset
+        Data containing the time series the user wants to plot.
+    probe: int
+        Probe number in ds where the time series was saved.
+    run_identifier: str
+        Unique run identifier for the selected dataset
+    return_range: bool
+        If true, the function returns 3 arguments with the last argument being a list of all the x-positions plotted
 
     Returns
     -------
-
+    fig: matplotlib.figure.Figure
+        Figure object containing the time series plot.
+    axes: list
+        List of axes objects containing the time series plot. axes[0] yields the temperature axis and
+        axes[1] yields the density axis and axes[2].
+    range_tot: list
+        Contains all the x values used to plot the temperature and the density
     """
+
+    # Average, get the standard deviation, and filter the temperature across shots
     mean_data = ds['t_e'].sel(probe=probe).mean('shot')
     std_data = ds['t_e'].sel(probe=probe).std('shot')
-
-    filtered_data = filter_data(mean_data, std_data)
-
-    fig1, axes1, range_tot = plot_time_series(ds, probe, run_identifier, return_range = True)
-    plt.show()
-
-    # Ask to find the steady state period
-    if ask_yes_or_no('Search for steady state?" (y/n) '):
-        zero_index = range_tot.index(0)
-        if len(range_tot) >= 5:
-            search_range = range_tot[(zero_index - 2) : (zero_index + 3)]
-        elif len(range_tot) >= 3:
-            search_range = range_tot[(zero_index - 1) : (zero_index + 2)]
-        else:
-            search_range = range_tot[zero_index]
-
-        while True:
-            user_input = input("Guess a center time for the steady state: ")
-            try:
-                int_user_input = int(user_input)
-                break
-
-            except ValueError:
-                print("Please enter an integer.")
-
-        t_e_data_arrays = [filtered_data.sel(x = x_val, y = 0) for x_val in search_range]
-        n_e_data_arrays = [ds['n_e'].sel(probe = probe, x = x_val, y = 0).mean('shot') for x_val in search_range]
-
-        min_time, max_time = find_steady_state(t_e_data_arrays, n_e_data_arrays, int_user_input)
-        fig2, axes2 = plot_time_series(ds, probe, run_identifier, return_range = False)
-
-        for ax in axes2:
-            ax.axvline(min_time, color='k', linestyle='--')
-            ax.axvline(max_time, color='k', linestyle='--')
-        plt.show()
-
-def plot_time_series(ds, probe, run_identifier, return_range = False):
-    mean_data = ds['t_e'].sel(probe=probe).mean('shot')
-    std_data = ds['t_e'].sel(probe=probe).std('shot')
-
     filtered_data = filter_data(mean_data, std_data)
 
     min_x = int(min(filtered_data['x'].values))
     max_x = int(max(filtered_data['x'].values))
 
+
+    # Starting from x = 0, list all values up to the maximum x value in increments of 5
     range_up = list(range(0, max_x + 1, 5))
+
+    # Starting from x = -5 list all values from x = -5 to the minimum x value in increments of 5
     if min_x <= - 5:
         range_down = list(range(-5, min_x + 1, -5))
     else:
         range_down = []
+
+    # Combine the two up and down lists
     range_tot = range_down + range_up
     range_tot = sorted(range_tot)
-    fig, axes = plt.subplots(1, 2, figsize=(16, 8))
-    axes = axes.flatten()
+
+    # Build the figure and axis objects
+    layout = [[2]]
+    fig, ax, letters = build_subplots(layout = layout)
+    temp_letter, dens_letter = letters
+    temp_axis = ax[temp_letter]
+    dens_axis = ax[dens_letter]
+
+    # For each x in the selected x's, plot the temperature and density on their respective axes
     for x_test in range_tot:
         test_data_t_e = filtered_data.sel(x=x_test, y=0)
         test_data_n_e = ds['n_e'].sel(probe=probe, x=x_test, y=0).mean('shot')
         num_nan = test_data_t_e.isnull().sum().item()
         if num_nan < len(test_data_t_e) / 2:
-            test_data_t_e.plot(ax=axes[0],
+            test_data_t_e.plot(ax=temp_axis,
                                x='time',
                                marker='o',
-                               label=f'x = {x_test}')
-            test_data_n_e.plot(ax=axes[1],
+                               label=f'x = {x_test}',
+                               linestyle='None')
+            test_data_n_e.plot(ax=dens_axis,
                                x='time',
                                marker='o',
-                               label=f'x = {x_test}')
+                               label=f'x = {x_test}',
+                               linestyle='None')
 
-    axes[0].set_xlabel(f'Time ({ds.attrs.get("time_units")})',fontsize=28)
-    axes[0].set_ylabel(rf'$T_{{e}}$ ({ds["t_e"].attrs.get("units", "t_e")})',fontsize=28)
-    axes[0].set_title(f'{ds["t_e"].attrs.get("long_name", "t_e")}',fontsize=28)
-    axes[0].legend(loc = 'upper left',fontsize=14)
-    axes[0].tick_params(labelsize=20)
+    # Temperature axis formatting
+    temp_axis.set_xlabel(f'Time ({ds.attrs.get("time_units")})', fontsize=28)
+    temp_axis.set_ylabel(rf'$T_{{e}}$ ({ds["t_e"].attrs.get("units", "t_e")})', fontsize=28)
+    temp_axis.set_title(f'{ds["t_e"].attrs.get("long_name", "t_e")}', fontsize=28)
+    temp_axis.tick_params(labelsize=20)
 
-    axes[1].set_xlabel(f'Time ({ds.attrs.get("time_units")})',fontsize=28)
-    axes[1].set_ylabel(rf'$n_{{e}}$ (${ds["n_e"].attrs.get("units", "n_e")}$)',fontsize=28)
-    axes[1].set_title(f'{ds["n_e"].attrs.get("long_name", "n_e")}',fontsize = 28)
-    axes[1].legend(loc = 'best',fontsize=14)
-    axes[1].tick_params(labelsize=24)
-    axes[1].ticklabel_format(style='sci', axis = 'y', scilimits = (0, 0))
-    axes[1].yaxis.get_offset_text().set_fontsize(24)
+    # Density axis formatting
+    dens_axis.set_xlabel(f'Time ({ds.attrs.get("time_units")})', fontsize=28)
+    dens_axis.set_ylabel(rf'$n_{{e}}$ (${ds["n_e"].attrs.get("units", "n_e")}$)', fontsize=28)
+    dens_axis.set_title(f'{ds["n_e"].attrs.get("long_name", "n_e")}', fontsize=28)
+    dens_axis.tick_params(labelsize=24)
+    dens_axis.ticklabel_format(style='sci', axis='y', scilimits=(0, 0))
+    dens_axis.yaxis.get_offset_text().set_fontsize(24)
+
+    # Extract legend items from temp_axis (since both axes plot the same x labels)
+    handles, labels = temp_axis.get_legend_handles_labels()
+
+    # Determine columns so legend entries span horizontally across the bottom
+    num_cols = min(len(labels), 3) if labels else 1
+
+    # Place one single legend centered underneath the figure
+    fig.legend(
+        handles,
+        labels,
+        loc='lower center',
+        bbox_to_anchor=(0.5, 0.01),
+        ncol=num_cols,
+        fontsize=16,
+        frameon=True
+    )
+    plt.tight_layout()
+
+    # Get the z position of the probe
+    probe_z = ds['z'].isel(probe=probe).item()
+
+    # Set super title
+    fig.suptitle(f"Time Series: {run_identifier},  z: {probe_z} m", fontsize=28)
+    fig.subplots_adjust(top=0.91, bottom=0.14)
 
 
-    probe_port = ds['port'].isel(probe=probe).item()
+    axes = [temp_axis, dens_axis]
 
-    plt.tight_layout(rect=[0, 0, 1, .9])
-    fig.suptitle(f"Time Series: {run_identifier},  Probe: {probe}", fontsize=28)
     if return_range:
         return fig, axes, range_tot
 
-    return fig, axes
+    return fig, axes, None
 
-def create_gradient_plot(ds, run_identifier, gradient_times_dict):
+def dim_num_params(filename, ds):
     """
+    An easy place to gather values useful in dimensionless number calculations.
+
     Parameters
     ----------
-    ds
-    probe
-    run_identifier
+    filename: string
+        Save name of the .nc file in the langmuir folder. Used to get the magnetic field if it is not in the dataset
+        attributes
 
+    ds: xarray.Dataset
+        Of which the user wants to look at the dimensionless numbers for
     Returns
     -------
-
+    ion_mass: Quantity
+        Mass of the ion of interest in kg.
+    z_eff: int
+        Ionization of the neutral particle -- unitless.
+    e_charge: Quantity
+        Charge of an electron in C
+    b_field: Quantity
+        Magnetic field for the experiment in T
     """
-    fig1, axes, range_tot = plot_time_series(ds, 0, run_identifier, return_range = True)
-    plt.show()
-    while True:
-        user_input = input("Guess a center time for the steady state: ")
-        try:
-            int_user_input = int(user_input)
-            break
 
-        except ValueError:
-            print("Please enter an integer.")
-    # plt.close('all')
-    d_probe_gradients = {}
-    for probe in range(ds.sizes['probe']):
-        mean_data = ds['t_e'].sel(probe=probe).mean('shot')
-        std_data = ds['t_e'].sel(probe=probe).std('shot')
-
-        t_e_filtered_data = filter_data(mean_data, std_data)
-        where_nans = t_e_filtered_data.isnull()
-        n_e_filtered_data = ds['n_e'].sel(probe=probe).mean('shot').where(~where_nans)
-        zero_index = range_tot.index(0)
-        if len(range_tot) >= 5:
-            search_range = range_tot[(zero_index - 2): (zero_index + 3)]
-        elif len(range_tot) >= 3:
-            search_range = range_tot[(zero_index - 1): (zero_index + 2)]
-        else:
-            search_range = range_tot[zero_index]
-
-        t_e_data_arrays = [t_e_filtered_data.sel(x=x_val, y=0) for x_val in search_range]
-        n_e_data_arrays = [n_e_filtered_data.sel(x=x_val, y=0) for x_val in search_range]
-        min_time, max_time = find_steady_state(t_e_data_arrays, n_e_data_arrays, int_user_input)
-        filtered_ne_mean_profile, filtered_ne_std_profile = filter_ne_data(n_e_filtered_data, min_time, max_time)
-
-        t_e_mask = (t_e_filtered_data['time'] >= min_time) & (t_e_filtered_data['time'] <= max_time)
-        n_e_mask = (n_e_filtered_data['time'] >= min_time) & (n_e_filtered_data['time'] <= max_time)
-
-        t_e_to_plot = t_e_filtered_data.sel(sweep=ds['sweep'][t_e_mask]).mean('sweep')
-        t_e_std_to_plot = t_e_filtered_data.sel(sweep=ds['sweep'][t_e_mask]).std('sweep')
-
-        # n_e_to_plot = n_e_filtered_data.sel(sweep=ds['sweep'][n_e_mask]).mean('sweep')
-        # n_e_std_to_plot = n_e_filtered_data.sel(sweep=ds['sweep'][n_e_mask]).std('sweep')
-        n_e_to_plot = filtered_ne_mean_profile
-        n_e_std_to_plot = filtered_ne_std_profile
-        # Format everything for matplot.lib plotting
-
-        x_vals = t_e_filtered_data['x'].values
-        t_e_to_plot_vals = t_e_to_plot.squeeze().values
-        t_e_std_to_plot_vals = t_e_std_to_plot.squeeze().values
-        n_e_to_plot_vals = n_e_to_plot.squeeze().values
-        n_e_std_to_plot_vals = n_e_std_to_plot.squeeze().values
-
-        threshold = 25
-        outlier_mask = t_e_to_plot_vals < threshold
-        x_vals = x_vals[outlier_mask]
-        t_e_to_plot_vals = t_e_to_plot_vals[outlier_mask]
-        t_e_std_to_plot_vals = t_e_std_to_plot_vals[outlier_mask]
-        n_e_to_plot_vals = n_e_to_plot_vals[outlier_mask]
-        n_e_std_to_plot_vals = n_e_std_to_plot_vals[outlier_mask]
-
-        # Test to see if the last edge of the temperature regime increases rapidly - We don't think that's possible
-        step = 3
-        # How far from the end do you want to check
-        max_value = 20
-        end_index = 1
-        beginning_index = 0
-        beg_threshold_slope = -.3
-        end_threshold_slope = .5
-        it_vars = list(reversed(list(range(max_value))))
-        for i in it_vars:
-
-            if end_index == 1 and -(i + 1) + step <= -1:
-                end_numerator = (-t_e_to_plot_vals[-(i+1)] + t_e_to_plot_vals[-(i+1)+ step])
-                end_denom = (-x_vals[-(i+1)] + x_vals[-(i+1) + step])
-                try:
-                    end_slope = end_numerator / end_denom
-                except ZeroDivisionError:
-                    end_slope = 0
-                if end_slope > end_threshold_slope:
-                    end_index = i + 1
-                # print('end_slope: ', end_slope)
-
-            if beginning_index == 0 and i - step >= 0:
-                beginning_numerator = t_e_to_plot_vals[i] - t_e_to_plot_vals[i - step]
-                beginning_denom = x_vals[i] - x_vals[i - step]
-                try:
-                    beginning_slope = beginning_numerator / beginning_denom
-                except ZeroDivisionError:
-                    beginning_slope = 0
-                if beginning_slope < beg_threshold_slope:
-                    beginning_index = i
-                # print('beginning_slope: ', beginning_slope)
-        adj_t_e_to_plot_vals = t_e_to_plot_vals[beginning_index: len(t_e_to_plot_vals) - end_index]
-        adj_t_e_std_to_plot_vals = t_e_std_to_plot_vals[beginning_index: len(t_e_to_plot_vals) - end_index]
-        adj_x_vals = x_vals[beginning_index: len(x_vals) - end_index]
-        # print(f'Beginning index: {beginning_index}, Ending index: {end_index}')
-        num_t_vals = len(adj_x_vals)
-        num_n_vals = len(x_vals)
-
-
-        if 'Apr 18' in run_identifier:
-            key_num = 0
-        elif 'Mar 22' in run_identifier:
-            key_num = 1
-        elif 'Nov 22' in run_identifier:
-            key_num = 2
-        elif 'Jan 24' in run_identifier:
-            key_num = 3
-        else:
-            key_num = 4
-
-        if key_num not in gradient_times_dict:
-
-            fig2, axes2 = plt.subplots(1, 2, figsize=(14, 6))
-            axes2 = axes2.flatten()
-
-            axes2[0].errorbar(x_vals, t_e_to_plot_vals, yerr=t_e_std_to_plot_vals, fmt='o', capsize=3)
-            axes2[0].set_xlabel(f'x ({ds.attrs.get("x_units")})',fontsize=24)
-
-            axes2[1].errorbar(x_vals, n_e_to_plot_vals, yerr=n_e_std_to_plot_vals, fmt='o', capsize=3)
-            axes2[1].set_xlabel(f'x ({ds.attrs.get("x_units")})',fontsize=24)
-
-            t_e_name = ds['t_e'].attrs.get("long_name", 't_e')
-            n_e_name = ds['n_e'].attrs.get("long_name", 'n_e')
-
-            axes2[0].set_ylabel(rf"$T_{{e}}$ ({ds['t_e'].attrs.get('units', 't_e')})",fontsize=24)
-            axes2[1].set_ylabel(rf'$n_{{e}}$ (${ds["n_e"].attrs.get("units", "n_e")}$)',fontsize=24)
-
-            axes2[0].set_title(f"{t_e_name}",fontsize=24)
-            axes2[1].set_title(f"{n_e_name}",fontsize=24)
-
-            axes2[0].tick_params(labelsize=20)
-            axes2[1].tick_params(labelsize=20)
-
-            axes2[1].ticklabel_format(style='sci', axis='y', scilimits=(0, 0))
-            axes2[1].yaxis.get_offset_text().set_fontsize(24)
-
-            probe_port = ds['port'].isel(probe=probe).item()
-            plt.tight_layout(rect=[0, 0, 1, .9])
-            fig2.suptitle(f"Radial Profile: {run_identifier}, Probe: {probe}",fontsize=24)
-
-            plt.show()
-            while True:
-                try:
-                    user_input = input("Enter intervals to use for the gradients (e.g., 10 15, 20 25, 30 35): ")
-
-                    # Split the input into interval strings using commas
-                    interval_strings = user_input.split(',')
-
-                    # Parse each interval string into a list of integers
-                    intervals = [list(map(int, interval.strip().split())) for interval in interval_strings]
-                    gradient_times_dict[key_num] = intervals
-                    break
-                except ValueError:
-                    print("Invalid interval input. Make sure all values are integers.")
-            # plt.close('all')
-
-        fig3, axes3 = plt.subplots(2, 2, figsize=(14, 12))
-        fig4, axes4 = plt.subplots(1, 2, figsize=(14, 6))
-        axes3 = axes3.flatten()
-        axes4 = axes4.flatten()
-
-        axes3[0].errorbar(x_vals, t_e_to_plot_vals, yerr=t_e_std_to_plot_vals, fmt='o', capsize=3)
-        axes3[0].set_xlabel(f'x ({ds.attrs.get("x_units")})')
-
-        axes4[0].set_xlabel(f'x ({ds.attrs.get("x_units")})')
-
-        axes3[2].errorbar(adj_x_vals, adj_t_e_to_plot_vals, yerr=adj_t_e_std_to_plot_vals, fmt='o', capsize=3)
-        axes3[2].set_xlabel(f'x ({ds.attrs.get("x_units")})')
-
-        axes4[0].errorbar(adj_x_vals, adj_t_e_to_plot_vals, yerr=adj_t_e_std_to_plot_vals, fmt='o', capsize=3)
-
-        axes3[1].errorbar(x_vals, n_e_to_plot_vals, yerr=n_e_std_to_plot_vals, fmt='o', capsize=3)
-        axes3[1].set_xlabel(f'x ({ds.attrs.get("x_units")})')
-
-        axes4[1].errorbar(x_vals, n_e_to_plot_vals, yerr=n_e_std_to_plot_vals, fmt='o', capsize=3)
-        axes4[1].set_xlabel(f'x ({ds.attrs.get("x_units")})')
-
-        axes3[3].errorbar(x_vals, n_e_to_plot_vals, yerr=n_e_std_to_plot_vals, fmt='o', capsize=3)
-        axes3[3].set_xlabel(f'x ({ds.attrs.get("x_units")})')
-
-        t_e_name = ds['t_e'].attrs.get("long_name", 't_e')
-        n_e_name = ds['n_e'].attrs.get("long_name", 'n_e')
-
-        axes3[0].set_ylabel(f"t_e ({ds['t_e'].attrs.get('units', 't_e')})")
-        axes3[2].set_ylabel(f"t_e ({ds['t_e'].attrs.get('units', 't_e')})")
-        axes4[0].set_ylabel(f"t_e ({ds['t_e'].attrs.get('units', 't_e')})")
-
-        axes3[1].set_ylabel(f"n_e ({ds['n_e'].attrs.get('units', 'n_e')})")
-        axes3[3].set_ylabel(f"n_e ({ds['n_e'].attrs.get('units', 'n_e')})")
-        axes4[1].set_ylabel(f"n_e ({ds['n_e'].attrs.get('units', 'n_e')})")
-
-        axes3[0].set_title(f"{t_e_name}")
-        axes4[0].set_title(f"{t_e_name}")
-        axes3[2].set_title(f"Cleaned {t_e_name} data")
-
-        axes3[1].set_title(f"{n_e_name}")
-        axes4[1].set_title(f"{n_e_name}")
-        axes3[3].set_title(f"{n_e_name}")
-
-        intervals = gradient_times_dict[key_num]
-        d_gradients = {}
-        d_gradients['intervals'] = len(intervals)
-        interval_num = 0
-        for interval in intervals:
-            for time in interval:
-                # Plot a vertical line at each of the chosen time intervals
-                for ax in axes3:
-                    ax.axvline(x=time, color='k', linestyle='--')
-                for ax in axes4:
-                    ax.axvline(x=time, color='k', linestyle='--')
-            start, end = interval
-            x_mask = (x_vals >= start) & (x_vals <= end)
-            adj_x_mask = (adj_x_vals >= start) & (adj_x_vals <= end)
-
-            t_vals = t_e_to_plot_vals[x_mask]
-            d_gradients[f'{interval_num}_t_vals'] = t_vals
-            adj_t_vals = adj_t_e_to_plot_vals[adj_x_mask]
-            d_gradients[f'{interval_num}_adj_t_vals'] = adj_t_vals
-
-            x_vals_masked = x_vals[x_mask]
-            num_n_vals = num_n_vals - len(x_vals_masked)
-            d_gradients[f'{interval_num}_x_vals'] = x_vals_masked
-            adj_x_vals_masked = adj_x_vals[adj_x_mask]
-            num_t_vals = num_t_vals - len(adj_x_vals_masked)
-            n_vals = n_e_to_plot_vals[x_mask]
-            d_gradients[f'{interval_num}_n_vals'] = n_vals
-        #     print('x vals: ', len(x_vals))
-        #     print('x_vals_masked', len(x_vals_masked))
-        #     t_coeffs = np.polyfit(x_vals_masked, t_vals, deg=1)
-        #     t_m, t_b = t_coeffs
-        #
-        #     try:
-        #         adj_t_coeffs = np.polyfit(adj_x_vals_masked, adj_t_vals, deg=1)
-        #     except TypeError:
-        #         adj_t_coeffs = np.polyfit(x_vals_masked, t_vals, deg=1)
-        #         adj_x_vals_masked = x_vals_masked
-        #     adj_t_m, adj_t_b = adj_t_coeffs
-        #     d_gradients[f'{interval_num}_adj_x_vals_masked'] = adj_x_vals_masked
-        #
-        #     if np.where(x_vals >= start)[0][0] <= beginning_index + 1 and t_m <= beg_threshold_slope:
-        #         t_m = 0
-        #         t_b = 0
-        #     if np.where(x_vals >= start)[0][0] <= beginning_index + 1 and adj_t_m <= beg_threshold_slope:
-        #         adj_t_m = 0
-        #         adj_t_b = 0
-        #
-        #     if np.where(x_vals <= end)[0][-1] >= len(x_vals) - end_index and t_m >= end_threshold_slope:
-        #         t_m = 0
-        #         t_b = 0
-        #     if np.where(x_vals <= end)[0][-1] >=len(x_vals) - end_index and adj_t_m >= end_threshold_slope:
-        #         adj_t_m = 0
-        #         adj_t_b = 0
-        #
-        #     if t_m == 0 and t_b == 0:
-        #         continue
-        #     else:
-        #         d_gradients[f'{interval_num}_t_m'] = t_m
-        #         d_gradients[f'{interval_num}_t_b'] = t_b
-        #         d_gradients[f'{interval_num}_adj_t_m'] = adj_t_m
-        #         d_gradients[f'{interval_num}_adj_t_b'] = adj_t_b
-        #
-        #     n_coeffs = np.polyfit(x_vals_masked, n_vals, deg=1)
-        #     n_m, n_b = n_coeffs
-        #     d_gradients[f'{interval_num}_n_m'] = n_m
-        #     axes3[0].plot(x_vals_masked, t_m * x_vals_masked + t_b, linestyle='--',
-        #                   label = f'Fit: y = {t_m:.2f}x + {t_b:.2f}')
-        #     axes3[2].plot(adj_x_vals_masked, adj_t_m * adj_x_vals_masked + adj_t_b, linestyle='--',
-        #                   label=f'Fit: y = {adj_t_m:.2f}x + {adj_t_b:.2f}')
-        #     axes4[0].plot(adj_x_vals_masked, adj_t_m * adj_x_vals_masked + adj_t_b, linestyle='--',
-        #                   label=f'Fit: y = {adj_t_m:.2f}x + {adj_t_b:.2f}')
-        #
-        #     axes3[1].plot(x_vals_masked, n_m * x_vals_masked + n_b, linestyle='--',
-        #                   label = f'Fit: y = {n_m:.2e}x + {n_b:.2e}')
-        #     axes4[1].plot(x_vals_masked, n_m * x_vals_masked + n_b, linestyle='--',
-        #                   label=f'Fit: y = {n_m:.2e}x + {n_b:.2e}')
-        #     axes3[3].plot(x_vals_masked, n_m * x_vals_masked + n_b, linestyle='--',
-        #                   label=f'Fit: y = {n_m:.2e}x + {n_b:.2e}')
-        #
-        #     axes3[0].legend(loc = 'best')
-        #     axes3[1].legend(loc = 'best')
-        #     axes3[2].legend(loc = 'best')
-        #     axes3[3].legend(loc = 'best')
-        #     axes4[0].legend(loc='best')
-        #     axes4[1].legend(loc='best')
-        #     interval_num += 1
-
-        probe_port = ds['port'].isel(probe=probe).item()
-        # plt.tight_layout(rect=[0, 0, 1, .9])
-        # fig3.suptitle(f"{run_identifier} \n Gradient plot \n Port: {probe_port}")
-        # fig4.suptitle(f"{run_identifier} \n Gradient plot \n Port: {probe_port}")
-        # # plt.show()
-        # # plt.show()
-        plt.close('all')
-
-        # Do a fit of the entire profile of order number of total points - number of points in interval
-
-        # Get rid of edge case
-        num_t_vals = num_t_vals - 4
-        num_n_vals = num_n_vals - 4
-
-        test_adj_x_vals = np.linspace(adj_x_vals[0], adj_x_vals[-1], 100)
-        test_x_vals = np.linspace(x_vals[0], x_vals[-1], 100)
-
-        # np.polyfit
-        t_poly_fit = np.polyfit(adj_x_vals,adj_t_e_to_plot_vals, deg = num_t_vals)
-        n_poly_fit = np.polyfit(x_vals,n_e_to_plot_vals, deg = num_n_vals)
-        t_func = np.poly1d(t_poly_fit)
-        n_func = np.poly1d(n_poly_fit)
-        poly_t_vals = t_func(test_adj_x_vals)
-        poly_n_vals = n_func(test_x_vals)
-
-        # curve fit
-        t_curvefit, t_curve_cov = curve_fit(polynomial_function, adj_x_vals, adj_t_e_to_plot_vals, p0 = t_poly_fit,
-                                           sigma = adj_t_e_std_to_plot_vals, absolute_sigma = True)
-        n_curvefit, n_curve_cov = curve_fit(polynomial_function, x_vals, n_e_to_plot_vals, p0=n_poly_fit,
-                                           sigma=n_e_std_to_plot_vals, absolute_sigma=True)
-        t_curve_func = np.poly1d(t_curvefit)
-        n_curve_func = np.poly1d(n_curvefit)
-        curve_t_vals = polynomial_function(test_adj_x_vals, *t_curvefit)
-        curve_n_vals = polynomial_function(test_x_vals, *n_curvefit)
-
-        # Remove edge wackiness from polynomials
-        points_on_edge = 2
-        t_fit_x_vals_mask = (test_adj_x_vals >= adj_x_vals[points_on_edge -1]) & (test_adj_x_vals <= adj_x_vals[-points_on_edge])
-        n_fit_x_vals_mask = (test_x_vals >= x_vals[points_on_edge -1]) & (test_x_vals <= x_vals[-points_on_edge])
-        curve_t_vals_masked = curve_t_vals[t_fit_x_vals_mask]
-        curve_n_vals_masked = curve_n_vals[n_fit_x_vals_mask]
-        test_adj_x_vals_masked = test_adj_x_vals[t_fit_x_vals_mask]
-        test_x_vals_masked = test_x_vals[n_fit_x_vals_mask]
-
-
-        n_adj_x_vals = adj_x_vals[points_on_edge - 1:len(adj_x_vals) - points_on_edge]
-        n_x_vals = x_vals[points_on_edge - 1:len(x_vals) - points_on_edge]
-        n_e_edge_mask = n_e_to_plot_vals[points_on_edge - 1:len(n_e_to_plot_vals) - points_on_edge]
-        t_e_edge_mask = adj_t_e_to_plot_vals[points_on_edge - 1:len(adj_t_e_to_plot_vals) - points_on_edge]
-        t_grad = t_curve_func.deriv()(n_adj_x_vals)
-        n_grad = n_curve_func.deriv()(n_x_vals)
-        n_x_vals_t_mask = (n_x_vals >= n_adj_x_vals[0]) & (n_x_vals <= n_adj_x_vals[-1])
-        n_grad_masked = n_grad[n_x_vals_t_mask]
-        n_e_masked = n_e_edge_mask[n_x_vals_t_mask]
-        normalized_grad_n = n_grad/n_e_edge_mask
-        adj_normalized_grad_n = n_grad_masked/n_e_masked
-        normalized_grad_t = t_grad/t_e_edge_mask
-        eta_e = normalized_grad_t/adj_normalized_grad_n
-
-
-
-        fig5, axes5 = plt.subplots(1, 2, figsize=(14, 6))
-        axes5 = axes5.flatten()
-
-        axes5[0].errorbar(adj_x_vals, adj_t_e_to_plot_vals, yerr=adj_t_e_std_to_plot_vals, fmt='o', capsize=3)
-        # axes5[0].plot(test_adj_x_vals, poly_t_vals, label=f'Polynomial fit order: {num_t_vals}')
-        axes5[0].plot(test_adj_x_vals_masked, curve_t_vals_masked, label=f'Curve fit order: {num_t_vals}')
-        axes5[0].set_ylabel(f"$t_e$ ({ds['t_e'].attrs.get('units', 't_e')})")
-        axes5[0].set_xlabel(f'x ({ds.attrs.get("x_units")})')
-        axes5[0].set_title(f"{t_e_name}")
-
-
-        axes5[1].errorbar(x_vals, n_e_to_plot_vals, yerr=n_e_std_to_plot_vals, fmt='o', capsize=3)
-        # axes5[1].plot(test_x_vals, poly_n_vals, label=f'Polynomial fit order: {num_n_vals}')
-        axes5[1].plot(test_x_vals_masked, curve_n_vals_masked, label=f'Curve fit order: {num_n_vals}')
-        axes5[1].set_ylabel(f"$n_e$ (${ds['n_e'].attrs.get('units', 'n_e')}$)")
-        axes5[1].set_xlabel(f'x ({ds.attrs.get("x_units")})')
-        axes5[1].set_title(f"{n_e_name}")
-
-        axes5[0].legend(loc='best')
-        axes5[1].legend(loc='best')
-
-        plt.tight_layout(rect=[0, 0, 1, .9])
-        fig5.suptitle(f"Radial Profile: {run_identifier} \n Probe: {probe}")
-        plt.show()
-        d_gradients['x_vals'] = n_x_vals
-        d_gradients['adj_x_vals'] = n_adj_x_vals
-        d_gradients['normalized grad t'] = normalized_grad_t
-        d_gradients['normalized grad n'] = normalized_grad_n
-        d_gradients['eta e'] = eta_e
-
-        d_probe_gradients[f'{probe}'] = d_gradients
-
-
-
-
-
-    return gradient_times_dict, d_probe_gradients
-
-
-def dim_num_params(run_identifier, filename):
-    particle_name = run_identifier.split(' ')[-1]
+    particle_name = ds.attrs['ion_type']
     part = Particle(particle_name)
 
     e_charge = c.e.si
@@ -881,135 +543,499 @@ def dim_num_params(run_identifier, filename):
 
     z_eff = part.charge_number
 
-    split_filename = filename.split('_')
-    b_field = 0 * u.kG
-    for snippet in split_filename:
-        if 'kG' in snippet:
-            b_field = float(snippet.split('kG')[0]) * u.kG
+
+    if 'B-field' in ds.attrs:
+        b_field_str = ds.attrs['B-field']
+        b_field = u.Quantity(b_field_str)
+
+    else:
+        split_filename = filename.split('_')
+        b_field = 0 * u.kG
+        for snippet in split_filename:
+            if 'kG' in snippet:
+                b_field = float(snippet.split('kG')[0]) * u.kG
 
     b_field = b_field.to(u.T)
 
     return ion_mass.to(u.kg), z_eff, e_charge.to(u.C), b_field
 
-def compute_dimesionless_plots(dataset, ion_mass, z_eff, e_charge, b_field, a, run_identifier):
-    fig1, axes, range_tot = plot_time_series(dataset, 0, run_identifier, return_range=True)
-    plt.show()
-    while True:
-        user_input = input("Guess a center time for the steady state: ")
-        try:
-            int_user_input = int(user_input)
-            break
+def compute_dimesionless_plots(ds, ion_mass, z_eff, e_charge, b_field, a, L, run_identifier):
+    """
+    Parameters
+    ----------
+    ds: xarray.Dataset
+        Full dataset corresponing to the experiment you want to get the dimensionless numbers for
+    ion_mass: astropy.units.Quantity
+        Mass of the ion of interest in kg
+    z_eff: int
+        Ionization value of the ion particle
+    e_charge: astropy.units.Quantity
+        Charge of the electron
+    b_field: astropy.units.Quantity
+        Magnetic field of LAPD in T
+    a: astropy.units.Quantity
+        LAPD core radius in m
+    L: astropy.units.Quantity
+        LAPD length in m
+    run_identifier: str
+        Identifies the experiment by experiment name and run number
 
-        except ValueError:
-            print("Please enter an integer.")
-    plt.close('all')
-    ds = dataset
+    Returns
+    -------
+    probe_dict: dict
+        Dictionary with the values needed to plot the dimensionless numbers sorted by probe
+
+    """
+
     probe_dict = {}
     for probe in range(ds.sizes['probe']):
+
+        # Find the steady state values for each probe
+        min_time = ds.attrs[f'steady state start probe {probe}']
+        max_time = ds.attrs[f'steady state end probe {probe}']
+
         probe_dict[probe] = {}
-        mean_data = ds['t_e'].sel(probe=probe).mean('shot')
-        std_data = ds['t_e'].sel(probe=probe).std('shot')
 
-        t_e_filtered_data = filter_data(mean_data, std_data)
-        where_nans = t_e_filtered_data.isnull()
-        n_e_filtered_data = ds['n_e'].sel(probe=probe).mean('shot').where(~where_nans)
-        nu_ei_filtered_data = ds['nu_ei'].sel(probe=probe).mean('shot').where(~where_nans)
-        zero_index = range_tot.index(0)
-        if len(range_tot) >= 5:
-            search_range = range_tot[(zero_index - 2): (zero_index + 3)]
-        elif len(range_tot) >= 3:
-            search_range = range_tot[(zero_index - 1): (zero_index + 2)]
-        else:
-            search_range = range_tot[zero_index]
+        # Process data
+        t_e_to_plot_vals, _, t_x_vals = process_variable_data(ds, probe, var_name='t_e')
+        nu_ei_to_plot_vals, _, nu_ei_x_vals = process_variable_data(ds, probe, var_name='nu_ei')
 
-        t_e_data_arrays = [t_e_filtered_data.sel(x=x_val, y=0) for x_val in search_range]
-        n_e_data_arrays = [n_e_filtered_data.sel(x=x_val, y=0) for x_val in search_range]
-        min_time, max_time = find_steady_state(t_e_data_arrays, n_e_data_arrays, int_user_input)
-        filtered_ne_mean_profile, filtered_ne_std_profile = filter_ne_data(n_e_filtered_data, min_time, max_time)
+        # Safely extract attributes/units
+        t_e_units = getattr(ds['t_e'], 'units', ds['t_e'].attrs.get('units', 'eV'))
+        nu_units = getattr(ds['nu_ei'], 'units', ds['nu_ei'].attrs.get('units', '1/s'))
 
-        t_e_mask = (t_e_filtered_data['time'] >= min_time) & (t_e_filtered_data['time'] <= max_time)
-        n_e_mask = (n_e_filtered_data['time'] >= min_time) & (n_e_filtered_data['time'] <= max_time)
-        nu_ei_mask = (nu_ei_filtered_data['time'] >= min_time) & (nu_ei_filtered_data['time'] <= max_time)
-
-
-        t_e_to_plot = t_e_filtered_data.sel(sweep=ds['sweep'][t_e_mask]).mean('sweep')
-        t_e_std_to_plot = t_e_filtered_data.sel(sweep=ds['sweep'][t_e_mask]).std('sweep')
-
-        nu_ei_to_plot = nu_ei_filtered_data.sel(sweep=ds['sweep'][nu_ei_mask]).mean('sweep')
-        nu_ei_std_to_plot = nu_ei_filtered_data.sel(sweep=ds['sweep'][nu_ei_mask]).std('sweep')
-
-        # Format everything for matplot.lib plotting
-        # print('t_e: ', t_e_to_plot)
-        # print('nu_ei: ', nu_ei_to_plot)
-        t_x_vals = t_e_filtered_data['x'].values
-        nu_x_vals = nu_ei_filtered_data['x'].values
-        t_e_to_plot_vals = t_e_to_plot.squeeze().values
-        t_e_std_to_plot_vals = t_e_std_to_plot.squeeze().values
-        nu_ei_to_plot_vals = nu_ei_to_plot.squeeze().values
-        nu_ei_std_to_plot_vals = nu_ei_std_to_plot.squeeze().values
-        t_e_units = ds['t_e'].units
-        nu_units = ds['nu_ei'].units
-
+        # Attach units to the values
         t_e_w_units = t_e_to_plot_vals * u.Unit(t_e_units)
         nu_ei_w_units = nu_ei_to_plot_vals * u.Unit(nu_units)
-        if t_e_w_units.unit == Unit('eV'):
-            t_e_joules = t_e_w_units.to(u.J, equivalencies=u.temperature_energy())
-        elif t_e_w_units.unit == Unit('K'):
-            t_e_joules = t_e_w_units.to(u.J, equivalencies=u.temperature_energy())
-        else:
-            t_e_joules = t_e_w_units
 
+        # Sound speed calculation for rho* -> sqrt(T_e/m_i) or other variations as outlined in the docstring of the
+        # function
+        c_s = sound_speed_calculation(t_e=t_e_w_units, ion_mass=ion_mass, z = z_eff)
 
-        rhostar = ((ion_mass * t_e_joules) ** 0.5/(e_charge * b_field * a)).to(u.dimensionless_unscaled)
-        nu_eff = ((z_eff * nu_ei_w_units ** 2 * a ** 2 * ion_mass)/t_e_joules).to(u.dimensionless_unscaled)
+        # Dimensionless Parameters Calculation
+        rhostar = (ion_mass * c_s / (e_charge * b_field * a)).to(u.dimensionless_unscaled)
+        nu_eff = (2 * np.pi * c_s / (nu_ei_w_units * L)).to(u.dimensionless_unscaled)
 
+        # Assign keys to the values we want to save in the dictionary
         probe_dict[probe]['rhostar'] = rhostar
         probe_dict[probe]['nu_eff'] = nu_eff
         probe_dict[probe]['x_vals'] = t_x_vals
         probe_dict[probe]['run identifier'] = run_identifier
 
-
     return probe_dict
 
 
 
+def shortened_exp_name(long_exp_name):
+    """
+    
+    Parameters
+    ----------
+    long_exp_name: str 
+        Full length name of the experiment from exp_params_dict such as January_2024
 
-def f_run_identifier(filename):
+    Returns
+    -------
+    exp_name: str
+        Shortened experiment name with 3 letters indicating the month followed by the year
+
+    """""
+
+    exp_name_split = long_exp_name.split('_')
+    month = exp_name_split[0][: 3]
+    year = exp_name_split[1]
+    exp_name = month + year
+    return exp_name
+
+
+
+
+
+def f_run_identifier(ds = None, filename = ''):
+    """
+    Parameters
+    ----------
+    filename: string
+        Raw filename coming from how the .nc file is saved
+    ds: xarray.Dataset
+        Data and, most importantly for this function, attributes corresponding to the user's selected experiment run
+
+    Returns
+    -------
+    run_identifier: String
+        In the format expname_runnumber_iontype
+    """
+    run_identifier = ""
+
+    if ds is not None:
+        # Create the run identifier from the dataset attributes
+        if 'Exp name' in ds.attrs:
+            exp_name = shortened_exp_name(ds.attrs['Exp name'])
+            run_identifier = exp_name + ', ' +  ds.attrs['Run number'] + ', ' + ds.attrs['ion_type']
+
+    else:
+        # Create run_identifier from the filename given
+        if "Mar" in filename:
+            run_identifier = "Mar 22 run " + filename.split("_")[1]
+        elif 'kG' in filename:
+            try:
+                addition = int(filename.split("_")[1])
+            except ValueError:
+                addition = filename.split("_")[0]
+
+            run_identifier = "Jan 24 run " + str(addition)
+
+            if "H2" in filename:
+                run_identifier = run_identifier + " H+"
+            else:
+                run_identifier = run_identifier + " He+"
+
+        else:
+            run_identifier = "filename not yet supported"
+
+    return run_identifier
+
+
+def generic_run_identifiers(lang_datasets):
+    """
+    Parameters
+    ----------
+    lang_datasets: list
+        List of xarray.Dataset objects corresponding to what the user would like to plot
+
+    Returns
+    -------
+    run_identifiers: list
+        List of strings containing generic run identifiers corresponding to the order in which the original
+        lang_datasets list was passed in. (He 1, H 1, He 2, etc.)
+    """
+
+    # Deal with PyCharm's annoying error handling
+    lang_datasets = list(lang_datasets)
+    he_num = 1
+    h_num = 1
+    run_identifiers = []
+
+    # This dictionary will store the mapping: {'raw_run_id': 'generic_run_id'}
+    id_mapping = {}
+
+    for ds in lang_datasets:
+        raw_identifier = f_run_identifier(ds)
+
+        # Check to see if the dataset has already been assigned an identifier and if not create one
+        if raw_identifier not in id_mapping:
+            if 'He' in raw_identifier:
+                gen_identifier = f'He {he_num}'
+                he_num += 1
+            elif 'H' in raw_identifier:
+                gen_identifier = f'H {h_num}'
+                h_num += 1
+            else:
+                gen_identifier = 'Unknown'
+            id_mapping[raw_identifier] = gen_identifier
+        else:
+            gen_identifier = id_mapping[raw_identifier]
+
+        run_identifiers.append(gen_identifier)
+
+    return run_identifiers
+
+
+def determine_colors(datasets, one_probe =True):
+
+    """
+    Parameters
+    ----------
+    datasets: list
+        list of user selected xarray.Datasets to assign colors and markers to
+    one_probe: boolean
+        Indicates whether to plot one probe from each dataset or all probes from each dataset
+
+    Returns
+    -------
+    clor: list
+        List of the colors corresponding to each dataset. Ordered by the order in the original dataset list
+    mark: list
+        List of the marks corresponding to each dataset. Ordered by the order in the original dataset list
+    """
+
+    # Supress PyCharm annoying warnings and ensure we don't have a generator object
+    datasets = list(datasets)
+
+    list_run_identifiers = []
+    probe_num_list = []
+
+    # Create run identifiers and look for the number of probes in each
+    for dataset in datasets:
+        run_identifier = f_run_identifier(ds = dataset)
+        list_run_identifiers.append(run_identifier)
+        probe_num_list.append(len(dataset.probe))
+
+    if one_probe:
+        # Create a list of 1s in the probe list equal in length to the number of datasets to evaluate
+        probes_in_file = [1] * len(datasets)
+        clor, mark = generate_file_colors(probes_in_file, list_run_identifiers)
+    else:
+        # Repeat each dataset's run identifier by the exact number of probes in that dataset
+        n_l_run_identifiers = []
+        for run_id, num_probes in zip(list_run_identifiers, probe_num_list):
+            n_l_run_identifiers.extend([run_id] * num_probes)
+
+        clor, mark = generate_file_colors(probe_num_list, n_l_run_identifiers)
+
+    return clor, mark
+
+def generate_file_colors(probes_per_file, l_run_identifiers):
+    """
+    Generate colors for multiple files.
+    - Hydrogen (H): Red spectrum
+    - Helium (He): Green spectrum
+    - Mar22: Blue spectrum
+    - Nov22: Yellow spectrum
+    Probes within files vary dramatically in brightness and saturation.
+
+    Parameters
+    ----------
+    probes_per_file: list
+        List where the length corresponds to the number of datasets to evaluate and each cell corresponds to how many
+        probes are in each dataset
+    l_run_identifiers: list
+        List of strings corresponding to which run is being looked at. Run identifiers are repeated for multiple probes
+        in the dataset
+
+    Returns
+    -------
+    colors: list
+        List of the colors corresponding to each dataset. Ordered by the order in the original dataset list and
+        repeated based on how many probes are in each dataset
+    markers: list
+        List of the marks corresponding to each dataset. Ordered by the order in the original dataset list and
+        repeated based on how many probes are in each dataset
+    """
+
+    # To deal with PyCharm's annoying warnings and ensure we are dealing with lists
+    probes_per_file = list(probes_per_file)
+    l_run_identifiers = list(l_run_identifiers)
+
+    # Master pool of distinct Matplotlib markers
+    master_markers = ['^', 'v', '<', '>', 'D', 'd', 'o', 's', 'P', '*', 'X', 'h']
+
+    # Split the master list in half so He and H have completely disjoint marker sets.
+    # This guarantees a Helium marker will NEVER be used for a Hydrogen plasma.
+    half = len(master_markers) // 2
+    he_markers = master_markers[:half]  # First half assigned to Helium  : ['^', 'v', '<', '>', 'D', 'd']
+    h_markers = master_markers[half:]  # Second half assigned to Hydrogen: ['o', 's', 'P', '*', 'X', 'h']
+
+    # Check to make sure we have the correct number of probes corresponding to run identifiers
+    if sum(probes_per_file) != len(l_run_identifiers):
+        raise ValueError("Sum of probes_per_file must match length of l_run_identifiers")
+
+    colors = []
+    markers = []
+
+    # Categorize and count files. Datasets from Jan 2024 and later will be categorized by Hydrogen and Helium
+    # and earlier experiments that were entirely Helium runs will be categorized with their run
+    file_categories = []
+    file_species = []
+    start_idx = 0
+    for n in probes_per_file:
+        run_id = l_run_identifiers[start_idx]
+        # Check identifiers in order of priority
+        if "Mar2022" in run_id:
+            file_categories.append("Mar22")
+        elif "Nov2022" in run_id:
+            file_categories.append("Nov22")
+        elif "He+" in run_id or "He-4+" in run_id:
+            file_categories.append("He")
+        else:
+            file_categories.append("H")
+
+        if "He+" in run_id or "He-4+" in run_id or "Mar2022" in run_id or "Nov2022" in run_id:
+            file_species.append("He")
+        else:
+            file_species.append("H")
+
+        start_idx += n
+
+    # Tally up the total number of files in each category
+    counts = {
+        "H": file_categories.count("H"),
+        "He": file_categories.count("He"),
+        "Mar22": file_categories.count("Mar22"),
+        "Nov22": file_categories.count("Nov22")
+    }
+
+    # Keep track of which file we are on for each category
+    indices = {"H": 0, "He": 0, "Mar22": 0, "Nov22": 0}
+
+    # Start assigning colors and markers. Start index refers to the index in the run_identifiers list where this
+    # probe set started
+    start_idx = 0
+    for file_idx, num_probes in enumerate(probes_per_file):
+        category = file_categories[file_idx]
+        species = file_species[file_idx]
+        total_in_cat = counts[category]
+        current_idx = indices[category]
+
+        # Select target marker pool based on species
+        target_markers = he_markers if species == "He" else h_markers
+        pool_size = len(target_markers)
+
+        # Print message if probes exceed available unique markers for this gas species
+        if num_probes > pool_size:
+            run_name = l_run_identifiers[start_idx]
+
+            # Calculate how many of each marker will be plotted
+            marker_counts = {}
+            for i, m in enumerate(target_markers):
+                count = (num_probes // pool_size) + (1 if i < (num_probes % pool_size) else 0)
+                marker_counts[m] = count
+
+            counts_str = ", ".join(f"'{m}': {count}" for m, count in marker_counts.items())
+            print(
+                f"Notice: File '{run_name}' has {num_probes} probes, exceeding the {pool_size} "
+                f"unique markers available. \n Marker plot counts -> {counts_str}"
+            )
+
+        # Assign base hue depending on the category
+        if category == "Mar22":
+            # Cyan/Teal range: 0.45 to 0.55
+            if total_in_cat > 1:
+                base_hue = 0.45 + 0.10 * (current_idx / (total_in_cat - 1))
+            else:
+                base_hue = 0.50
+
+        elif category == "Nov22":
+            # Yellow range: 0.10 (Golden-Orange) to 0.18 (Bright Lemon)
+            if total_in_cat > 1:
+                base_hue = 0.10 + 0.08 * (current_idx / (total_in_cat - 1))
+            else:
+                base_hue = 0.15  # Standard Yellow
+
+
+        elif category == "He":
+            # Deep Blue range: 0.60 (True Blue) to 0.70 (Deep Indigo)
+            if total_in_cat > 1:
+                base_hue = 0.60 + 0.10 * (current_idx / (total_in_cat - 1))
+            else:
+                base_hue = 0.65
+
+
+        else:  # "H"
+            # Pink range: 0.82 (Magenta) to 0.92 (Hot Pink)
+            if total_in_cat > 1:
+                base_hue = 0.82 + 0.10 * (current_idx / (total_in_cat - 1))
+            else:
+                base_hue = 0.87
+
+        # Increment the index for whichever category we just processed
+        indices[category] += 1
+
+        # Calculate Saturation and value and determine the marker for each probe
+        for p in range(num_probes):
+            if num_probes > 1:
+                fraction = p / (num_probes - 1)
+                # Saturation goes from 1.0 (intense) down to 0.45 (washed out)
+                saturation = 1.0 - 0.55 * fraction
+                # Value (Brightness) goes from 0.45 (dark) up to 0.95 (bright)
+                value = 0.45 + 0.50 * fraction
+            else:
+                saturation = 0.8
+                value = 0.8
+
+            # Convert hue saturation and value numbers into normalized RGB float
+            rgb = colorsys.hsv_to_rgb(base_hue, saturation, value)
+
+            # Scale floats to 8-bit integers and format into standard Hex format
+            hex_color = '#{:02x}{:02x}{:02x}'.format(
+                int(rgb[0] * 255),
+                int(rgb[1] * 255),
+                int(rgb[2] * 255)
+            )
+
+            colors.append(hex_color)
+
+            # Assign marker (cycling through the species pool)
+            marker = target_markers[p % pool_size]
+            markers.append(marker)
+
+        start_idx += num_probes
+
+    return colors, markers
+
+def build_subplots(layout, fig_width = 6.4, fig_height = 4.8, **kwargs):
     """
 
     Parameters
     ----------
-    filename - String identifying what run the data is from
+    layout: list
+        List of lists with each list containing an integer indicating the number of subplots in each row.
+    fig_width: float
+        Width of ONE subplot figure in inches.
+    fig_height: float
+        Height of ONE subplot figure in inches.
+    **kwargs: additional keyword arguments
+        Passed directly to plt.subplot_mosaic (e.g., sharex=True, sharey=True).
 
     Returns
     -------
-    run_identifier - String identifying what run the data is from to be used in a plot title
+    fig: figure
+        Figure object with the associated subplots
+    ax: dict
+        Dictionary of axes mapped to letters
+    letters: list
+        List of strings with all the letters needed to place figures within the subplot
     """
 
-    if "Mar" in filename:
-        run_identifier = "Mar 22 run " + filename.split("_")[1]
-    elif 'kG' in filename:
-        try:
-            addition = int(filename.split("_")[1])
-        except ValueError:
-            addition = filename.split("_")[0]
+    # Deal with PyCharm's annoying warnings
+    layout = list(layout)
 
-        run_identifier = "Jan 24 run " + str(addition)
+    # Find the maximum number of plots in a row to determine the width of the subplot diagram
+    max_plots = max(row[0] for row in layout)
+    total_cols = max_plots * 2
 
-        if "H2" in filename:
-            run_identifier = run_identifier + " H+"
-        else:
-            run_identifier = run_identifier + " He+"
+    # Find the size of the total figure
+    total_fig_width = fig_width * 1.25 * max_plots
+    total_fig_height = fig_height * 1.25 * len(layout)
 
-    else:
-        run_identifier = "filename not yet supported"
-    # print(run_identifier)
-    if "pp" in filename:
-        run_identifier = "Plasma Py " + run_identifier
-    if "adj" in filename:
-        run_identifier = 'Adj V_P ' + run_identifier
+    mosaic_layout = []
+    letters = []
+    current_ascii = ord('A')
+    for row in layout:
+        num_plots = row[0]
+        row_mosaic = []
 
-    return run_identifier
+        # How much space needs to be padded with the '.'s
+        cols_used = num_plots * 2
+        padding = (total_cols - cols_used) // 2
+
+        # Add padding to the left side (One '.' on each side for each set of columns not used)
+        row_mosaic.extend(['.'] * padding)
+
+        # Add in the letters
+        for _ in range(num_plots):
+            # Convert the ascii number back into a letter
+            letter = chr(current_ascii)
+            letters.append(letter)
+            # Add those letters to the row
+            row_mosaic.extend([letter,letter])
+            # Move on to the next letter
+            current_ascii += 1
+
+
+        # Add padding to the right side
+        row_mosaic.extend(['.'] * padding)
+
+        # Add the completed row to the mosaic
+        mosaic_layout.append(row_mosaic)
+
+    # Create the figure and axis objects
+    fig, ax = plt.subplot_mosaic(mosaic_layout, figsize=(total_fig_width, total_fig_height),dpi = 100, **kwargs)
+
+    return fig, ax, letters
+
+
+
 
 
 

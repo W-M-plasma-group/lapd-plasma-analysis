@@ -131,40 +131,40 @@ def electron_temperature_max(unique_bias,unique_adj_current, dlnIdV, dlnI2dV2,v_
 
 
     #
-    # Create plots
-    fig, ax = plt.subplots(2,2, figsize = (8,8))
-    ax = ax.flatten()
-    ax[0].plot(unique_bias, unique_adj_current, marker=".", color='b', linestyle='None', label= 'Original data')
-    ax[0].plot(unique_bias, slope * unique_bias.value + intercept, linestyle="--", color='r', label = 'Temperature Fit')
-    ax[0].plot(unique_bias[left_edge], unique_adj_current[left_edge], marker=".", color='y', label = 'Left edge of fit')
-    ax[0].plot(unique_bias[right_edge], unique_adj_current[right_edge], marker=".", color='y', label = 'Right edge of fit')
-    ax[0].plot(unique_bias[v_max_idx], unique_adj_current[v_max_idx], marker=".", color='g', label = 'Maximum index')
-    ax[0].set_title('log plot ' + filename)
-    ax[0].set_xlabel(r'Voltage (V)')
-    ax[0].set_ylabel(r'$\text{ln}(I)$')
-    ax[0].legend(loc='lower right')
-
-    ax[1].plot(unique_bias, dlnIdV, marker=".", color='b', label = 'Derivative of spline fit')
-    ax[1].plot(unique_bias[v_max_idx], dlnIdV[v_max_idx], marker=".", color='m', label = 'Maximum index')
-    ax[1].axvline(x=unique_bias[left_edge].value, color='g', label = 'Left edge of fit')
-    ax[1].axvline(x=unique_bias[right_edge].value, color='y', label = 'Right edge of fit')
-    ax[1].set_xlabel('Voltage (V)')
-    ax[1].set_ylabel(r'$\frac{\text{dln}(I)}{\text{d}V}$')
-    ax[1].set_title('log plot derivative ' + filename)
-    ax[1].legend(loc='lower right')
-
-    ax[2].plot(unique_bias[left_edge:right_edge], unique_adj_current[left_edge:right_edge], marker=".", color='b',
-               linestyle = 'None',label = 'Original Data')
-    ax[2].plot(unique_bias[left_edge:right_edge], slope * unique_bias[left_edge:right_edge].value + intercept,
-               linestyle="--", color='r', label = 'Temperature fit')
-    ax[2].plot(unique_bias[v_max_idx], unique_adj_current[v_max_idx], marker=".", color='g', label = 'Maximum index')
-    ax[2].legend(loc='lower right')
-    ax[2].set_xlabel('Voltage (V)')
-    ax[2].set_ylabel(r'$\text{ln}(I)$')
-    ax[2].set_title('Zoomed log plot ' + filename)
-
-    plt.tight_layout()
-    plt.show()
+    # # Create plots
+    # fig, ax = plt.subplots(2,2, figsize = (8,8))
+    # ax = ax.flatten()
+    # ax[0].plot(unique_bias, unique_adj_current, marker=".", color='b', linestyle='None', label= 'Original data')
+    # ax[0].plot(unique_bias, slope * unique_bias.value + intercept, linestyle="--", color='r', label = 'Temperature Fit')
+    # ax[0].plot(unique_bias[left_edge], unique_adj_current[left_edge], marker=".", color='y', label = 'Left edge of fit')
+    # ax[0].plot(unique_bias[right_edge], unique_adj_current[right_edge], marker=".", color='y', label = 'Right edge of fit')
+    # ax[0].plot(unique_bias[v_max_idx], unique_adj_current[v_max_idx], marker=".", color='g', label = 'Maximum index')
+    # ax[0].set_title('log plot ' + filename)
+    # ax[0].set_xlabel(r'Voltage (V)')
+    # ax[0].set_ylabel(r'$\text{ln}(I)$')
+    # ax[0].legend(loc='lower right')
+    #
+    # ax[1].plot(unique_bias, dlnIdV, marker=".", color='b', label = 'Derivative of spline fit')
+    # ax[1].plot(unique_bias[v_max_idx], dlnIdV[v_max_idx], marker=".", color='m', label = 'Maximum index')
+    # ax[1].axvline(x=unique_bias[left_edge].value, color='g', label = 'Left edge of fit')
+    # ax[1].axvline(x=unique_bias[right_edge].value, color='y', label = 'Right edge of fit')
+    # ax[1].set_xlabel('Voltage (V)')
+    # ax[1].set_ylabel(r'$\frac{\text{dln}(I)}{\text{d}V}$')
+    # ax[1].set_title('log plot derivative ' + filename)
+    # ax[1].legend(loc='lower right')
+    #
+    # ax[2].plot(unique_bias[left_edge:right_edge], unique_adj_current[left_edge:right_edge], marker=".", color='b',
+    #            linestyle = 'None',label = 'Original Data')
+    # ax[2].plot(unique_bias[left_edge:right_edge], slope * unique_bias[left_edge:right_edge].value + intercept,
+    #            linestyle="--", color='r', label = 'Temperature fit')
+    # ax[2].plot(unique_bias[v_max_idx], unique_adj_current[v_max_idx], marker=".", color='g', label = 'Maximum index')
+    # ax[2].legend(loc='lower right')
+    # ax[2].set_xlabel('Voltage (V)')
+    # ax[2].set_ylabel(r'$\text{ln}(I)$')
+    # ax[2].set_title('Zoomed log plot ' + filename)
+    #
+    # plt.tight_layout()
+    # plt.show()
 
 
     return slope, intercept

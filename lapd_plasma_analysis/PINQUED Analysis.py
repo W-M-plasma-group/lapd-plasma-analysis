@@ -7,6 +7,7 @@ import astropy.constants as const
 from scipy.interpolate import UnivariateSpline
 from lapd_plasma_analysis.PINQUED_Functions.Curve_fitting import *
 from lapd_plasma_analysis.PINQUED_Functions.PINQUED_Auxillary_functions import *
+from lapd_plasma_analysis.file_access import ensure_directory
 
 full_folder = "/Users/lukec/Downloads/Pinqued_csv_Jan_26/"
 csv_folder = "/Users/lukec/Downloads/Pinqued_csv_Jan_26/data-lprobe-2025-10-21/"
@@ -44,6 +45,20 @@ for file in os.listdir(csv_folder):
 
         # Get the floating potential at the bias where the current crosses 0
         v_f_bias, _, v_f_index = p_get_floating_potential(sorted_bias, sorted_current)
+        plt.plot(sorted_bias, sorted_current, color = 'steelblue', linestyle = 'None', marker = '.')
+        plt.axvline(v_f_bias.value, color = 'k', linestyle = '--')
+        plt.axhline(0, color = 'k', linestyle = '--')
+        plt.xlabel('Bias (V)')
+        plt.ylabel('Current (A)')
+        plt.title(filename)
+
+        plt.tight_layout()
+        directory_name = 'individual_sweeps/'
+        ensure_directory(full_folder + directory_name)
+        plt.savefig(full_folder + directory_name + filename + ".svg")
+        print('plot saved to: ', full_folder + directory_name + filename + ".svg")
+        plt.show()
+
 
         # Find the ion current by looking at the first 50% of data points before the floating potential and fitting a
         # line

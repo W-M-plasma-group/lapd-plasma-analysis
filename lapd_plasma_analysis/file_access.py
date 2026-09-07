@@ -58,6 +58,110 @@ def choose_multiple_from_list(choices, name, null_action=None):
 
     return [chr_to_num(letter) for letter in selection_str]
 
+def int_choose_multiple_from_list(choices, name, null_action=None, return_idxs = False, lim_length = None):
+    prompt = "Input a list of integers corresponding to " + name + ("s  \n Note: they must be separated by commas "
+                                                                            "(e.g. '1,2,3,4,5,etc.)'")
+
+    print(*["  " + str(i) + ": " + str(choices[i]) for i in range(len(choices))], sep="\n")
+    if null_action is not None:
+        prompt += ", \n\tor two empty strings in a row to " + null_action
+    prompt += ": "
+    proper_input = False
+    num_empty = 0
+    selected_options_idxs = []
+    loop_i = 0
+
+    while not proper_input:
+        bad_selections = 0
+
+        if loop_i > 0:
+            print(*["  " + str(i) + ": " + str(choices[i]) for i in range(len(choices))], sep="\n")
+            print("Selected options: ", selected_options_idxs)
+            remove_indices = ask_yes_or_no('Remove any indices from selection? (y/n) ')
+        else:
+            remove_indices = False
+
+        if remove_indices:
+            idxs_to_remove = input('Input the index of the option you want to remove '
+                                   '(Any invalid entries will reset the loop, must be comma separated): ')
+            try:
+                idxs_to_remove = idxs_to_remove.split(',')
+                for idx in idxs_to_remove:
+                    idx = idx.strip()
+                    try:
+                        idx = int(idx)
+                        if idx not in selected_options_idxs:
+                            print(f'{idx} is not in the selected options and thus will not be removed.')
+                        else:
+                            selected_options_idxs.remove(idx)
+                    except ValueError:
+                        print(f'{idx} is not an integer in the selected options and thus will not be removed.')
+
+            except ValueError:
+                print('Invalid Input: No options removed')
+
+        if loop_i > 0:
+            print(*["  " + str(i) + ": " + str(choices[i]) for i in range(len(choices))], sep="\n")
+        selection_str = input(prompt)
+
+        if selection_str.strip() == "":
+            num_empty += 1
+            print('\n One empty string selected, exit the loop by inputting another empty string.')
+
+        elif selection_str.strip() == "" and num_empty > 0:
+            print('\n You have decided to exit the loop by inputting another empty string. Returning the empty list.')
+            return []
+
+        elif selection_str.strip() != "" and num_empty > 0:
+            num_empty = 0
+
+        try:
+            selections = selection_str.split(',')
+            if lim_length is not None:
+                if len(selections) > lim_length:
+                    print(f'\n Too many options selected, you are restricted to {lim_length} selectons')
+
+            for selection in selections:
+                selection = selection.strip()
+                try:
+                    i_selection = int(selection)
+                    if i_selection < 0 or i_selection > len(choices) - 1:
+                        print(
+                            f'\n {selection} is not an integer between 0 and {len(choices) - 1} corresponding to a valid '
+                            f'option. Please try again.')
+                        bad_selections += 1
+                    else:
+                        if i_selection not in selected_options_idxs:
+                            selected_options_idxs.append(i_selection)
+
+                except ValueError:
+                    print(f'\n {selection} is not a valid integer')
+                    bad_selections += 1
+
+            print('selected options idx: ', selected_options_idxs)
+            print('bad selections: ', bad_selections)
+            if len(selected_options_idxs) > 0 and bad_selections == 0:
+                print('Loop breaking!! ')
+                break
+            loop_i += 1
+
+        except ValueError:
+            print("Please enter a comma-separated list of integers.")
+
+
+
+    selected_options = []
+    for idx in selected_options_idxs:
+        choice = choices[idx]
+        selected_options.append(choice)
+        print(f"\n {choice}")
+
+
+    if return_idxs:
+        return selected_options_idxs
+    else:
+        return selected_options
+
 
 def ask_yes_or_no(prompt):
     """Prompts the user to answer a yes-or-no question.
@@ -256,3 +360,102 @@ def make_path(folder, name, ext):
     # full_netcdf_path = os.path.join(netcdf_folder, bimaxwellian_filename + ".nc")
     extension = ext if ext.startswith(".") else "." + ext
     return os.path.join(folder, name + extension)
+
+def default_fig_params():
+    default_fig_height = 4.8
+    default_fig_width = 6.4
+    return default_fig_height, default_fig_width
+
+def xarray_gradient_strings():
+    dens_grad_regions_str = 'dens_grad_regions'
+    dens_grad_slopes_str = 'dens_grad_slopes'
+    dens_grad_intercepts_str = 'dens_grad_intercepts'
+    temp_grad_regions_str = 'temp_grad_regions'
+    temp_grad_slopes_str = 'temp_grad_slopes'
+    temp_grad_intercepts_str = 'temp_grad_intercepts'
+    return (dens_grad_regions_str, dens_grad_slopes_str, dens_grad_intercepts_str,
+            temp_grad_regions_str, temp_grad_slopes_str, temp_grad_intercepts_str)
+
+def allow_only_ints(prompt, min_condition = None, max_condition = None, accept_empty = True):
+    '''
+
+    Parameters
+    ----------
+    prompt: 'str'
+        String indicating what the integers being used should be referring to.
+    min_condition: `int`, optional
+        Minimum integer value to allow.
+    max_condition: `int`, optional
+        Maximum integer value to allow.
+    accept_empty: `bool`, optional
+        If True, returns an empty list if the user presses Enter.
+        If False, forces the user to input at least one valid integer.
+
+    Returns
+    -------
+    int_list: `list`
+        List of integers indicating which integers to allow.
+    '''
+
+
+    while True:
+        skip_text = "(or press Enter to skip)" if accept_empty else "(cannot be blank)"
+        user_input = input(
+            f"{prompt}, separated by commas {skip_text}. \n"
+            f"Between min value {min_condition: .1f} and max value {max_condition: .1f}: \n")
+
+        # Success Condition 1: User just presses Enter
+        if not user_input.strip():
+            if accept_empty:
+                int_list = []
+                break  # Exits the while loop entirely, returning []
+            else:
+                print("Error: This value cannot be left blank. Please enter at least one integer.")
+                continue  # Jumps back to the top of the while loop
+
+        # Success Condition 2: User enters valid integers
+        try:
+            # Attempt to split and convert to integers
+            int_list = [int(val.strip()) for val in user_input.split(',')]
+
+            if min_condition is not None and any(val < min_condition for val in int_list):
+                print(f"Error: All values must be greater than or equal to {min_condition}.")
+                continue  # Skips the rest of the loop and asks again
+
+
+            if max_condition is not None and any(val > max_condition for val in int_list):
+                print(f"Error: All values must be less than or equal to {max_condition}.")
+                continue  # Skips the rest of the loop and asks again
+            break  # If successful, exit the while loop
+
+        # Failure Condition: User enters letters, decimals, or gibberish
+        except ValueError:
+            # Print an error message. Because there is no 'break' here,
+            # the loop jumps back up to the 'input()' prompt.
+            print(
+                "Error: Invalid input. Please enter ONLY integers separated by commas, or press Enter to skip.")
+
+    return int_list
+
+
+def get_hdf5_filename(exp_name, run_number, file_list):
+    # Format the run number to always be two digits (e.g., 5 becomes "05")
+    run_str = str(run_number)
+
+    for filename in file_list:
+
+        # 1. March 2022: Starts with "Mar22_" + the run number
+        if exp_name == "March_2022" and filename.startswith(f"Mar22_{run_str}_"):
+            return filename
+
+        # 2. Jan 2024: Starts with the run number AND contains "2024" in the filename
+        elif exp_name == "January_2024" and filename.startswith(f"{run_str}_") and "2024" in filename:
+            return filename
+
+        # 3. Nov 2022: Starts with the run number but DOES NOT contain "2024"
+        elif exp_name == "November_2022" and filename.startswith(f"{run_str}_") and "2024" not in filename:
+            return filename
+
+    # Fallback if the file is genuinely missing
+    print(f"Warning: Could not find a matching file for {exp_name} run {run_number}.")
+    return None

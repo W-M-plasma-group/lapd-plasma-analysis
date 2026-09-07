@@ -1,18 +1,24 @@
 # from pty import slave_open
-
+import matplotlib
+matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
+
 import numpy as np
 import astropy.constants as const
 from plasmapy.diagnostics.langmuir import get_plasma_potential
 from plasmapy.formulary import Coulomb_logarithm
 from pycparser.c_ast import Return
 from scipy.constants import epsilon_0
+from scipy.optimize import minimize_scalar
 
 from lapd_plasma_analysis.file_access import *
 from lapd_plasma_analysis.experimental import get_exp_params
 
 from lapd_plasma_analysis.langmuir.helper import *
 from lapd_plasma_analysis.langmuir.configurations import *
+from scipy.interpolate import UnivariateSpline
+from scipy.signal import savgol_filter, find_peaks, peak_widths
+
 from lapd_plasma_analysis.langmuir.getIVsweep import get_sweep_voltage, get_sweep_current, get_shot_positions
 from lapd_plasma_analysis.langmuir.characterization import make_characteristic_array, isolate_ramps
 from lapd_plasma_analysis.langmuir.preview import preview_raw_sweep, preview_characteristics
@@ -122,13 +128,60 @@ def find_sweep_indices(time_array,end_time,search_times,bias,dt):
 
     return i,last_index
 
+def get_ion_current(sorted_bias, sorted_current, v_f_bias, fit_fraction=0.5):
+    '''
+
+    Parameters
+    ----------
+    sorted_bias - Quantity Array (V)  - of bias values from the minimum to maximum of the bias array
+    sorted_current - Quantity Array (A) - of current value sorted by matched bias values from the minimum to
+    maximum of the bias array
+    v_f_idx - int - The index of the floating potential in the sorted_bias and sorted_current arrays
+
+    Returns
+    -------
+    ion_current - Quantity (A) Array of the ion current piecewise from a fitted section. Once the fitted section
+    crosses 0 the ion current is assumed to be 0
+    '''
+
+    v_f_idx = np.where(sorted_bias <= v_f_bias)[0][-1]
+
+    # Use a safer, tunable fraction of the region strictly below V_f
+    end_idx = int(v_f_idx * fit_fraction)
+
+    # Strip units for fitting
+    bias_vals = sorted_bias[:end_idx + 1].value
+    curr_vals = sorted_current[:end_idx + 1].value
+
+    # Fit the line
+    slope, intercept = np.polyfit(bias_vals, curr_vals, 1)
+
+    # Ion saturation slope must be positive AND the line must be negative at V_f
+    # (by definition I_ion(V_f) = -I_e(V_f) < 0). If either fails, the ion branch
+    # is too noisy to trust -> default to a flat ion floor.
+    ion_at_vf = slope * v_f_bias.value + intercept
+    if slope < 0 or ion_at_vf >= 0:
+        slope = 0.0
+        intercept = np.median(curr_vals)
+
+    # Calculate full extrapolated line
+    full_slope_current = (slope * sorted_bias.value) + intercept
+
+    # Vectorized clamping: keep values <= 0, set positive values to 0
+    ion_current_vals = np.where(full_slope_current <= 0, full_slope_current, 0.0)
+
+    # Re-attach Astropy units
+    return ion_current_vals * u.A
+
 
 def get_ion_isat_min(sorted_current,sorted_bias):
     """
 
     Parameters
     ----------
-    sorted_current - Array of current value sorted by matched bias values from the minimum to maximum of the bias array
+    sorted_current - Quantity Array (A) - of current value sorted by matched bias values from the minimum to
+    maximum of the bias array
+    sorted_bias - Quantity Array (V)  - of bias values from the minimum to maximum of the bias array
 
     Returns
     -------
@@ -138,347 +191,83 @@ def get_ion_isat_min(sorted_current,sorted_bias):
     Finds the Ion Isat by taking the average of the first avg_volts of the current array
     """
 
+    # Assume the ion saturation current is the minimum of the current array
     ion_isat_index = np.argmin(sorted_current)
 
+    # The ion_isat_index is assumed to be the center of the array - this line determines how many volts around the
+    # center to average over to get a more accurate ion saturation current
     avg_volts = 5 * u.V
 
+    # If there is no issues and the first index is less than half the avg_volts number away from the center point then
+    # go up avg_volst/2 and go down avg_volts/2 from the ion_isat_index and indicate those as the start and end indices
     if sorted_bias[0] < sorted_bias[ion_isat_index] - avg_volts/2:
         end_index = np.nonzero(sorted_bias < sorted_bias[ion_isat_index] + avg_volts/2)[0][-1]
         start_index = np.nonzero(sorted_bias < sorted_bias[ion_isat_index] - avg_volts/2)[0][-1]
+
+    # If the first index in the bias array is anything bigger than the center - avg_volts/2 the first index is the first
+    # index of the bias array and the final index is avg_volts greater than the value at the first index
     else:
         start_index = 0
         end_index = np.nonzero(sorted_bias < sorted_bias[0] + avg_volts)[0][-1]
 
+    # Filter out the current we are interested in and take the mean
     ion_isat_current = sorted_current[start_index:end_index]
     ion_isat = np.mean(ion_isat_current)
 
     return ion_isat, ion_isat_index
 
-def get_electron_isat_end(sorted_bias,sorted_current,get_V_P=False):
-    """
-
-    Parameters
-    ----------
-    sorted_bias
-    sorted_current
-
-    Returns
-    -------
-    electron_isat - float in Amps corresponding to the electron saturation current
-    e_sat_index - int indicating the index of the point that was determined to be the electron saturation current
-
-    This function aims to find the knee in the IV curve for a Langmuir probe by searching for when there is a drastic
-    shift in the slope of the IV sweep. It starts sampling from the last element in the current array
-
-    """
-
-    check_tolerance = 3
-    confirm_tolerance = check_tolerance
-    step = min(30,len(sorted_bias)-2)
-    skip = 3
-    k = 0
-    electron_isat = min(sorted_current)
-    # Calculate the average slope of the last step elements in the current and bias arrays
-    slope_array = []
-    # May take a lot of time -> Test and see if its worth the extra time if not go back to calculating slope as in
-    # the slope of the exponential part of the curve calculation
-    while electron_isat < .7 * max(sorted_current):
-        slope_array = []
-        slope_iteration = 1
-        for i in range(step):
-            try:
-                delta_current = sorted_current[-(i + 1)] - sorted_current[-(i + 1 + skip)]
-                delta_bias = sorted_bias[-(i + 1)] - sorted_bias[-(i + 1 + skip)]
-                if np.isclose(delta_bias.value, 0):
-                    continue
-                slope_array.append(delta_current / delta_bias)
-            except IndexError:
-                break  # Avoid crashing if out of bounds
-            except ZeroDivisionError:
-                continue  # Avoid division by zero
-
-        if len(slope_array) == 0:
-            raise ValueError("Not enough data points to compute slope.")
-        slope_array = [s for s in slope_array if np.isfinite(s.value)]
-        check_slope = u.Quantity(slope_array).mean()
-
-        test_slope = check_slope
-        h = 1
-        while step * (h+1) <= len(sorted_bias):
-            slope_array = []
-            for j in range(step):
-                try:
-                    delta_current = sorted_current[-(h * step + (j + 1))] - sorted_current[-(h * step + (j + 1 + skip))]
-                    delta_bias = sorted_bias[-(h * step + (j + 1))] - sorted_bias[-(h * step + (j + 1 + skip))]
-                    # Don't add an inf or nan value to the slope array
-                    if np.isclose(delta_bias.value, 0):
-                        continue
-                    slope_array.append(delta_current / delta_bias)
-                except IndexError:
-                    break  # Avoid crashing if out of bounds
-                except ZeroDivisionError:
-                    continue  # Avoid division by zero
-            h += 1
-            slope_array = [s for s in slope_array if np.isfinite(s.value)]
-            if len(slope_array) == 0:
-                break
-            test_slope = u.Quantity(slope_array).mean()
-
-            # Force the electron saturation current to choose an index outside the last data points
-            if k == 0:
-                last_index_condition = step * (h + 1) >= 0.25 * len(sorted_bias)
-            elif k == 1:
-                last_index_condition = step * (h + 1) >= 0.1 * len(sorted_bias)
-            elif k == 2:
-                last_index_condition = True
-
-            # What tolerance are we looking for - the higher threshold indicates the initial dip, the lower threshold
-            # confirms that we have the right electron saturation current
-            if slope_iteration == 2:
-                tolerance = confirm_tolerance
-            else:
-                tolerance = check_tolerance
-
-            # Checks to see if we have a notable change in the slope - abs because we want a positive slope
-            if (abs(test_slope - check_slope) >= tolerance * abs(check_slope) and last_index_condition and
-                    slope_iteration == 1):
-                pp_index = -(h*step+1)
-                slope_iteration += 1
-                check_slope_hold = test_slope
-            elif (abs(test_slope - check_slope) >= tolerance * abs(check_slope) and last_index_condition and
-                    slope_iteration == 2):
-                break
-            elif ((abs(test_slope - check_slope) <= tolerance * abs(check_slope)) and
-                    slope_iteration == 2):
-                slope_iteration = 1
-                h -= 1
-                pp_index = None
-                check_slope = check_slope_hold
-            else:
-                check_slope = test_slope
-                pp_index = None
-
-            # Return none if we've searched the entire current array and found nothing
-            if step * (h + 1) >= len(sorted_bias) and pp_index is None:
-                print("Failed to find an electron Isat")
-                return None,None
-
-        # Return the current of the last tested value
-        electron_isat = sorted_current[pp_index]
-        # if electron_isat > .7*max(sorted_current):
-        print('electron_isat =', electron_isat)
-        print('test_current =', .7*max(sorted_current))
-        #     break
-        k += 1
-        if k > 2:
-            break
-
-    # Allows you to get the index of the upper bound for a search for the plasma potential
-    if get_V_P:
-        return electron_isat, pp_index
-
-    else:
-        return electron_isat, None
-
-def get_electron_isat_max(sorted_current, sorted_bias):
-    """
-
-    Parameters
-    ----------
-    sorted_current - Array of current value sorted by matched bias values from the minimum to maximum of the bias array
-
-    Returns
-    -------
-    electron_isat - Quantity: Electron Isat value in A
-    electron_isat_index - Integer: Electron Isat location within sorted bias (and sorted current) array
-
-    Finds the Electron saturation current by taking the max of the sorted current array
-    """
-
-    electron_isat_index = np.argmax(sorted_current)
-    avg_volts = 5 * u.V
-
-    if sorted_bias[-1] > sorted_bias[electron_isat_index] + avg_volts/2:
-        end_index = np.nonzero(sorted_bias < sorted_bias[electron_isat_index] + avg_volts/2)[0][-1]
-        start_index = np.nonzero(sorted_bias < sorted_bias[electron_isat_index] - avg_volts/2)[0][-1]
-    else:
-        end_index = len(sorted_bias) - 1
-        start_index = np.nonzero(sorted_bias < sorted_bias[-1] - avg_volts)[0][-1]
-
-    electron_isat_current = sorted_current[start_index:end_index]
-    electron_isat = np.mean(electron_isat_current)
-
-    return electron_isat, electron_isat_index
-
-def get_electron_isat_v_f(sorted_bias, sorted_current,v_f_index, get_V_P = False):
-    """
-
-    Parameters
-    ----------
-    sorted_bias
-    sorted_current
-    v_f_index - int - floating potential index
-    get_V_P - Boolean - Does the user want to the index from the electron saturation current to start searching for the
-                        plasma potential?
-
-
-    Returns
-    -------
-    electron_isat - Quantity in Amps corresponding to the electron saturation current
-    e_sat_index - int indicating the index of the point that was determined to be the electron saturation current
-                    Only returned if get_V_P is True.
-
-    This function aims to find the knee in the IV curve for a Langmuir probe by searching for when there is a drastic
-    shift in the slope of the IV sweep. It starts sampling from the last element in the current array
-
-    """
-
-    original_tolerance = .7
-    # Confirm_tolerance tells what % of check slope you want the confirmation loop to look for
-    confirm_tolerance = .7
-    step = min(30, len(sorted_bias) - 2)
-    skip = 3
-    k = 0
-    electron_isat = min(sorted_current)
-    threshold_current = 0.7 * max(sorted_current)
-    # Calculate the average slope of the last step elements in the current and bias array
-    # May take a lot of time -> Test and see if its worth the extra time if not go back to calculating slope as in
-    # the slope of the exponential part of the curve calculation
-    for k in range(3):
-        check_tolerance = original_tolerance * (1 if k == 0 else 0.8 if k == 1 else (.8-.2*(k-1))/.8)
-        slope_array = []
-        slope_iteration = 1
-        for i in range(step):
-            try:
-                delta_current = sorted_current[v_f_index+i] - sorted_current[v_f_index + skip + i]
-                delta_bias = sorted_bias[v_f_index + i] - sorted_bias[v_f_index + skip + i]
-                if np.isclose(delta_bias.value, 0):
-                    continue
-                slope_array.append(delta_current / delta_bias)
-            except (IndexError, ZeroDivisionError):
-                continue
-
-        if len(slope_array) == 0:
-            raise ValueError("Not enough data points to compute slope.")
-        slope_array = [s for s in slope_array if np.isfinite(s.value)]
-        check_slope = u.Quantity(slope_array).mean()
-
-        test_slope = check_slope
-        h = 1
-        pp_index = None
-        while v_f_index + step * (h + 1) <= len(sorted_bias):
-            slope_array = []
-            for j in range(step):
-                try:
-                    delta_current = sorted_current[h * step + j + v_f_index] - sorted_current[h * step + j + skip + v_f_index]
-                    delta_bias = sorted_bias[h * step + j + v_f_index] - sorted_bias[h * step + j + skip + v_f_index]
-                    # Don't add an inf or nan value to the slope array
-                    if np.isclose(delta_bias.value, 0):
-                        continue
-                    slope_array.append(delta_current / delta_bias)
-                except (IndexError, ZeroDivisionError):
-                    continue
-            h += 1
-            slope_array = [s for s in slope_array if np.isfinite(s.value)]
-            if len(slope_array) == 0:
-                break
-            test_slope = u.Quantity(slope_array).mean()
-
-
-
-            # What tolerance are we looking for - the higher threshold indicates the initial dip, the lower threshold
-            # confirms that we have the right electron saturation current
-            if slope_iteration == 2:
-                tolerance = confirm_tolerance * check_tolerance
-            else:
-                tolerance = check_tolerance
-
-            # Checks to see if we have a notable change in the slope - abs because we want a positive slope
-            if (abs((test_slope - check_slope)/u.Quantity([check_slope,test_slope]).mean()) >= tolerance and
-                    slope_iteration == 1 and sorted_current[v_f_index + step * h] > threshold_current):
-                pp_index = v_f_index + step * h
-                slope_iteration += 1
-                check_slope_hold = test_slope
-            elif (abs((test_slope - check_slope)/u.Quantity([check_slope,test_slope]).mean()) >= tolerance and
-                  slope_iteration == 2):
-                electron_isat = sorted_current[pp_index]
-                break
-            elif (abs((test_slope - check_slope)/u.Quantity([check_slope,test_slope]).mean()) <= tolerance and
-                  slope_iteration == 2):
-                slope_iteration = 1
-                h -= 1
-                pp_index = None
-                check_slope = check_slope_hold
-            else:
-                check_slope = test_slope
-                pp_index = None
-
-            # Return none if we've searched the entire current array and found nothing
-            if step * (h + 1) >= len(sorted_bias) and pp_index is None:
-                print("Failed to find an electron Isat")
-                return None
-
-    if pp_index is None:
-        # print("Failed to find an electron Isat")
-        return None,None
-
-    # Allows you to get the index of the upper bound for a search for the plasma potential
-    if get_V_P:
-        return electron_isat, pp_index
-
-    else:
-        return electron_isat, None
-
 def get_electron_isat_curve_fit(sorted_bias, sorted_current, v_f_index, v_p_index, return_arg = False):
+    '''
 
+    Parameters
+    ----------
+    sorted_bias - Quantity Array (V)  - of bias values from the minimum to maximum of the bias array
+    sorted_current - Quantity Array (A) - of current value sorted by matched bias values from the minimum to
+    maximum of the bias array
+    v_f_index - int - index of the floating potential in sorted bias and sorted current arrays
+    v_p_index - int - index of the plasma potential in sorted bias and sorted current arrays
+    return_arg - boolean - Does the user want the argument to be returned with the function
+
+    Returns
+    -------
+    electron_isat - Quantity (A) - value of electron saturation current in Amps
+    electron_isat_index - Int - Index of where approximately the electron saturation current could be plotted
+    '''
+
+    # We are assuming the electron saturation current must start after the plasma potential
     upper_section_bias = sorted_bias[v_p_index :].value
     upper_section_current = sorted_current[v_p_index :].value
 
+    # Find the temperature
     t_e, exp_int, offset = get_te_v_p_vf(sorted_bias,sorted_current,v_f_index,v_p_index,return_intercept = True)
     slope_exponential = 1/t_e.value
-    exp_int = exp_int - np.log(offset)
 
+    # Remove the offset from the intercept of the fit
+    exp_int = exp_int - np.log(offset)
     exp_const = np.exp(exp_int)
+
+    # Compute DI/DV at every point along the IV curve
     exp_slope_fit = slope_exponential * exp_const * np.exp(slope_exponential * sorted_bias[v_p_index].value) * u.A/u.V
 
 
+    # Fit a line to the IV current above the plasma potential
     up_slope, up_int = np.polyfit(upper_section_bias, upper_section_current, 1)
 
-    # print("Up slope is: ", up_slope)
-    # print("Up intercept is: ", up_int)
-
+    # Taylor expand the exponential to first order and create an array
     exp_array = (exp_slope_fit * (sorted_bias - sorted_bias[v_p_index]) + sorted_current[v_p_index])
 
+    # Create an array for the linear fit
     up_array = up_slope * u.A/u.V * sorted_bias + up_int * u.A
 
+    # Look for the last value before the exponetial section crosses the linear array
     exp_minus_up = exp_array - up_array
-
     arg_electron_isat = np.nonzero(exp_minus_up < 0 * u.A)[0][-1]
     electron_isat = sorted_current[arg_electron_isat]
-
-    # plt.plot(sorted_bias, up_array, label = 'upper section fit', color = 'c')
-    # plt.plot(sorted_bias, exp_array, label = 'exponential fit', color = 'm')
-    # plt.xlabel("Voltage [V]")
-    # plt.ylabel("Current [A]")
-    # plt.legend()
-    # plt.tight_layout()
-    # plt.show()
-
-    # print('electron saturation bias = ', sorted_bias[arg_electron_isat])
 
     if return_arg:
         return electron_isat, arg_electron_isat
 
     return electron_isat
-
-
-
-
-
-
-
-
-
 
 # Adapted from PlasmaPy.Langmuir -> Grabs a more accurate V_F with the point slope form
 def get_floating_potential(sorted_bias,sorted_current):
@@ -493,145 +282,56 @@ def get_floating_potential(sorted_bias,sorted_current):
     -------
     V_f_bias - Quantity (V): the voltage bias associated with the floating potential
     V_f_current - Quantity (A): the current associated with the floating potential
-    arg_v_f - Integer: index within sorted bias (and sorted current) where the plasma potential is located
+    arg_v_f - Integer: index within sorted bias (and sorted current) where the floating potential is located
 
     Searches for the last index where the current is less than zero. Checks to see if the next value is greater than zero,
     then if so, uses point slope form to determine the bias at which the current is equal to zero.
     """
 
-    arg_v_f = np.nonzero(sorted_current < 0 * u.A)[0][-1]
-    slope = (sorted_current[arg_v_f+1]-sorted_current[arg_v_f])/(sorted_bias[arg_v_f+1]-sorted_bias[arg_v_f])
-    v_f_bias = -sorted_current[arg_v_f] / slope + sorted_bias[arg_v_f]
+    try:
+        total_volatge_len = (sorted_bias[-1] - sorted_bias[0])
+    except IndexError:
+        return None, None, None
+
+    sign = np.sign(sorted_current)
+
+    # Treat zeros as positive so they count as part of the pos side (Ensures we have a neg to pos crossing)
+    sign[sign == 0] = 1
+
+    zero_crossings = np.where((sign[:-1] < 0) & (sign[1:] > 0))[0]
+
+    # The best case scenario is that we can take the last voltage before the current crosses 0
+    orig_v_f_idx = zero_crossings[-1]
+    arg_v_f = None
+    if (sorted_bias[-1] - sorted_bias[orig_v_f_idx]) > 0.15 * total_volatge_len:
+        arg_v_f = orig_v_f_idx
+
+    # However, sometimes we have really messy data (far outside core, early in run etc.) so we need to do some prelim
+    # filtering
+    else:
+        # Build an array that has all possible 0 crossings (Additional points are for edge handling)
+        edges = np.concatenate(([0], zero_crossings))
+
+        # Find the actual voltage differences between the 0 crossings
+        edges_bias = sorted_bias[edges]
+        voltage_diff = np.diff(edges_bias)
+
+        # Don't want the first section because that is not actually a zero crossing
+        largest_vd_idx = np.argmax(voltage_diff[1:]) + 1
+        if voltage_diff[largest_vd_idx] > 0.1 * total_volatge_len:
+            arg_v_f = edges[largest_vd_idx]
+
+    # Lock in where the 0 crossing might have actually occured
+    v_f_bias = None
+    if arg_v_f is not None:
+        # Looks for the slope between the first value below and the first value above 0 in current
+        slope = (sorted_current[arg_v_f + 1] - sorted_current[arg_v_f]) / (
+                    sorted_bias[arg_v_f + 1] - sorted_bias[arg_v_f])
+
+        # Point slope rearrangement of when I = 0 and solving for the bias associated with that
+        v_f_bias = -sorted_current[arg_v_f] / slope + sorted_bias[arg_v_f]
 
     return v_f_bias, 0 * u.A, arg_v_f
-
-def get_plasma_potential(sorted_bias,sorted_current,I_esat_index):
-    """
-
-    Parameters
-    ----------
-    sorted_bias - Array of bias value sorted from minimum to maximum
-    sorted_current - Array of current value sorted by matched bias values from the minimum to maximum of the bias array
-    I_esat_index - Index of the electron saturation current - negative from the end
-
-    Returns
-    -------
-    V_p_bias - Quantity (V): the voltage bias associated with the plasma potential
-    V_p_current - Quantity (A): the current associated with the plasma potential
-
-    Performs a slope sweep from the point where I = 0 to the Electron saturation current and picks the value with the
-    highest slope
-    """
-    h = 0
-    step = 10
-    skip = 50
-    mean_slope_array = []
-    index_array = []
-    while True:
-
-
-        start_index = I_esat_index - (h + skip)
-        end_index = I_esat_index - h
-
-        # print('start index, end index ',start_index, end_index)
-        if start_index < 0 or end_index >= len(sorted_bias):
-            break
-
-        bias_slice = sorted_bias[start_index:end_index]
-        current_slice = sorted_current[start_index:end_index]
-        slope_array = []
-        # Take the average value of the slope between skip points by doing pointwise slope calculations
-        # Good if there is a general trend in the data - otherwise not so much -> Slow but works well
-        for i in range(len(bias_slice)-1):
-            delta_current = current_slice[i+1]-current_slice[i]
-            delta_bias = bias_slice[i+1]-bias_slice[i]
-            if np.isclose(delta_bias.value, 0):
-                continue
-            slope_array.append((delta_current / delta_bias).to(u.A/u.V).value)
-            # print('slope_array: ', slope_array)
-        if slope_array:
-            mean_slope_array.append(np.mean(slope_array))
-            # print('mean slope array', mean_slope_array)
-            index_array.append(start_index + skip // 2)
-            # print('index_array', index_array)
-        h += step
-    if not mean_slope_array:
-        return None, None, None
-    # Finds the value of the greatest slope
-    max_index = np.argmax(mean_slope_array)
-    # print('max_index = ',max_index)
-    v_p_index = index_array[max_index]
-
-    # Returns the current and voltage associated with the plasma potential
-    # Plasma potential is assumed to be the first value in the largest slope
-    return sorted_bias[v_p_index], sorted_current[v_p_index], v_p_index
-
-def get_plasma_potential_slope(sorted_bias,sorted_current,v_f_index,electron_esat_index):
-    """
-
-    Parameters
-    ----------
-    sorted_bias - Array of bias quantities (V) sorted from minimum to maximum
-    sorted_current - Array of current quantities (A) sorted by matched bias values from the minimum to maximum of the bias array
-    v_f_index - Index of the floating potential (where the current is 0) in the sorted bias and sorted current arrays
-    electron_esat_index - Index of the electron saturation current in the sorted bias and sorted current arrays
-
-    Returns
-    -------
-    v_p - Quantity (V): the voltage bias associated with the plasma potential
-    v_p_index - Integer index of the plasma potential
-
-    Starts building an array of slopes at the floating potential and ends it at the electron saturation. Returned value
-    is the maximum value of that slope array and the index returned is the middle of the slope search array
-    """
-
-    min_value = 0.2 * sorted_current[electron_esat_index]
-    min_index = np.argmin(np.abs(sorted_current-min_value))
-
-
-    m_sorted_bias = sorted_bias[min_index : electron_esat_index + 1]
-    m_sorted_current = sorted_current[min_index : electron_esat_index + 1]
-    # print('min_index: ', min_index)
-
-
-    # We look at 30 steps between the floating potential and the electron saturation current - TODO Only getting 1-2 values in final slope array
-    step = 19
-    skip = 3
-    start_index = 0
-    end_index = step - 1
-
-    slope_array = []
-    index_array = []
-    while end_index < len(m_sorted_bias):
-        mid_slope_array =[]
-
-        for i in range(start_index, min(end_index - skip + 1, len(m_sorted_current)-skip), skip):
-            # We do end_index - skip + 1 so it includes the last index
-            slope_num = m_sorted_current[i + skip] - m_sorted_current[i]
-            slope_den = m_sorted_bias[i + skip] - m_sorted_bias[i]
-            if np.isclose(slope_den.value, 0):
-                continue
-            slope = slope_num / slope_den
-            mid_slope_array.append(slope)
-
-        if mid_slope_array:
-            q_mid_slope_array = u.Quantity(mid_slope_array)
-            mean_slope = q_mid_slope_array.mean()
-            if q_mid_slope_array.std() <= 0.65 * mean_slope:
-                slope_array.append(mean_slope)
-                index_array.append((start_index + end_index) // 2)
-        start_index = end_index
-        end_index = end_index + step - 1
-
-    # print('slope array: ', slope_array)
-    if not slope_array:
-        return None, None
-
-    index_of_int = int(np.argmax([slope.value for slope in slope_array]))
-    v_p = m_sorted_bias[index_array[index_of_int]]
-    v_p_index = index_array[index_of_int] + v_f_index
-
-    return v_p.to(u.V), v_p_index
 
 def l_get_pressure(temperature, density):
     """
@@ -643,8 +343,79 @@ def l_get_pressure(temperature, density):
     Returns
     -------
     Pressure - Quantity (Pascal): the pressure associated with the corresponding temperature and density values
+
+    Temperature (J) * density (1/m^3)= pressure
     """
     return(temperature.to(u.J, equivalencies=u.temperature_energy()) * density).to(u.Pa)
+
+def get_plasma_potential_spline(sorted_bias, sorted_current, return_spline = False):
+    '''
+
+    Parameters
+    ----------
+    sorted_bias - Quantity Array (V)  - of bias values from the minimum to maximum of the bias array
+    sorted_current -  Quantity Array (A) - of current value sorted by matched bias values from the minimum to
+    maximum of the bias array
+    return_spline - Boolean - This algorithm uses a spline fitting algorithm. This boolean determines if the user
+    wants to return that spline for future use
+
+    Returns
+    -------
+    max_index - Integer - Index of where the first iteration of the plasma potential is
+    '''
+
+    # Make sure all bias values are unique
+    _, unique_b_mask = np.unique(sorted_bias, return_index=True)
+    unique_bias = sorted_bias[unique_b_mask]
+    unique_current = sorted_current[unique_b_mask]
+
+    # Create a spline fit for the data to plot on top of the raw data
+    spline = UnivariateSpline(unique_bias, unique_current, s = 0.1, k=3)
+    current_fit = spline(unique_bias)
+
+    # Take the first derivative of the spline fit
+    spline_deriv = spline.derivative(n=1)
+    dIdV = spline_deriv(unique_bias)
+
+    # Take the second derivative of the spline fit
+    spline_2_deriv = spline.derivative(n=2)
+    dI2dV2 = spline_2_deriv(unique_bias)
+
+    # Find Plasma Potential from the maximum of the derivative curve - Chen method (Pace says look at E-sat region
+    # and draw a line through that and the region where we are calculating the T_e and where they intersect is the
+    # plasma potential
+    max_idxs = []
+    for i in range(len(dI2dV2) - 1):
+        if (np.sign(dI2dV2[i]) == 1 and np.sign(dI2dV2[i + 1]) == -1) or np.sign(dI2dV2[i]) == 0:
+            max_idxs.append(i)
+    max_idxs = np.array(max_idxs)
+    # valid_guesses_mask = dIdV[max_idxs] > (np.max(dIdV[max_idxs]) * .7)
+    valid_guesses_mask = dIdV[max_idxs] >= (np.max(dIdV[max_idxs]))
+    v_p_idx = max_idxs[valid_guesses_mask][0]
+    v_p = unique_bias[v_p_idx]
+
+    fig, ax = plt.subplots(1, 2, figsize = (10,5))
+    ax = ax.flatten()
+
+    ax[0].plot(unique_bias, unique_current, color = 'b')
+    ax[0].plot(unique_bias, current_fit, color = 'r')
+    ax[0].plot(unique_bias[v_p_idx],unique_current[v_p_idx], marker = 'D', markersize = 10, color = 'm')
+    ax[0].set_xlabel('Bias (V)')
+    ax[0].set_ylabel('Current (A)')
+
+    ax[1].plot(unique_bias, dIdV, label='dIdV')
+    ax[1].plot(unique_bias[v_p_idx], dIdV[v_p_idx], marker = 'D',color = 'm', markersize = 10,
+             label='Plasma Potential')
+    ax[1].set_xlabel('Bias (V)')
+    ax[1].set_ylabel('dI/dV (A/V)')
+    plt.tight_layout()
+    plt.show()
+
+    if return_spline:
+        return v_p, v_p_idx, spline
+    else:
+        return v_p, v_p_idx
+
 
 def get_ion_density(ion_type,ion_isat,A_p,T_e):
     """
@@ -661,17 +432,17 @@ def get_ion_density(ion_type,ion_isat,A_p,T_e):
 
     Calculates the ion Density from the formula given in https://davidpace.com/example-of-langmuir-probe-analysis/
     """
+
+    # Gets the mass of the associated ion in kg
     m_i = Particle(ion_type).mass
-    # e * T_e = T_e Joules
+
+    # Converts the temperature from eV to J
     T_e_joules = T_e.to(u.J, equivalencies=u.temperature_energy())
+
+    # Computes the ion density
     n_i = -((ion_isat / (c.e.si * A_p * np.exp(-0.5))) * np.sqrt(m_i / T_e_joules))
+
     return n_i.to(1/(u.m ** 3))
-
-def get_ion_density_chi(ion_type,ion_isat,A_p,T_e,chi):
-    m_i = Particle(ion_type).mass
-
-    n_i = -(ion_isat/(chi * c.e.si * A_p) * (m_i/(c.e.si * T_e)) ** 0.5).value
-    return n_i * 1/(u.m ** 3)
 
 def get_electron_density(electron_isat,A_p,T_e):
     """
@@ -686,8 +457,11 @@ def get_electron_density(electron_isat,A_p,T_e):
     -------
     n_e - (Quantity) - Electron density in 1/m^3
     """
+
+    # Gets the electron mass
     m_e = Particle("electron").mass
 
+    # Converts the temperature from eV to J
     T_e_joules = T_e.to(u.J, equivalencies=u.temperature_energy())
 
     # Calculate thermal velocity from the mean value of a Maxwellian distribution
@@ -709,14 +483,19 @@ def get_electron_ion_collision_frequency(n_e,ion_type,T_e):
     -------
     nu_ei - (Quantity) - Electron-ion collision frequency in 1/s
     """
+
+    # Makes electrons and ions particles in the plasmapy particle library
     p_ion = Particle(ion_type)
     p_electron = Particle("electron")
     epsilon_0 = 8.854187817e-12 * u.F / u.m
 
+    # Computes ion and electron temperature in J
     # Ion temperature is assumed to be 1 eV as reported in Perks et al. 2022
     T_i = 1 * u.eV
     T_i_joule = T_i.to(u.J, equivalencies=u.temperature_energy())
     T_e_joule = T_e.to(u.J, equivalencies=u.temperature_energy())
+
+    # Computes the thermal speed of ions and electrons
     v_ti = np.sqrt(2 * T_i_joule / p_ion.mass)
     v_te = np.sqrt(2 * T_e_joule / p_electron.mass)
     mean_thermal_velocity = np.sqrt(v_ti ** 2 + v_te ** 2)
@@ -738,118 +517,6 @@ def get_electron_ion_collision_frequency(n_e,ion_type,T_e):
     maxwellian_frequency = 4/(3*np.sqrt(np.pi)) * lorentz_frequency
 
     return maxwellian_frequency.to(1 / u.s)
-
-def get_te(sorted_bias,sorted_current,v_f_index):
-    # Convert to numpy array with units handled
-    current_vals = sorted_current[v_f_index :]
-    bias_vals = sorted_bias[v_f_index :]
-
-    bias_vals = u.Quantity(bias_vals,u.V)
-    current_vals = u.Quantity(current_vals,u.A)
-
-
-    # Mask: keep only values where current is non-negative
-    mask = current_vals > 0 * u.A
-    adjusted_bias = bias_vals[mask]
-    adjusted_current = np.log(current_vals[mask].to(u.A).value)
-
-
-    # Now
-    # May want to add the addition of *10^-9 or so after the absolute value - but there are significant outliers
-    # Need to fit a line to the straight region of the curve.
-
-    # Build an array of skip slopes and calculate the mean and standard deviation if the standard deviation is bigger
-    # than the tolerance (which should be derived from the mean) then that should be the slope we use.
-    # Plot the calculated slope on the log plot using point slope form from the first point of the median slope value
-
-    skip = 24
-    elem_in_array = 4
-    found_slope = False
-    j = 0  # set the start index
-    while not found_slope and j + (elem_in_array + 1) * skip < len(adjusted_current):
-        slopes_to_use = []
-        for h in range(0, elem_in_array):
-            slope=((adjusted_current[j + skip * h] -
-                    adjusted_current[j + skip * (h + 1)]) /
-                    (adjusted_bias[j + skip * h] -
-                    adjusted_bias[j + skip * (h + 1)]))
-            slope = u.Quantity(slope, 1/u.V)
-            slopes_to_use.append(slope)
-        mean = u.Quantity(slopes_to_use).mean().to(1/u.V)
-        standard_dev = u.Quantity(slopes_to_use).std()
-        tolerance = 0.3 * abs(mean)
-        # print('tolerance:', tolerance)
-        # print('standard deviation:', standard_dev)
-        if standard_dev < tolerance:
-            slope = mean
-            found_slope = True
-        else:
-            j += skip
-    if not found_slope:
-        return None
-
-    return  abs(1/slope).to(u.V).value * u.eV
-
-def get_te_speed(sorted_bias,sorted_current,v_f_index,v_p_index,get_indices = False):
-    current_vals = sorted_current[v_f_index: v_p_index]
-    bias_vals = sorted_bias[v_f_index: v_p_index]
-    mask = current_vals > 0 * u.A
-    adjusted_bias = bias_vals[mask]
-    adjusted_current = np.log(current_vals[mask].to(u.A).value)
-    if len(adjusted_bias) < 2:
-        if get_indices:
-            return None, None, None
-        else:
-            return None
-
-    remove_indices = 0.01
-    # Check to make sure we have the proper amount of indices to slice
-    if 2 * remove_indices * len(sorted_bias) > len(adjusted_bias):
-        remove_indices = remove_indices/2
-        if 2 * remove_indices * len(sorted_bias) > len(adjusted_bias):
-            remove_indices = 0
-
-    indices_to_remove = int(remove_indices * len(sorted_bias))
-    adjusted_current = adjusted_current[indices_to_remove: -(indices_to_remove + 1)]
-    adjusted_bias = adjusted_bias[indices_to_remove:-(indices_to_remove + 1)]
-    slope_array = []
-    skip = max(int(0.05 * len(adjusted_bias)), 1)
-    if skip == 1:
-        if get_indices:
-            return None, None, None
-        else:
-            return None
-    index = 0
-    while index + skip < len(adjusted_bias):
-        slope_num = adjusted_current[index + skip] - adjusted_current[index]
-        slope_denom = adjusted_bias[index + skip] - adjusted_bias[index]
-        if slope_denom == 0 * u.V:
-            index += skip
-            continue
-
-        slope = (slope_num / slope_denom)
-        slope_array.append(slope)
-        index += skip
-        # (print('index = ', index))
-    if not slope_array:
-        if get_indices:
-            return None, None, None
-        else:
-            return None
-    mean_slope = u.Quantity(slope_array).mean()
-    if mean_slope < 0:
-        if get_indices:
-            return None, None, None
-        else:
-            return None
-
-    t_e = (1 / mean_slope).to(u.V).value * u.eV
-    if get_indices:
-        beginning_index = v_f_index + indices_to_remove
-        end_index = v_p_index - indices_to_remove + 1
-        return t_e, beginning_index, end_index
-
-    return t_e
 
 def get_te_v_p_vf(sorted_bias,sorted_current,v_f_index,v_p_index, fit_curve = True, return_intercept = False):
     """
@@ -892,68 +559,699 @@ def get_te_v_p_vf(sorted_bias,sorted_current,v_f_index,v_p_index, fit_curve = Tr
 
     return t_e
 
+def get_t_e_spline (sorted_bias,sorted_current,v_f_bias, plot_title = ''):
+    '''
+
+    Parameters
+    ----------
+    sorted_bias - Quantity Array (V)  - of bias values from the minimum to maximum of the bias array
+    sorted_current - Quantity Array (A) - of current value sorted by matched bias values from the minimum to
+    maximum of the bias array
+    v_f_idx - int - The index of the floating potential in the sorted_bias and sorted_current arrays
+
+    Returns
+    -------
+    t_e
+    '''
 
 
 
+    # Test and see what works best for the fit
+    off_max_pct_tests = [0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
+
+    fit_colors = [
+        "#FF0000",  # Pure Red
+        "#8B0000",  # Dark Red
+        "#DC143C",  # Crimson
+        "#FF1493",  # Deep Pink
+        "#C71585",  # Medium Violet Red
+        "#9932CC",  # Dark Orchid
+        "#800080",  # Purple
+        "#4B0082"  # Indigo
+    ]
+
+    raw_data_clr = "#00BFFF" # Deep Sky Blue
+    tanh_clr = "#00FF00" # Lime green
+
+    fit_labels = ['60% of max',
+                  '65% of max',
+                  '70% of max',
+                  '75% of max',
+                  '80% of max',
+                  '85% of max',
+                  '90% of max',
+                  '95% of max']
+
+    if v_f_bias is None:
+         return None, None, None, None, None, None, None, None
+
+    if v_f_bias is not None:
+        # Remove the ion current from the total current
+        ion_current = get_ion_current(sorted_bias, sorted_current, v_f_bias)
+        n_sorted_current = sorted_current - ion_current
+        val_sorted_current = n_sorted_current.to(u.A).value.astype(np.float64)
+
+        # Shift the current up by an offset so that we don't take the logarithm of a negative value (The slope will be the
+        # same regardless of the shift since all values are shifted by the same amount)
+        t_e_offset = abs(min(val_sorted_current)) + 1e-9
+        current_to_adj = val_sorted_current + t_e_offset
+        adjusted_current = np.log(current_to_adj)
+
+        # Make sure we don't have multiple current values for each bias value
+        _, unique_b_mask = np.unique(sorted_bias, return_index=True)
+        unique_bias = sorted_bias[unique_b_mask]
+        unique_adj_current = adjusted_current[unique_b_mask]
+
+        u_b_voltage_len = unique_bias[-1] - unique_bias[0]
+
+        v_f_idx = np.where(unique_bias <= v_f_bias)[0][-1]
+
+        # Restrict the region where we are going to perform the tanh fit
+        inxs_of_int = np.where((unique_bias >= (v_f_bias - 0.3 * u_b_voltage_len)) &
+                               (unique_bias <= (v_f_bias + 0.5 * u_b_voltage_len)))[0]
+        bias_to_fit = unique_bias[inxs_of_int]
+        bias_to_fit_values = bias_to_fit.value
+        btf_vf_idx = np.where(bias_to_fit <= v_f_bias)[0][-1]
+
+        adj_current_to_fit = adjusted_current[inxs_of_int]
+
+        # Now we can define the tanh function we want to fit for numpy's curve fitting
+        def tanh_func(x, A, x0, w, B):
+            return A * np.tanh((x - x0) / w) + B
+
+        # For the np.curve_fit we have to provide initial guesses for the parameters that are not the x values so below
+        # are general guesses
+        # A - Amplitude - The range of the data to be fit
+        # x0 - The center of the fit - Chosen to be the spot where the np.gradient is the steepest
+        # w - width of the function (steepness of the curve) - (max(bias)-min(bias))/10 Assumes that the transition
+        # happens over approximately 10% of the voltage values (Again it is just a guess curve_fit will adjust)
+        # B - Offset - Guess is the mean value of the current array of interest
+
+        p0 = [
+            (max(adj_current_to_fit) - min(adj_current_to_fit)) / 2,  # A
+            bias_to_fit_values[np.argmax(np.gradient(adj_current_to_fit))],  # x0
+            (max(bias_to_fit_values) - min(bias_to_fit_values)) / 10,  # w
+            np.mean(adj_current_to_fit)  # B
+        ]
+        # print('A type: ', (max(adj_current_to_fit) - min(adj_current_to_fit)) / 2)
+        # print('x0 type: ', bias_to_fit[np.argmax(np.gradient(adj_current_to_fit))].value)
+        # print('w type: ', (max(bias_to_fit.value) - min(bias_to_fit.value)) / 10)
+        # print('B type: ', np.mean(adj_current_to_fit))
+
+        try:
+            # Fit the tanh function
+            popt, pcov = curve_fit(tanh_func, bias_to_fit_values, adj_current_to_fit, p0=p0)
+        except RuntimeError:
+            return None, None, None, None, None, None
 
 
-def dataset_detect_steady_states(ds, ramp_times):
+        # Return the fitted parameters
+        A_fit, x0_fit, w_fit, B_fit = popt
 
-    y_positions = ds["y"].size
-    x_positions = ds["x"].size
-    box_size = 1
-    tolerance = .1
-    # Check to make sure we are not looking at more outer squares than are actually available
-    if y_positions > 1:
-        y_range = list(range(-box_size, box_size + 1))
-    else:
-        y_range = [0]
-    if x_positions > 1:
-        x_range = list(range(-box_size, box_size + 1))
-    else:
-        x_range = [0]
-    # Get the mean ion saturation current across all shots for a square of positions around the center
-    sweep_means_iisat = []
-    for i in y_range:
-        for j in x_range:
-            # Grab the mean along the shot dimension for the
-            sweep_means_iisat.append(ds["ion_isat"].sel(x=j, y=i, method='nearest').isel(probe=0).mean(dim='shot'))
+        # Compute fitted curve if needed to plot
+        bias_fit = np.linspace(min(bias_to_fit_values), max(bias_to_fit_values), 3000)
+        current_fit = tanh_func(bias_fit, *popt)
 
-    means_list = []
-    # Create a mean of each individual sweep across all elements in the box. Should return a list of floats that give
-    # the mean of each sweep for the entire box of positions.
-    for k in range(len(sweep_means_iisat[0])):
-        sweep_holder = []
-        for h in range(len(sweep_means_iisat)):
-            sweep_holder.append(sweep_means_iisat[h][k])
-        means_list.append(np.mean(sweep_holder))
+        # Compute the derivative to do our PINQUED fit
+        dlnIdV = A_fit / w_fit * (1 / np.cosh((bias_fit - x0_fit) / w_fit) ** 2)
 
-    start_indices = []
-    end_indices = []
-    g = 0
-    while g < len(means_list) - 1:
-        compare_iisat = means_list[g]
-        if abs((compare_iisat - means_list[g + 1])/np.mean([compare_iisat,means_list[g + 1]])) < tolerance:
-            start_current = compare_iisat
-            test_index = g
-            l = 2
-            while (l + g < len(means_list) and
-                    abs((start_current - means_list[g + l])/np.mean([start_current,means_list[g + l]])) < tolerance):
-                l += 1
-            if l > 2:
-                start_indices.append(test_index)
-                end_indices.append(g + l - 1)
-                g += l
-            else:
-                g += 1
+        # Find the knee from the max curvature of the tanh fit
+        # (Proof of equation at https://openstax.org/books/calculus-volume-3/pages/3-3-arc-length-and-curvature)
+        # This is specific for tanh functions although a similar function could be created for any other function
+
+        def get_fitted_knee(A, x0, w, B):
+            """
+            Finds the geometric knee (max curvature) for y = A * tanh((x - x0) / w) + B.
+            Finds the knee on the right side of the curve (x > x0).
+            """
+
+            def curvature(x):
+                # Let u be the inner part of the function
+                u = (x - x0) / w
+
+                # First derivative
+                y_prime = (A / w) * (1.0 / np.cosh(u) ** 2)
+
+                # Second derivative
+                y_double_prime = -2.0 * (A / w ** 2) * np.tanh(u) * (1.0 / np.cosh(u) ** 2)
+
+                # Curvature formula
+                k = np.abs(y_double_prime) / (1.0 + y_prime ** 2) ** 1.5
+                return k
+
+            # We want to maximize curvature (minimize negative curvature)
+            def objective_function(x):
+                return -curvature(x)
+
+            # We search for the knee between the center (x0) and an upper bound.
+            # 3*w is a very safe upper bound where the curve is almost completely flat.
+            result = minimize_scalar(objective_function, bounds=(x0_fit, x0_fit + 3 * w_fit), method='bounded')
+
+            knee_x = result.x
+            knee_y = A * np.tanh((knee_x - x0) / w) + B
+
+            return knee_x, knee_y
+
+        # Calculate using your fitted parameters
+        knee_x, knee_y = get_fitted_knee(A_fit, x0_fit, w_fit, B_fit)
+
+
+        # This works well to get the knee but it is not based in physics
+
+        # def get_robust_visual_knee(A_fit, x0_fit, w_fit, B_fit):
+        #     """
+        #     Finds the visual knee using the Maximum Perpendicular Distance method.
+        #     This is invariant to the physical units of X (bias) and Y (current).
+        #     """
+        #
+        #     # 1. Define the search region.
+        #     # For a tanh curve, we look from the center (x0) to a flat plateau (x0 + 3*w)
+        #     x_start = x0_fit
+        #     x_end = x0_fit + 3 * w_fit
+        #
+        #     y_start = B_fit  # value at center
+        #     y_end = A_fit * np.tanh((x_end - x0_fit) / w_fit) + B_fit  # value at plateau
+        #
+        #     def negative_normalized_distance(x):
+        #         # 2. Normalize the current X value between 0 and 1
+        #         x_norm = (x - x_start) / (x_end - x_start)
+        #
+        #         # 3. Calculate Y and normalize it between 0 and 1
+        #         y = A_fit * np.tanh((x - x0_fit) / w_fit) + B_fit
+        #         y_norm = (y - y_start) / (y_end - y_start)
+        #
+        #         # 4. Calculate distance from the diagonal line y = x.
+        #         # In normalized [0,1] space, the diagonal line is y_norm = x_norm.
+        #         # The perpendicular distance is proportional to (y_norm - x_norm).
+        #         # We return the negative distance because minimize_scalar finds the minimum.
+        #         return -(y_norm - x_norm)
+        #
+        #     # 5. Run the optimizer
+        #     result = minimize_scalar(
+        #         negative_normalized_distance,
+        #         bounds=(x_start, x_end),
+        #         method='bounded'
+        #     )
+        #
+        #     # Calculate final coordinates
+        #     knee_x = result.x
+        #     knee_y = A_fit * np.tanh((knee_x - x0_fit) / w_fit) + B_fit
+        #
+        #     return knee_x, knee_y
+        #
+        # # Usage with your parameters:
+        # knee_x, knee_y = get_robust_visual_knee(A_fit, x0_fit, w_fit, B_fit)
+
+        # Find the maximum of the derivative and the bias values where we want to do the actual linear fit
+        max_deriv = dlnIdV.max()
+        slopes = []
+        intercepts = []
+        r_squareds = []
+        length_arrays = []
+        left_edges = []
+        right_edges = []
+
+        def check_off_max_pcts(dlnIdV, max_deriv, bias_fit, bias_to_fit_values, adj_current_to_fit, off_max_pct):
+            off_max = max_deriv * off_max_pct
+            left_edge = np.where(dlnIdV > off_max)[0][0]
+            if bias_fit[left_edge] < v_f_bias.value:
+                left_edge = np.where(bias_fit <= v_f_bias.value)[0][-1]
+
+            right_edge = np.where(dlnIdV > off_max)[0][-1]
+
+            # Get the indices in the original probe data associated with the left and the right edges
+            left_bias_idx = np.where(bias_to_fit_values >= bias_fit[left_edge])[0][0]
+            right_bias_idx = np.where(bias_to_fit_values <= bias_fit[right_edge])[0][-1]
+            len_array = len(bias_to_fit_values[left_bias_idx:right_bias_idx])
+
+            # Perform a linear fit between the left and the right edge on the probe data to get 1/T_e
+            slope, intercept = np.polyfit(bias_to_fit_values[left_bias_idx:right_bias_idx],
+                                          adj_current_to_fit[left_bias_idx:right_bias_idx],
+                                          1)
+            r = np.corrcoef(bias_to_fit_values[left_bias_idx:right_bias_idx],
+                            adj_current_to_fit[left_bias_idx:right_bias_idx])[0,1]
+            r_squared = r**2
+
+            t_e = 1/slope * u.eV
+
+            return slope, intercept, r_squared, len_array, left_edge, right_edge
+
+        for test_pct in off_max_pct_tests:
+            slope, intercept, r_squared, len_array, left_edge, right_edge = (
+                check_off_max_pcts(dlnIdV, max_deriv,  bias_fit, bias_to_fit_values, adj_current_to_fit, test_pct))
+            slopes.append(slope)
+            intercepts.append(intercept)
+            r_squareds.append(r_squared)
+            length_arrays.append(len_array)
+            left_edges.append(left_edge)
+            right_edges.append(right_edge)
+
+
+
+        # Now to get the Electron saturation current and the Plasma Potential
+        slope = slopes[3]
+        intercept = intercepts[3]
+
+        knee_idx = np.where(unique_bias.value <= knee_x)[0][-1]
+
+        # Define the region to fit a line to for the Esat current
+        esat_bias_region = unique_bias[knee_idx:].value
+        esat_adj_curr_region = unique_adj_current[knee_idx:]
+
+        # Create the linear fit for the Esat region
+        esat_slope, esat_intercept = np.polyfit(esat_bias_region, esat_adj_curr_region, 1)
+
+        # TODO make the function return None for everything if the esat_slope > 0
+
+        # Find the plasma potential by finding the intersection of the esat and temperature fits
+        v_p_value = (esat_intercept - intercept) / (slope - esat_slope)
+        v_p = v_p_value * u.V
+
+
+        if plot_title != '':
+            max_len_array_idx = np.argmax(length_arrays)
+            max_len_left = left_edges[max_len_array_idx]
+            max_len_right = right_edges[max_len_array_idx]
+            max_len_left_idx = np.where(bias_to_fit_values >= bias_fit[max_len_left])[0][0]
+            max_len_right_idx = np.where(bias_to_fit_values <= bias_fit[max_len_right])[0][-1]
+
+
+            y_upper_lim = np.max(adj_current_to_fit + 0.5)
+            fig, axes = plt.subplots(2, 2, figsize=(12, 12))
+            axes = axes.flatten()
+
+            axes[0].scatter(unique_bias, unique_adj_current, color='b', label='Data from Probe')
+            axes[0].plot(bias_fit, current_fit, color='r', label='Tanh fit')
+            axes[0].axvline(knee_x, color='g', linestyle='--', label='Knee')
+            axes[0].plot(v_f_bias, adj_current_to_fit[btf_vf_idx],
+                         color='m', label=r'$V_f$', linestyle='None', marker='o')
+
+            axes[1].plot(bias_fit, dlnIdV, color='r', label='Tanh fit Derivative')
+            axes[1].axvline(knee_x, color='g', linestyle='--', label='Knee')
+
+            axes[2].scatter(bias_to_fit_values[max_len_left_idx:max_len_right_idx],
+                            adj_current_to_fit[max_len_left_idx:max_len_right_idx],
+                            color='b', label='Data from Probe')
+
+            for i in range(len(off_max_pct_tests)):
+                slope = slopes[i]
+                intercept = intercepts[i]
+                r_squared = r_squareds[i]
+                left_edge = left_edges[i]
+                right_edge = right_edges[i]
+
+
+                left_bias_idx = np.where(bias_to_fit_values >= bias_fit[left_edge])[0][0]
+                right_bias_idx = np.where(bias_to_fit_values <= bias_fit[right_edge])[0][-1]
+
+                axes[0].axvline(bias_fit[left_edge], color=fit_colors[i], linestyle='--')
+                axes[0].axvline(bias_fit[right_edge], color=fit_colors[i], linestyle='--')
+                axes[0].plot(bias_to_fit_values[left_bias_idx:], slope * bias_to_fit_values[left_bias_idx:] + intercept,
+                             color = fit_colors[i], label = fit_labels[i] + fr' $T_e$ = {1/slope:.2f}')
+
+                axes[1].axvline(bias_fit[left_edge], color=fit_colors[i], linestyle='--')
+                axes[1].axvline(bias_fit[right_edge], color=fit_colors[i], linestyle='--')
+
+
+                axes[2].plot(bias_to_fit_values[left_bias_idx:right_bias_idx],
+                             slope * bias_to_fit_values[left_bias_idx:right_bias_idx] + intercept,
+                             color = fit_colors[i], label = fit_labels[i] + fr'$ T_e$ = {1/slope:.2f}, $r^2$ = {r_squared:.2f}')
+                axes[2].axvline(bias_fit[left_edge], color=fit_colors[i], linestyle='--')
+                axes[2].axvline(bias_fit[right_edge], color=fit_colors[i], linestyle='--')
+
+
+            slope = slopes[3]
+            intercept = intercepts[3]
+            left_edge = left_edges[3]
+            left_bias_idx = np.where(bias_to_fit_values >= bias_fit[left_edge])[0][0]
+
+            old_knee_pct = 0.3
+            old_knee_voltage_idx = np.where(dlnIdV >= (old_knee_pct * max_deriv))[0][-1]
+            full_old_knee_idx = np.where(unique_bias.value <= bias_fit[old_knee_voltage_idx])[0][-1]
+
+            # Define the region to fit a line to for the Esat current
+            old_esat_bias_region = unique_bias[full_old_knee_idx:].value
+            old_esat_adj_curr_region = unique_adj_current[full_old_knee_idx:]
+
+            # Create the linear fit for the Esat region
+            old_esat_slope, old_esat_intercept = np.polyfit(old_esat_bias_region, old_esat_adj_curr_region, 1)
+
+
+            axes[3].scatter(unique_bias, unique_adj_current, color = 'b', label = 'Data from Probe' )
+            axes[3].plot(bias_to_fit_values[left_bias_idx:],
+                         slope * bias_to_fit_values[left_bias_idx:] + intercept,
+                         color = fit_colors[3], label = fr'{fit_labels[3]}, $T_e$ = {1/slope:.2f}')
+            axes[3].plot(v_f_bias, adj_current_to_fit[btf_vf_idx],
+                         color='m', label=r'$V_f$', linestyle = 'None', marker = 'o')
+            axes[3].plot(bias_to_fit_values[left_bias_idx:],
+                         esat_slope * bias_to_fit_values[left_bias_idx:] + esat_intercept,
+                         color='c', linestyle='--', label='Esat current')
+            axes[3].plot(bias_to_fit_values[left_bias_idx:],
+                         old_esat_slope * bias_to_fit_values[left_bias_idx:] + old_esat_intercept,
+                         color='lime', linestyle='--', label='Old Esat current')
+            axes[3].axvline(v_p_value, color='y', linestyle='--', label = r'$V_p$')
+            axes[3].axvline(knee_x, color='k', linestyle='--', label = r'$Knee$')
+            axes[3].axvline(bias_fit[old_knee_voltage_idx], color = 'orange', linestyle='--', label = 'Old Knee')
+
+
+            axes[0].set_xlabel('Bias (V)')
+            axes[0].set_ylabel('ln(Current)')
+            axes[0].set_ylim([-6, y_upper_lim])
+            axes[0].legend(loc='lower right', fontsize='small')
+
+            axes[1].set_xlabel('Bias (V)')
+            axes[1].set_ylabel('dln(Current)/dV')
+            axes[1].legend(loc='upper left',fontsize='small')
+
+            axes[2].set_xlabel('Bias (V)')
+            axes[2].set_ylabel('ln(Current)')
+            axes[2].legend(loc='lower right', fontsize='small')
+
+            axes[3].set_xlabel('Bias (V)')
+            axes[3].set_ylabel('ln(Current)')
+            axes[3].set_ylim([-6, y_upper_lim])
+            axes[3].legend(loc='upper left')
+
+            fig.suptitle(plot_title)
+            fig.tight_layout()
+            plt.show()
+            plt.close()
+
+        # TODO ensure .75 correct
+        slope = slopes[3]
+        biases = bias_fit[left_edges[3]:right_edges[3]]
+        currents = adj_current_to_fit[left_edges[3]:right_edges[3]]
+
+        intercept = intercepts[3]
+        r_squared = r_squareds[3]
+        t_e = 1/slope * u.eV
+
+
+        if r_squared < 0.8:
+            return None, None, None, None, None, None, None, None
         else:
-            g += 1
-
-    start_times = [ramp_times[idx] for idx in start_indices]
-    end_times = [ramp_times[idx] for idx in end_indices]
-    return start_indices, end_indices, start_times, end_times
+            return t_e, intercept,v_p, esat_slope, esat_intercept, t_e_offset,biases,currents
 
 
+
+
+
+
+
+    # # Makes sure we don't have crazy values that will make the splines go crazy
+    # exceptions_mask = np.abs(unique_adj_current) < 5 * np.max(np.abs(unique_adj_current))
+    # unique_bias = unique_bias[exceptions_mask]
+    # unique_adj_current = unique_adj_current[exceptions_mask]
+    #
+    # # Makes sure we don't have crazy values that will make the splines go crazy
+    # exceptions_mask = np.where(unique_adj_current >= 5 * np.max(unique_adj_current))[0]
+    # unique_bias = unique_bias[exceptions_mask]
+    # unique_adj_current = unique_adj_current[exceptions_mask]
+    #
+    # bias_vals = unique_bias.value
+    #
+    # voltage_span = bias_vals.max() - bias_vals.min()
+    # points_per_volts = len(bias_vals)/voltage_span
+    #
+    # smoothing_width = 4.0
+    # window_length = int(smoothing_width * points_per_volts)
+    #
+    # polyorder = 3
+    #
+    # if window_length % 2 == 0:
+    #     window_length += 1
+    #
+    # fitted_log_current = savgol_filter(unique_adj_current, window_length=window_length, polyorder=polyorder)
+    #
+    # dx = np.mean(np.diff(bias_vals))
+    #
+    # dlnIdV = savgol_filter(unique_adj_current, window_length=window_length, polyorder=polyorder, deriv=1, delta=dx)
+    #
+    # dlnI2dV2 = savgol_filter(unique_adj_current, window_length=window_length, polyorder=polyorder, deriv=2, delta=dx)
+    #
+    # u_b_v_f_idx = np.where(unique_bias.value >= v_f_bias.value)[0][0]
+    # min_idx = u_b_v_f_idx
+    #
+    # # Boolean mask for low derivative
+    # low_mask = np.abs(dlnIdV) < 0.05
+    #
+    # # Ignore everything before min_idx
+    # low_mask[:min_idx] = False
+    #
+    # # Find edges
+    # diff = np.diff(low_mask.astype(int))
+    # start_index = np.where(diff == 1)[0] + 1
+    # end_index = np.where(diff == -1)[0] + 1
+    #
+    # # Handle edge cases
+    # if low_mask[0]:
+    #     start_index = np.r_[0, start_index]
+    # if low_mask[-1]:
+    #     end_index = np.r_[end_index, len(low_mask)]
+    #
+    # # Find longest plateau
+    # lengths = end_index - start_index
+    # try:
+    #     longest_idx = np.argmax(lengths)
+    #     start_idx = start_index[longest_idx]
+    #     end_idx = end_index[longest_idx] - 1
+    #
+    #     # # Create a spline for the log data
+    #     # log_spline = UnivariateSpline(unique_bias, unique_adj_current, s=3, k=3)
+    #     #
+    #     # spline_bias = np.linspace(min(unique_bias.value), max(unique_bias.value), 10000)
+    #     # log_current_fit = log_spline(spline_bias)
+    #     #
+    #     # # First derivative of the spline of the log data
+    #     # log_spline_deriv = log_spline.derivative(n=1)
+    #     # dlnIdV = log_spline_deriv(spline_bias)
+    #     #
+    #     # # Second derivative of the spline of the log data
+    #     # log_spline_2_deriv = log_spline.derivative(n=2)
+    #     # dlnI2dV2 = log_spline_2_deriv(spline_bias)
+    #
+    #     # Because everything of interest is going to be within a narrow range, cut down the viewing window to make the
+    #     # data easier to see
+    #     log_mask_spline = ((bias_vals >= v_f_bias.value - 5) & (bias_vals<= bias_vals[end_idx]))
+    #     log_mask_ub = ((unique_bias >= v_f_bias - 5 * u.V) & (unique_bias <= bias_vals[end_idx] * u.V))
+    #     log_b_plot = bias_vals[log_mask_spline]
+    #     dlnIdV_plot = dlnIdV[log_mask_spline]
+    #
+    #     # Calculate the electron temperature
+    #     slope, t_e_intercept, v_p, esat_slope, esat_intercept = electron_temperature_max(unique_bias, unique_adj_current,
+    #                                                                                      bias_vals, fitted_log_current,
+    #                                                                                      dlnIdV,
+    #                                                                                      v_f_bias,
+    #                                                                                      log_mask_spline,
+    #                                                                                      log_mask_ub)
+
+
+    #     if slope is not None:
+    #         t_e = 1 / slope * u.eV
+    #     else:
+    #         t_e = None
+    #
+    #     return t_e, t_e_intercept, v_p, esat_slope, esat_intercept
+    # except ValueError:
+    #     return None, None, None, None, None
+
+def electron_temperature_max(unique_bias, unique_adj_current,
+                             spline_bias, log_current_fit,
+                             dlnIdV,
+                             v_f_bias,
+                             log_mask_spline,
+                             log_mask_ub):
+    '''
+
+    Parameters
+    ----------
+    unique_bias - Unique Bias values from the langmuir probe sweep
+    spline_bias - Bias values associated with the spline
+    unique_adj_current - Unique ln current values from the langmuir probe sweep
+    dlnIdV - derivative of the natural log of current curve
+    log_mask_spline - log mask applied to the derivative curve for spline data
+    log_mask_ub - log mask applied to the derivative curve for unique bias data
+
+    Returns
+    -------
+    slope - Slope of the line of best fit of the linear region of the logarithmic curve -> Corresponds to 1/t_e in eV
+    intercept - Intercept of the line of best fit of the linear region of the logarithmic curve
+
+    Note: This method only works for higher temperature plasmas -- for lower temperature plasmas see the PINQUED analysis
+    code. The primary reason for this is that the lower temperature plasmas don't have a well-defined electron
+    saturation region. For further discussion of this see Chen's review of Langmuir probes here
+    https://www.seas.ucla.edu/~ffchen/Publs/Chen210R.pdf
+    '''
+
+    # How much of the initial data is checked in %
+    check = 0.2
+    # How many stds do we need to be away from the previous mean before we assume it is a knee
+    knee_tol = 2
+    # How close to the window maximum value should the maximum values be to register as a valid max value
+    max_thresh = 0.5
+    # How much up off the peak do you want to calculate the max from
+    off_max_thresh = 0.6
+    min_thresh = 0.15
+    v_from_min = 1
+
+    group_num = 3
+    # Ensure that all parameters are compatible for the analysis
+    unique_bias = unique_bias[log_mask_ub]
+    log_spline = log_current_fit[log_mask_spline]
+    spline_bias = spline_bias[log_mask_spline]
+    unique_adj_current = unique_adj_current[log_mask_ub]
+    dlnIdV = dlnIdV[log_mask_spline]
+
+    len_to_avg_over = int(len(dlnIdV) * check)
+    avg_initial_slope = np.mean(dlnIdV[-len_to_avg_over:])
+    std_initial_slope = np.std(dlnIdV[-len_to_avg_over:])
+
+    first_idx = -len_to_avg_over - (group_num + 1)
+    last_idx = first_idx + group_num
+    test_data = dlnIdV[first_idx:last_idx]
+    while (np.mean(test_data) - avg_initial_slope < knee_tol * std_initial_slope
+                  and first_idx > -len(dlnIdV) + 1):
+        first_idx -= group_num
+        last_idx -= group_num
+        test_data = dlnIdV[first_idx:last_idx]
+
+    neg_knee_idx = (first_idx + last_idx) // 2
+
+    # From the negative knee index we want to slide until we find a max in the dIdV curve
+
+    # Convert negative knee index to positive
+    knee_idx = len(dlnIdV) + neg_knee_idx
+    v_f_spline_idx = np.where(spline_bias >= v_f_bias.value)[0][0]
+    v_f_ub_idx = np.where(unique_bias.value >= v_f_bias.value)[0][0]
+    # print('v_f_spline_idx: ', v_f_spline_idx, 'knee_idx: ', knee_idx)
+    search_deriv = dlnIdV[v_f_spline_idx:knee_idx]
+    # print(len(search_deriv))
+    search_bias = spline_bias[v_f_spline_idx:knee_idx]
+    search_max = np.max(search_deriv)
+    max_thresh = max_thresh * search_max
+    # print("search_max:", search_max, "max_thresh:", max_thresh)
+
+    maxs, max_props = find_peaks(
+                                 search_deriv,
+                                 distance = group_num,
+                                 height = max_thresh,
+                                 prominence = 0.03 * search_max
+                                 )
+
+    if len(maxs) == 0:
+        widest_maxs = None
+        widest_widths = None
+    else:
+        # Returns width value, y-value of the peak, left fractional index at specified hight,
+        # and right fractional index at specified height
+        width_peaks = peak_widths(search_deriv, maxs, rel_height = off_max_thresh)
+        widths = width_peaks[0]
+        left_ips = width_peaks[2]
+        right_ips = width_peaks[3]
+
+        # Take the two widest peaks
+        sorted_indices = np.argsort(widths)[::-1]  # descending width
+        top_two = sorted_indices[:2] if len(widths) >= 2 else sorted_indices
+
+        widest_peaks = maxs[top_two]
+        widest_left_ips = left_ips[top_two]
+        widest_right_ips = right_ips[top_two]
+
+        # Select the remaining peak with the highest voltage
+        rightmost_idx = np.argmax(widest_peaks)
+        max_slope_idx = widest_peaks[rightmost_idx] + v_f_spline_idx
+        left_edge = int(np.floor(widest_left_ips[rightmost_idx])) + v_f_spline_idx
+        right_edge = int(np.ceil(widest_right_ips[rightmost_idx])) + v_f_spline_idx
+
+        leftmost_idx = None
+        max2_idx = None
+        left2_edge = None
+        right2_edge = None
+        if len(sorted_indices) > 1:
+            # Find the second peak to plot it
+            leftmost_idx = np.argmin(widest_peaks)
+            max2_idx = widest_peaks[leftmost_idx] + v_f_spline_idx
+            left2_edge = int(np.floor(widest_left_ips[leftmost_idx])) + v_f_spline_idx
+            right2_edge = int(np.ceil(widest_right_ips[leftmost_idx])) + v_f_spline_idx
+
+        left_edge_ub = np.where(unique_bias.value < spline_bias[left_edge])[0][-1]
+        right_edge_ub = np.where(unique_bias.value < spline_bias[right_edge])[0][-1]
+
+        left2_edge_ub = np.where(unique_bias.value < spline_bias[left2_edge])[0][-1]
+        right2_edge_ub = np.where(unique_bias.value < spline_bias[right2_edge])[0][-1]
+
+        knee_idx_ub = np.where(unique_bias.value < spline_bias[knee_idx])[0][-1]
+        max_slope_idx_ub = np.where(unique_bias.value < spline_bias[max_slope_idx])[0][-1]
+
+        # Fit the region with a line and return the slope and intercept
+        slope, intercept = np.polyfit(unique_bias[left_edge_ub:right_edge_ub],
+                                       unique_adj_current[left_edge_ub:right_edge_ub], 1)
+        esat_slope, esat_intercept = np.polyfit(unique_bias[knee_idx_ub:],
+                                                unique_adj_current[knee_idx_ub:],1)
+        r = np.corrcoef(unique_bias[left_edge_ub:right_edge_ub], unique_adj_current[left_edge_ub:right_edge_ub]) [0,1]
+        r2 = r ** 2
+        # print('r^2: ', r2)
+        if np.isclose(slope, esat_slope):
+            v_p = np.nan  # Lines nearly parallel
+        else:
+            v_p = ((esat_intercept - intercept) / (slope - esat_slope)) * u.V
+
+        v_p_idx = np.where(unique_bias < v_p)[0][-1]
+
+        # print('v_p: ', v_p)
+    # # Create plots
+    # fig, ax = plt.subplots(2,2, figsize = (8,8))
+    # ax = ax.flatten()
+    # ax[0].plot(unique_bias, unique_adj_current, marker=".", color='b', linestyle='None', label= 'Original data')
+    # ax[0].plot(unique_bias[v_f_ub_idx:v_p_idx], slope * unique_bias[v_f_ub_idx:v_p_idx].value + intercept, linestyle="--", color='r', label = 'Temperature Fit')
+    # ax[0].plot(unique_bias, esat_slope * unique_bias.value + esat_intercept, linestyle="--", color='c',
+    #            label = 'Electron Saturation Fit')
+    # ax[0].plot(unique_bias[v_p_idx], unique_adj_current[v_p_idx], marker=".", color='k')
+    # ax[0].plot(spline_bias[v_f_spline_idx], log_spline[v_f_spline_idx], marker=".", color='c')
+    # ax[0].axvline(spline_bias[left_edge], color='m', linestyle='--', label='Left edge of fit')
+    # ax[0].axvline(spline_bias[right_edge], color='y', linestyle='--', label='Right edge of fit')
+    # ax[0].plot(spline_bias[max_slope_idx], log_spline[max_slope_idx], marker=".", color='g', label = 'Maximum index')
+    # ax[0].set_title('log plot ')
+    # ax[0].set_xlabel(r'Voltage (V)')
+    # ax[0].set_ylabel(r'$\text{ln}(I)$')
+    # ax[0].legend(loc='lower right')
+    #
+    # ax[1].plot(spline_bias, dlnIdV, marker=".", color='b', label = 'Derivative of spline fit')
+    # ax[1].plot(spline_bias[max_slope_idx], dlnIdV[max_slope_idx], marker=".", color='k', label = 'Maximum index')
+    # ax[1].plot(spline_bias[v_f_spline_idx], dlnIdV[v_f_spline_idx], marker=".", color='c')
+    # ax[1].axvline(spline_bias[left_edge], color='m', linestyle='--', label='Left edge of fit')
+    # ax[1].axvline(spline_bias[right_edge], color='y', linestyle='--', label='Right edge of fit')
+    # ax[1].axvline(spline_bias[knee_idx], color='r', linestyle='--', label='Knee')
+    # ax[1].set_xlabel('Voltage (V)')
+    # ax[1].set_ylabel(r'$\frac{\text{dln}(I)}{\text{d}V}$')
+    # ax[1].set_title('log plot derivative ')
+    # ax[1].legend(loc='lower right')
+    #
+    # ax[2].plot(unique_bias[left_edge_ub:right_edge_ub], unique_adj_current[left_edge_ub:right_edge_ub], marker=".", color='b',
+    #            linestyle = 'None',label = 'Original Data')
+    # ax[2].plot(unique_bias[left_edge_ub:right_edge_ub], slope * unique_bias[left_edge_ub:right_edge_ub].value + intercept,
+    #            linestyle="--", color='r', label = 'Temperature fit')
+    # ax[2].plot(unique_bias[max_slope_idx_ub], unique_adj_current[max_slope_idx_ub], marker=".", color='g', label = 'Maximum index')
+    # ax[2].legend(loc='lower right')
+    # ax[2].set_xlabel('Voltage (V)')
+    # ax[2].set_ylabel(r'$\text{ln}(I)$')
+    # ax[2].set_title('Zoomed log plot ')
+    #
+    # plt.tight_layout()
+    # plt.show()
+    # plt.close('all')
+
+    if (max_slope_idx < v_f_spline_idx or
+            v_p.value > spline_bias[knee_idx] or
+            (spline_bias[right_edge]- spline_bias[left_edge] < 2) or
+            r2 < 0.85):
+        slope = None
+        intercept = None
+        v_p = None
+        esat_slope = None
+        esat_intercept = None
+
+    return slope, intercept, v_p, esat_slope, esat_intercept
 
 def nan_summary(ds: xr.Dataset, diagnostic_keys=None):
     """
@@ -1084,10 +1382,161 @@ def filter_ne_data(filtered_ne_data,min_time,max_time):
     return filtered_ne_mean_profile, filtered_ne_std_profile
 
 
+def find_steady_state(t_e_data_arrays, n_e_data_arrays, ds, probe, run_identifier, prev_start=None, prev_end=None):
+    """
+    Parameters
+    ----------
+    t_e_data_arrays
+    n_e_data_arrays
+    ds : The xarray dataset (needed to redraw the plot)
+    probe : The current probe index (needed to redraw the plot)
+    run_identifier : String identifier (needed to redraw the plot)
+    prev_start : Previously saved left edge (if any)
+    prev_end : Previously saved right edge (if any)
 
+    Returns
+    -------
+    min_time
+    max_time
+    """
+    from lapd_plasma_analysis.obtain_plots.xarray_plots import plot_time_series
 
+    # --- SHOW PREVIOUS BOUNDS ---
+    if prev_start is not None and prev_end is not None:
+        print(f"\nPrevious Steady State Bounds found: Left = {prev_start}, Right = {prev_end}")
 
-def find_steady_state(t_e_data_arrays, n_e_data_arrays, middle_guess):
+        # Draw the plot
+        fig, axes, _ = plot_time_series(ds, probe, run_identifier, return_range=True)
+
+        # Add previous lines
+        axes[0].axvline(x=prev_start, color='k', linestyle='--', linewidth=2, label='Prev Left')
+        axes[1].axvline(x=prev_start, color='k', linestyle='--', linewidth=2, label='Prev Left')
+        axes[0].axvline(x=prev_end, color='k', linestyle=':', linewidth=2, label='Prev Right')
+        axes[1].axvline(x=prev_end, color='k', linestyle=':', linewidth=2, label='Prev Right')
+
+        for ax in axes:
+            handles, labels = ax.get_legend_handles_labels()
+            by_label = dict(zip(labels, handles))
+            ax.legend(by_label.values(), by_label.keys(), loc='best', fontsize=14)
+
+        plt.show(block=False)
+        plt.pause(0.5)  # Give macOS a half-second to render the window
+
+        input("Press Enter to clear previous bounds and select new ones...")
+        plt.close('all')  # Destroy the plot
+
+    # --- LEFT EDGE SELECTION ---
+    left_edge = None
+
+    while True:
+        # Generate fresh plot
+        fig, axes, _ = plot_time_series(ds, probe, run_identifier, return_range=True)
+
+        if left_edge is not None:
+            axes[0].axvline(x=left_edge, color='r', linestyle='-', linewidth=2, label='Left Edge')
+            axes[1].axvline(x=left_edge, color='r', linestyle='-', linewidth=2, label='Left Edge')
+            for ax in axes:
+                handles, labels = ax.get_legend_handles_labels()
+                by_label = dict(zip(labels, handles))
+                ax.legend(by_label.values(), by_label.keys(), loc='best', fontsize=14)
+
+        plt.show(block=False)
+        plt.pause(0.5)
+
+        user_input = input("\nEnter an INTEGER number for the LEFT edge: ")
+        try:
+            left_edge = int(user_input)
+            plt.close('all')  # Close before asking if happy, to redraw with the new line
+
+            # Redraw to show the line you just typed
+            fig, axes, _ = plot_time_series(ds, probe, run_identifier, return_range=True)
+            axes[0].axvline(x=left_edge, color='r', linestyle='-', linewidth=2, label='Left Edge')
+            axes[1].axvline(x=left_edge, color='r', linestyle='-', linewidth=2, label='Left Edge')
+            for ax in axes:
+                handles, labels = ax.get_legend_handles_labels()
+                by_label = dict(zip(labels, handles))
+                ax.legend(by_label.values(), by_label.keys(), loc='best', fontsize=14)
+            plt.show(block=False)
+            plt.pause(0.5)
+
+            if ask_yes_or_no("Are you happy with this left edge placement (y/n)? "):
+                plt.close('all')
+                break
+            else:
+                plt.close('all')
+
+        except ValueError:
+            print("Invalid input. Please enter an integer.")
+            plt.close('all')
+            continue
+
+    # --- RIGHT EDGE SELECTION ---
+    right_edge = None
+
+    while True:
+        fig, axes, _ = plot_time_series(ds, probe, run_identifier, return_range=True)
+
+        # Always draw the confirmed left edge
+        axes[0].axvline(x=left_edge, color='r', linestyle='-', linewidth=2, label='Left Edge')
+        axes[1].axvline(x=left_edge, color='r', linestyle='-', linewidth=2, label='Left Edge')
+
+        if right_edge is not None:
+            axes[0].axvline(x=right_edge, color='g', linestyle='-', linewidth=2, label='Right Edge')
+            axes[1].axvline(x=right_edge, color='g', linestyle='-', linewidth=2, label='Right Edge')
+
+        for ax in axes:
+            handles, labels = ax.get_legend_handles_labels()
+            by_label = dict(zip(labels, handles))
+            ax.legend(by_label.values(), by_label.keys(), loc='best', fontsize=14)
+
+        plt.show(block=False)
+        plt.pause(0.5)
+
+        user_input = input("\nEnter an INTEGER number for the RIGHT edge: ")
+        try:
+            right_edge = int(user_input)
+            plt.close('all')
+
+            # Redraw with both lines
+            fig, axes, _ = plot_time_series(ds, probe, run_identifier, return_range=True)
+            axes[0].axvline(x=left_edge, color='r', linestyle='-', linewidth=2, label='Left Edge')
+            axes[1].axvline(x=left_edge, color='r', linestyle='-', linewidth=2, label='Left Edge')
+            axes[0].axvline(x=right_edge, color='g', linestyle='-', linewidth=2, label='Right Edge')
+            axes[1].axvline(x=right_edge, color='g', linestyle='-', linewidth=2, label='Right Edge')
+            for ax in axes:
+                handles, labels = ax.get_legend_handles_labels()
+                by_label = dict(zip(labels, handles))
+                ax.legend(by_label.values(), by_label.keys(), loc='best', fontsize=14)
+            plt.show(block=False)
+            plt.pause(0.5)
+
+            happy_with_right = ask_yes_or_no("Are you happy with this right edge placement (y/n)? ")
+
+            if happy_with_right:
+                if right_edge <= left_edge:
+                    print("Error: The right edge must be strictly greater than the left edge. Try again.")
+                    right_edge = None
+                    plt.close('all')
+                else:
+                    plt.close('all')
+                    break
+            else:
+                plt.close('all')
+
+        except ValueError:
+            print("Invalid input. Please enter an integer.")
+            plt.close('all')
+            continue
+
+    # --- DURATION CHECK ---
+    duration = right_edge - left_edge
+    if duration > 5:
+        print(
+            f"\nWarning: The selected steady state time period ({duration} ms) is longer than 5 ms and may be too long.")
+
+    return left_edge, right_edge
+
+def find_steady_state_auto(t_e_data_arrays, n_e_data_arrays, middle_guess):
     """
     Parameters
     ----------
@@ -1249,6 +1698,5 @@ def find_steady_state(t_e_data_arrays, n_e_data_arrays, middle_guess):
     # print('max_time: ', max_time)
 
     return min_time, max_time
-
 
 
