@@ -15,7 +15,7 @@ from lapd_plasma_analysis.langmuir.metadata_for_dataset import get_supplemental_
 
 
 def get_langmuir_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder, interferometry_mode,
-                          core_radius, bimaxwellian, plot_save_directory):
+                          core_radius, bimaxwellian, plot_save_directory, silent=False):
     """
     Retrieve datasets of Langmuir probe diagnostic data from LAPD experiments.
     Also returns the steady-state time period of each dataset
@@ -69,19 +69,25 @@ def get_langmuir_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder
     """
 
     # Create folder to save NetCDF files if not yet existing
-    netcdf_folder = ensure_directory(langmuir_nc_folder)
+    if not silent:
+        netcdf_folder = ensure_directory(langmuir_nc_folder)
+    if silent:
+        netcdf_folder = " "
 
     # Ask user to choose either NetCDF files or HDF5 files, then create datasets from them
-    datasets, hdf5_paths = load_datasets(hdf5_folder, netcdf_folder, bimaxwellian, plot_save_directory)
+    datasets, hdf5_paths = load_datasets(hdf5_folder, netcdf_folder, bimaxwellian, plot_save_directory, silent=silent)
     if datasets is None:
         return None, None, None
 
-    steady_state_times_runs = [detect_steady_state_times(dataset, core_radius) for dataset in datasets]
+    if not silent:
+        steady_state_times_runs = [detect_steady_state_times(dataset, core_radius) for dataset in datasets]
 
-    # Calibrate electron densities using interferometry data, depending on interferometry mode
-    for density_diagnostic in ('n_e', 'n_i', 'n_i_OML'):
-        datasets = interferometry_calibrate_datasets(datasets, density_diagnostic, interferometry_folder,
-                                                     interferometry_mode, core_radius, steady_state_times_runs)
+        # Calibrate electron densities using interferometry data, depending on interferometry mode
+        for density_diagnostic in ('n_e', 'n_i', 'n_i_OML'):
+            datasets = interferometry_calibrate_datasets(datasets, density_diagnostic, interferometry_folder,
+                                                        interferometry_mode, core_radius, steady_state_times_runs)
+    if silent:
+        steady_state_times_runs = " "
 
     # Calculate pressures
     for i in range(len(datasets)):
@@ -113,8 +119,9 @@ def get_langmuir_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder
         neutral_density = get_neutral_density(value_safe(datasets[i].attrs['Fill pressure'])) #todo removed * u.Torr
         datasets[i] = datasets[i].assign_attrs({"Neutral density": neutral_density})
 
-    # Final save diagnostics datasets to folder (after earlier save point in load_datasets function)
-    save_datasets_nc(datasets, netcdf_folder, "lang_", bimaxwellian)
+    if not silent:
+        # Final save diagnostics datasets to folder (after earlier save point in load_datasets function)
+        save_datasets_nc(datasets, netcdf_folder, "lang_", bimaxwellian)
 
     return datasets, steady_state_times_runs, hdf5_paths
 
@@ -166,7 +173,7 @@ def print_user_file_choices(hdf5_folder, lang_nc_folder, interferometry_folder, 
     input("Enter any key to continue: ")
 
 
-def load_datasets(hdf5_folder, lang_nc_folder, bimaxwellian, plot_save_directory):
+def load_datasets(hdf5_folder, lang_nc_folder, bimaxwellian, plot_save_directory, silent=False):
     r"""
 
     Parameters
@@ -194,6 +201,14 @@ def load_datasets(hdf5_folder, lang_nc_folder, bimaxwellian, plot_save_directory
         Can also be `None` if no HDF5 files were chosen.
 
     """
+
+    if silent:
+        hdf5_chosen_list = None
+        datasets = [xr.open_dataset(hdf5_folder)]
+        for i in range(len(datasets)):
+            datasets[i] = datasets[i].assign_attrs(get_supplemental_metadata(datasets[i]))
+
+        return datasets, hdf5_chosen_list
 
     print("\nThe following Langmuir NetCDF files were found in the NetCDF folder (specified in main.py): ")
     nc_paths = sorted(search_folder(lang_nc_folder, 'nc', limit=52))
@@ -341,6 +356,11 @@ def interferometry_calibrate_datasets(datasets, density_diagnostic, interferomet
             """
 
     return datasets
+
+def silent_get_langmuir_datasets(langmuir_nc_folder, hdf5_folder, interferometry_folder, interferometry_mode,
+                          core_radius, bimaxwellian, plot_save_directory):
+    """ Same function as get_langmuir_datasets, but works for
+    one experiment at a time and runs without prompting the user."""
 
 
 def get_diagnostics_to_plot(diagnostic_name_dict):

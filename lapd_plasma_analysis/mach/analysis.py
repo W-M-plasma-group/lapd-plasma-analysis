@@ -9,6 +9,7 @@ from lapd_plasma_analysis.langmuir.analysis import save_datasets_nc
 from lapd_plasma_analysis.langmuir.configurations import get_ion
 
 from lapd_plasma_analysis.mach.getMachIsat import get_mach_isat
+from lapd_plasma_analysis.mach.metadata_for_dataset import get_supplemental_metadata
 from lapd_plasma_analysis.mach.velocity import get_mach_numbers, get_velocity
 from lapd_plasma_analysis.mach.configurations import get_mach_config
 
@@ -72,6 +73,9 @@ def get_mach_datasets(mach_nc_folder, hdf5_folder, lang_datasets, hdf5_selected_
             mach_isat = get_mach_isat(hdf5_path, mach_configs)
 
             mach_datasets += [get_mach_numbers(mach_isat).assign_attrs(exp_params_dict)]
+
+        for i in range(len(mach_datasets)):
+            mach_datasets[i] = mach_datasets[i].assign_attrs(get_supplemental_metadata(mach_datasets[i]))
 
         # Save Mach datasets as separate NetCDF files
         save_datasets_nc(mach_datasets, mach_nc_folder, "mach_")
