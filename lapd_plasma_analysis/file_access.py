@@ -138,10 +138,7 @@ def int_choose_multiple_from_list(choices, name, null_action=None, return_idxs =
                     print(f'\n {selection} is not a valid integer')
                     bad_selections += 1
 
-            print('selected options idx: ', selected_options_idxs)
-            print('bad selections: ', bad_selections)
             if len(selected_options_idxs) > 0 and bad_selections == 0:
-                print('Loop breaking!! ')
                 break
             loop_i += 1
 
