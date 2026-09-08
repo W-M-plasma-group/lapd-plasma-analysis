@@ -105,12 +105,15 @@ if __name__ == "__main__":
                        "Build Mach Datasets",
                        'Do stuff with Mach datasets']
 
-    # Returns a list of what the user wants to do indexed by the location in the prompt_filetype list
-    user_choice_to_do = choose_multiple_from_list(prompt_filetype, 'action',null_action= "end main")
+    # # Returns a list of what the user wants to do indexed by the location in the prompt_filetype list
+    # user_choice_to_do = choose_multiple_from_list(prompt_filetype, 'action',null_action= "end main")
+    #
+    # # Returns options using the string from prompt_filetype rather than the index. This makes it easier to delete
+    # # options
+    # chosen_options = [prompt_filetype[choice] for choice in user_choice_to_do]
 
-    # Returns options using the string from prompt_filetype rather than the index. This makes it easier to delete
-    # options
-    chosen_options = [prompt_filetype[choice] for choice in user_choice_to_do]
+    chosen_options = int_choose_multiple_from_list(prompt_filetype, 'action', null_action= "end main")
+    print('Chosen options: ' + str(chosen_options))
 
 
     # If the user chooses convert HDF5 files to NetCDF files or get plots from HDF5 files - loading data is the same.
@@ -122,31 +125,38 @@ if __name__ == "__main__":
             'Get HDF5 metadata' in chosen_options):
         # Choose hdf5 files to read
         hdf5_list = sorted([f for f in os.listdir(hdf5_folder) if f.endswith(".hdf5")])
-        print(hdf5_list)
+        # print(hdf5_list)
+
+        # hdf5_choice returns the indices in hdf5_list associated with the files that the user wants to see.
+        hdf5_choice = int_choose_multiple_from_list(hdf5_list, 'HDF5 file',
+                                                    null_action="not retrieve data from HDF5 files.")
 
         # The following loop ensures that the user inputs values that the rest of the main can understand. If the user selects
         # any unavailable files or a non-alphabetic character, this forces the user to reselect.
-        hdf5_proper_input = False
-        hdf5_choice = None # For Py Charm warning handling
+        # hdf5_proper_input = False
+        # hdf5_choice = None # For Py Charm warning handling
 
-        # hdf5_choice returns the indices in hdf5_list associated with the files that the user wants to see.
-        while not hdf5_proper_input:
-            try:
-                hdf5_choice = choose_multiple_from_list(hdf5_list, 'HDF5 file',
-                                                        null_action="not retrieve data from HDF5 files.")
-                hdf5_choice = list(set(hdf5_choice))
-                boolean_list = [(i >= len(hdf5_list)) or (i < 0) for i in hdf5_choice]
-                has_error = any(boolean_list)
-                if has_error:
 
-                    print('Invalid input - Ensure all selected letters correspond to a listed HDF5 file.')
-                    time.sleep(1)
-                    continue
 
-                hdf5_proper_input = True
-            except ValueError:
-                print('Invalid input - please input a LETTER associated with a file in the list.')
-                time.sleep(1)
+        # while not hdf5_proper_input:
+        #     try:
+        #         # hdf5_choice = choose_multiple_from_list(hdf5_list, 'HDF5 file',
+        #         #                                         null_action="not retrieve data from HDF5 files.")
+        #         # hdf5_choice = list(set(hdf5_choice))
+        #
+        #
+        #         boolean_list = [(i >= len(hdf5_list)) or (i < 0) for i in hdf5_choice]
+        #         has_error = any(boolean_list)
+        #         if has_error:
+        #
+        #             print('Invalid input - Ensure all selected letters correspond to a listed HDF5 file.')
+        #             time.sleep(1)
+        #             continue
+        #
+        #         hdf5_proper_input = True
+        #     except ValueError:
+        #         print('Invalid input - please input a LETTER associated with a file in the list.')
+        #         time.sleep(1)
 
         # So long as the user selects a file to view it will run through this section
         if hdf5_choice:
@@ -161,29 +171,31 @@ if __name__ == "__main__":
                                    "Plot Ion saturation current vs time for a position-shot combination (best in core region)"
                                    ]
 
-                # The following loop allows the user to select which type of plots they want to see while limiting user
-                # inputs to only valid characters
-                IV_plots_proper_input = False
-                IV_plots_choice = None # For Py Charm warning handling
-                while not IV_plots_proper_input:
-                    try:
-                        IV_plots_choice = choose_multiple_from_list(IV_plots_prompt, 'parameter plot')
-                        # Ensures there are no duplicates
-                        IV_plots_choice = list(set(IV_plots_choice))
-                        choices_long = [i >= len(IV_plots_prompt) for i in IV_plots_choice]
-                        choices_neg = [i < 0 for i in IV_plots_choice]
-                        if (IV_plots_choice == [] or
-                                any(choices_long or choices_neg)):
-                            print('Invalid input - Ensure all selected letters correspond to a listed plot format')
-                            time.sleep(1)
-                            continue
 
-                        IV_plots_proper_input = True
-                    except ValueError:
-                        print('Invalid input - please input a LETTER associated with a plot format in the list.')
-                        time.sleep(1)
-
-                plot_choices = [IV_plots_prompt[choice] for choice in IV_plots_choice]
+                plot_choices = int_choose_multiple_from_list(IV_plots_prompt, "parameter plot")
+                # # The following loop allows the user to select which type of plots they want to see while limiting user
+                # # inputs to only valid characters
+                # IV_plots_proper_input = False
+                # IV_plots_choice = None # For Py Charm warning handling
+                # while not IV_plots_proper_input:
+                #     try:
+                #         IV_plots_choice = choose_multiple_from_list(IV_plots_prompt, 'parameter plot')
+                #         # Ensures there are no duplicates
+                #         IV_plots_choice = list(set(IV_plots_choice))
+                #         choices_long = [i >= len(IV_plots_prompt) for i in IV_plots_choice]
+                #         choices_neg = [i < 0 for i in IV_plots_choice]
+                #         if (IV_plots_choice == [] or
+                #                 any(choices_long or choices_neg)):
+                #             print('Invalid input - Ensure all selected letters correspond to a listed plot format')
+                #             time.sleep(1)
+                #             continue
+                #
+                #         IV_plots_proper_input = True
+                #     except ValueError:
+                #         print('Invalid input - please input a LETTER associated with a plot format in the list.')
+                #         time.sleep(1)
+                #
+                # plot_choices = [IV_plots_prompt[choice] for choice in IV_plots_choice]
 
                 # Allow the user to select if they would like to save the plots that are created
                 save_plots = ask_yes_or_no("Do you want to save the plots? (Will be saved in a directory labelled by the run name)"
@@ -420,40 +432,46 @@ if __name__ == "__main__":
 
     if 'Check NaNs' in chosen_options:
         nc_list = [f for f in os.listdir(langmuir_nc_folder) if f.endswith(".nc")]
-        nc_choice = choose_multiple_from_list(nc_list, 'NetCDF file',
-                                              null_action="not retrieve data from NetCDF files.")
+        # nc_choice = choose_multiple_from_list(nc_list, 'NetCDF file',
+        #                                       null_action="not retrieve data from NetCDF files.")
+        nc_name_choice = int_choose_multiple_from_list(nc_list, 'NetCDF file',
+                                                       null_action="not retrieve data from NetCDF files.")
         datasets = []
         steady_state_times_runs = []
-        for i in range(len(nc_choice)):
-            ds = xr.load_dataset(os.path.join(langmuir_nc_folder, nc_list[nc_choice[i]]))
+        for choice in nc_name_choice:
+            ds = xr.load_dataset(os.path.join(langmuir_nc_folder, choice))
             nan_summary(ds)
 
     updated_nc_folder = ensure_directory(langmuir_nc_folder + 'updated/')
     if 'Obtain plasma parameters from netCDF files' in chosen_options:
         nc_list = sorted([f for f in os.listdir(langmuir_nc_folder) if f.endswith(".nc")])
-        nc_choice = choose_multiple_from_list(nc_list, 'NetCDF file',
+        # nc_choice = choose_multiple_from_list(nc_list, 'NetCDF file',
+        #                                       null_action="Get data from updated nc files")
+
+        nc_name_choice = int_choose_multiple_from_list(nc_list, 'NetCDF file',
                                               null_action="Get data from updated nc files")
 
         # Initialize our master list of paths
         selected_file_paths = []
 
         # Convert chosen indices into absolute paths
-        if nc_choice:
-            for idx in nc_choice:
-                filename = nc_list[idx]
-                selected_file_paths.append(os.path.join(langmuir_nc_folder, filename))
+        if nc_name_choice:
+            for choice in nc_name_choice:
+                selected_file_paths.append(os.path.join(langmuir_nc_folder, choice))
         updated = ask_yes_or_no('Retrieve data from updated nc files? (y/n) ')
         updated_nc_list = None
         updated_nc_choice = None
         if updated:
             updated_nc_list = sorted([f for f in os.listdir(updated_nc_folder) if f.endswith(".nc")])
-            updated_nc_choice = choose_multiple_from_list(updated_nc_list, 'NetCDF file',
-                                                  null_action="Don't make any plots")
+            # updated_nc_choice = choose_multiple_from_list(updated_nc_list, 'NetCDF file',
+            #                                       null_action="Don't make any plots")
+
+            updated_name_nc_choice = int_choose_multiple_from_list(updated_nc_list, 'NetCDF file',
+                                                          null_action="Don't make any plots")
             # Convert chosen indices into absolute paths and add to the master list
-            if updated_nc_choice:
-                for idx in updated_nc_choice:
-                    filename = updated_nc_list[idx]
-                    selected_file_paths.append(os.path.join(updated_nc_folder, filename))
+            if updated_name_nc_choice:
+                for choice in updated_name_nc_choice:
+                    selected_file_paths.append(os.path.join(updated_nc_folder, choice))
 
         possible_plots = ['contour',
                           'contour_subplots - Only for 0 probe',
@@ -467,10 +485,12 @@ if __name__ == "__main__":
                           'Dimensionless comparison'
                           ]
 
-        idx_plot_choices = choose_multiple_from_list(possible_plots, 'action', null_action='not plot data')
-        plot_choices = []
-        for idx in idx_plot_choices:
-            plot_choices.append(possible_plots[idx])
+        # idx_plot_choices = choose_multiple_from_list(possible_plots, 'action', null_action='not plot data')
+        # plot_choices = []
+        # for idx in idx_plot_choices:
+        #     plot_choices.append(possible_plots[idx])
+        #
+        plot_choices = int_choose_multiple_from_list(possible_plots, 'action', null_action='not plot data')
 
         if ('Show steady state' in plot_choices or
                 'Isat radial plot' in plot_choices or
@@ -899,15 +919,17 @@ if __name__ == "__main__":
 
     if 'Convert NetCDF to usable form for fluctuations' in chosen_options:
         nc_list = [f for f in os.listdir(langmuir_nc_folder) if f.endswith(".nc")]
-        nc_choice = choose_multiple_from_list(nc_list, 'NetCDF file',
+        # nc_choice = choose_multiple_from_list(nc_list, 'NetCDF file',
+        #                                       null_action="not retrieve data from NetCDF files.")
+        nc_name_choice = int_choose_multiple_from_list(nc_list, 'NetCDF file',
                                               null_action="not retrieve data from NetCDF files.")
 
         datasets = []
         steady_state_times_runs = []
 
         # Select data sets to plot from saved .nc files in the selected folder
-        for i in range(len(nc_choice)):
-            ds = xr.load_dataset(os.path.join(langmuir_nc_folder, nc_list[nc_choice[i]]))
+        for choice in nc_name_choice:
+            ds = xr.load_dataset(os.path.join(langmuir_nc_folder, choice))
             datasets.append(ds)
 
         # Get temperature into a form where it is indexed by probe, x, y shot, time to be used in Michael's fluctuation
@@ -938,18 +960,21 @@ if __name__ == "__main__":
         # files_in_flux_nc = combined_files
         print("Choose one of the following NetCDF files to analyze,\n"
               "or press Enter to retrieve data from HDF5 files")
-        choice_indices = choose_multiple_from_list(fluctuations_nc_files, "Fluctuations NetCDF file",
+        # choice_indices = choose_multiple_from_list(fluctuations_nc_files, "Fluctuations NetCDF file",
+        #                                            null_action="retrieve data from HDF5 files.")
+
+        choice_names = int_choose_multiple_from_list(fluctuations_nc_files, "Fluctuations NetCDF file",
                                                    null_action="retrieve data from HDF5 files.")
         files_to_plot = []
-        if choice_indices:
+        if choice_names:
             datasets = []
-            for index in choice_indices:
+            for name in choice_names:
                 # for folder in [march_folder, november_folder, january_folder]:
                 #     try:
                 #         flux_nc_folder = folder + "flux_nc/"
                 try:
-                    datasets.append(xr.open_dataset(flux_nc_folder + fluctuations_nc_files[index]))
-                    files_to_plot.append(fluctuations_nc_files[index].split('.nc')[0])
+                    datasets.append(xr.open_dataset(flux_nc_folder + name))
+                    files_to_plot.append(name.split('.nc')[0])
                 except:
                     pass
             plot_choices = ['Plot time series for a single x for each dataset',
@@ -959,9 +984,9 @@ if __name__ == "__main__":
                             '\delta n/n vs L_n for multiple datasets',
                             "Other plots from Michael's structure"]
 
-            plot_choice_idxs = choose_multiple_from_list(plot_choices, "figure types available to plot")
-            plots_to_make = [plot_choices[i] for i in plot_choice_idxs]
-
+            # plot_choice_idxs = choose_multiple_from_list(plot_choices, "figure types available to plot")
+            # plots_to_make = [plot_choices[i] for i in plot_choice_idxs]
+            plots_to_make = int_choose_multiple_from_list(plot_choices, "figure types available to plot")
 
 
 
@@ -974,19 +999,21 @@ if __name__ == "__main__":
                 quantities = ['density', 'isat', 'vf', 'dvf']
                 if len(plots_to_make) == 1 and ('\delta n/n vs x for multiple datasets' in plots_to_make or
                                                 '\delta n/n vs L_n for multiple datasets' in plots_to_make):
-                    plot_type_idxs =[0]
+                    # plot_type_idxs =[0]
+                    plot_type_list = ['density']
+
                 else:
-                    plot_type_idxs = choose_multiple_from_list(quantities, "Quantities to plot")
+                    # plot_type_idxs = choose_multiple_from_list(quantities, "Quantities to plot")
+                    plot_type_list = int_choose_multiple_from_list(quantities, "Quantities to plot")
                 default_fig_height = 6.4
                 default_fig_width = 4.8
-                plot_type_list = [quantities[j] for j in plot_type_idxs]
+                # plot_type_list = [quantities[j] for j in plot_type_idxs]
                 if ('\delta n/n vs x for multiple datasets' in plots_to_make or
                     '\delta n/n vs L_n for multiple datasets' in plots_to_make)  and 'density' not in plot_type_list:
-                    plot_type_idxs.append(0)
+                    plot_type_list.append('density')
 
-                for i in plot_type_idxs:
-                    quantity = quantities[i]
-                    print('Qunatity to plot = ', quantity)
+                for quantity in plot_type_list:
+                    print('Quantity to plot = ', quantity)
                     if 'Plot time series for a single x for each dataset' in plots_to_make:
                         print('time series for single x for each dataset')
                         save_plots = ask_yes_or_no('Save plots? (y/n) ')
@@ -1138,7 +1165,9 @@ if __name__ == "__main__":
                             valid_filenames = [run['filename'] for run in valid_runs]
 
                             # dataset_choices returns indices (e.g., [0, 1, 2])
-                            dataset_choices = choose_multiple_from_list(valid_filenames, 'Datasets in first round')
+                            # dataset_choices = choose_multiple_from_list(valid_filenames, 'Datasets in first round')
+                            dataset_choices = int_choose_multiple_from_list(valid_filenames,
+                                                                            'Datasets in first round', return_idxs=True)
 
                             # Use enumerate to check if the index (i) is in your chosen indices
                             group_1 = [run for i, run in enumerate(valid_runs) if i in dataset_choices]
@@ -1476,16 +1505,19 @@ if __name__ == "__main__":
                 print("--------Other plots from Michael's structure--------")
                 ask_about_plots(datasets, plot_save_folder=plot_save_folder, langmuir_folder = langmuir_nc_folder,
                                 filenames = files_to_plot)
-        if not choice_indices:
+        if not choice_names:
             print("Choose one of the following HDF5 files to extract data from.\n"
                   "Press Enter to continue without processing data.")
             files_in_hdf5_folder = sorted([f for f in os.listdir(hdf5_folder) if f.endswith(".hdf5")])
-            choice_indices = choose_multiple_from_list(files_in_hdf5_folder, "HDF5 file",
+            # choice_indices = choose_multiple_from_list(files_in_hdf5_folder, "HDF5 file",
+            #                                            null_action="not retrieve data from "
+            #                                                        "HDF5 files.")
+            choice_names = int_choose_multiple_from_list(files_in_hdf5_folder, "HDF5 file",
                                                        null_action="not retrieve data from "
                                                                    "HDF5 files.")
-            if choice_indices:
-                for index in tqdm(choice_indices, desc="Processing data from fluctuation probes..."):
-                    get_isat_vf(hdf5_folder + files_in_hdf5_folder[index], hdf5_folder, flux_nc_folder,
+            if choice_names:
+                for name in tqdm(choice_names, desc="Processing data from fluctuation probes..."):
+                    get_isat_vf(hdf5_folder + name, hdf5_folder, flux_nc_folder,
                                 main_luke = True)
 
 
@@ -1493,7 +1525,9 @@ if __name__ == "__main__":
     if "Build Mach Datasets" in chosen_options:
         updated_lang_folder = langmuir_nc_folder + 'updated/'
         nc_list = sorted([f for f in os.listdir(langmuir_nc_folder) if f.endswith(".nc")])
-        nc_choice = choose_multiple_from_list(nc_list, 'NetCDF file',
+        # nc_choice = choose_multiple_from_list(nc_list, 'NetCDF file',
+        #                                       null_action="Continue to updated nc files for temperature (can do both)")
+        nc_names = int_choose_multiple_from_list(nc_list, 'NetCDF file',
                                               null_action="Continue to updated nc files for temperature (can do both)")
 
         # Initialize our master list of paths and filenames
@@ -1501,24 +1535,23 @@ if __name__ == "__main__":
         selected_filenames = []
 
         # Convert chosen indices into absolute paths
-        if nc_choice:
-            for idx in nc_choice:
-                filename = nc_list[idx]
-                selected_filenames.append(filename)
-                selected_file_paths.append(os.path.join(langmuir_nc_folder, filename))
+        if nc_names:
+            for name in nc_names:
+                selected_filenames.append(name)
+                selected_file_paths.append(os.path.join(langmuir_nc_folder, name))
         updated = ask_yes_or_no('Retrieve data from updated nc files? (y/n) ')
-        updated_nc_list = None
-        updated_nc_choice = None
         if updated:
             updated_nc_list = sorted([f for f in os.listdir(updated_nc_folder) if f.endswith(".nc")])
-            updated_nc_choice = choose_multiple_from_list(updated_nc_list, 'NetCDF file',
+            # updated_nc_choice = choose_multiple_from_list(updated_nc_list, 'NetCDF file',
+            #                                               null_action="Don't make any plots")
+
+            updated_nc_names = int_choose_multiple_from_list(updated_nc_list, 'NetCDF file',
                                                           null_action="Don't make any plots")
             # Convert chosen indices into absolute paths and add to the master list
-            if updated_nc_choice:
-                for idx in updated_nc_choice:
-                    filename = updated_nc_list[idx]
-                    selected_filenames.append(filename)
-                    selected_file_paths.append(os.path.join(updated_nc_folder, filename))
+            if updated_nc_names:
+                for name in updated_nc_names:
+                    selected_filenames.append(name)
+                    selected_file_paths.append(os.path.join(updated_nc_folder, name))
 
         for i, filename in enumerate(selected_filenames):
             nc_filepath = selected_file_paths[i]
@@ -1565,18 +1598,22 @@ if __name__ == "__main__":
     if 'Do stuff with Mach datasets' in chosen_options:
         list_of_plots = ['Plot radial plots of Mach numbers and Velocity',
                          'Check Mach number by looking at Isat upstream and downstream contour plots']
-        plot_idx_choice = choose_multiple_from_list(list_of_plots, 'Choose which plots you want')
+        # plot_idx_choice = choose_multiple_from_list(list_of_plots, 'Choose which plots you want')
+        chosen_plots = int_choose_multiple_from_list(list_of_plots, 'Choose which plots you want')
 
-        chosen_plots = []
-        if plot_idx_choice:
-            for idx in plot_idx_choice:
-                plot_choice = list_of_plots[idx]
-                chosen_plots.append(plot_choice)
+        # chosen_plots = []
+        # if plot_idx_names:
+        #     for idx in plot_idx_choice:
+        #         plot_choice = list_of_plots[idx]
+        #         chosen_plots.append(plot_choice)
 
         mach_figures = ensure_directory(figure_folder + 'mach/')
 
         nc_list = sorted([f for f in os.listdir(mach_nc_folder) if f.endswith(".nc")])
-        nc_choice = choose_multiple_from_list(nc_list, 'NetCDF file',
+        # nc_choice = choose_multiple_from_list(nc_list, 'NetCDF file',
+        #                                       null_action="Continue")
+
+        nc_names = int_choose_multiple_from_list(nc_list, 'NetCDF file',
                                               null_action="Continue")
 
         # Initialize our master list of paths and filenames
@@ -1584,11 +1621,10 @@ if __name__ == "__main__":
         selected_filenames = []
 
         # Convert chosen indices into absolute paths
-        if nc_choice:
-            for idx in nc_choice:
-                filename = nc_list[idx]
-                selected_filenames.append(filename)
-                selected_file_paths.append(os.path.join(mach_nc_folder, filename))
+        if nc_names:
+            for name in nc_names:
+                selected_filenames.append(name)
+                selected_file_paths.append(os.path.join(mach_nc_folder, name))
 
         if selected_file_paths:
             if 'Plot radial plots of Mach numbers and Velocity' in chosen_plots:
