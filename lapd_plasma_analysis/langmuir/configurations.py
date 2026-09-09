@@ -86,7 +86,7 @@ def get_voltage_gain(config_id):
     # Note: here, gain refers to the inverse gain applied. Multiply by this gain to undo.
 
 
-def get_langmuir_config(hdf5_path, config_id):
+def get_langmuir_config(hdf5_path = None, config_id = None):
     r"""Obtains a dictionary of configuration parameters for a given experiment.
 
     Gets a list of configuration settings for the Langmuir probe corresponding to a
@@ -152,8 +152,9 @@ def get_langmuir_config(hdf5_path, config_id):
     langmuir_configs_array = np.array(langmuir_probe_configs[config_id], column_dtypes)  # see note below
     # (End of hardcoded probe configuration data)
 
-    ports_receptacles = get_ports_receptacles(hdf5_path)
-    langmuir_configs_array['receptacle'] = [ports_receptacles[port] for port in langmuir_configs_array['port']]
+    if hdf5_path is not None:
+        ports_receptacles = get_ports_receptacles(hdf5_path)
+        langmuir_configs_array['receptacle'] = [ports_receptacles[port] for port in langmuir_configs_array['port']]
     return langmuir_configs_array
 
 
