@@ -58,106 +58,139 @@ def choose_multiple_from_list(choices, name, null_action=None):
 
     return [chr_to_num(letter) for letter in selection_str]
 
-def int_choose_multiple_from_list(choices, name, null_action=None, return_idxs = False, lim_length = None):
-    prompt = "Input a list of integers corresponding to " + name + ("s  \n Note: they must be separated by commas "
-                                                                            "(e.g. '1,2,3,4,5,etc.)'")
+def int_choose_multiple_from_list(
+    choices, name, null_action=None, return_idxs=False, lim_length=None
+):
+  prompt = (
+      "Input a list of integers corresponding to "
+      + name
+      + "s  \n Note: they must be separated by commas (e.g. '1,2,3,4,5,etc.')"
+  )
 
-    print(*["  " + str(i) + ": " + str(choices[i]) for i in range(len(choices))], sep="\n")
-    if null_action is not None:
-        prompt += ", \n\tor two empty strings in a row to " + null_action
-    prompt += ": "
-    proper_input = False
-    num_empty = 0
-    selected_options_idxs = []
-    loop_i = 0
+  print(
+      *["  " + str(i) + ": " + str(choices[i]) for i in range(len(choices))],
+      sep="\n",
+  )
+  if null_action is not None:
+    prompt += ", \n\tor two empty strings in a row to " + null_action
+  prompt += ": "
+  proper_input = False
+  num_empty = 0
+  selected_options_idxs = []
+  loop_i = 0
 
-    while not proper_input:
-        bad_selections = 0
+  while not proper_input:
+    bad_selections = 0
 
-        if loop_i > 0:
-            print(*["  " + str(i) + ": " + str(choices[i]) for i in range(len(choices))], sep="\n")
-            print("Selected options: ", selected_options_idxs)
-            remove_indices = ask_yes_or_no('Remove any indices from selection? (y/n) ')
-        else:
-            remove_indices = False
+    if loop_i > 0:
+      print(
+          *["  " + str(i) + ": " + str(choices[i]) for i in range(len(choices))],
+          sep="\n",
+      )
+      print("Selected options: ", selected_options_idxs)
+      remove_indices = ask_yes_or_no(
+          "Remove any indices from selection? (y/n) "
+      )
+    else:
+      remove_indices = False
 
-        if remove_indices:
-            idxs_to_remove = input('Input the index of the option you want to remove '
-                                   '(Any invalid entries will reset the loop, must be comma separated): ')
-            try:
-                idxs_to_remove = idxs_to_remove.split(',')
-                for idx in idxs_to_remove:
-                    idx = idx.strip()
-                    try:
-                        idx = int(idx)
-                        if idx not in selected_options_idxs:
-                            print(f'{idx} is not in the selected options and thus will not be removed.')
-                        else:
-                            selected_options_idxs.remove(idx)
-                    except ValueError:
-                        print(f'{idx} is not an integer in the selected options and thus will not be removed.')
+    if remove_indices:
+      idxs_to_remove = input(
+          "Input the index of the option you want to remove (Any invalid"
+          " entries will reset the loop, must be comma separated): "
+      )
+      try:
+        idxs_to_remove = idxs_to_remove.split(",")
+        for idx in idxs_to_remove:
+          idx = idx.strip()
+          try:
+            idx = int(idx)
+            if idx not in selected_options_idxs:
+              print(
+                  f"{idx} is not in the selected options and thus will not be"
+                  " removed."
+              )
+            else:
+              selected_options_idxs.remove(idx)
+          except ValueError:
+            print(
+                f"{idx} is not an integer in the selected options and thus will"
+                " not be removed."
+            )
 
-            except ValueError:
-                print('Invalid Input: No options removed')
+      except ValueError:
+        print("Invalid Input: No options removed")
 
-        if loop_i > 0:
-            print(*["  " + str(i) + ": " + str(choices[i]) for i in range(len(choices))], sep="\n")
-        selection_str = input(prompt)
+    if loop_i > 0:
+      print(
+          *["  " + str(i) + ": " + str(choices[i]) for i in range(len(choices))],
+          sep="\n",
+      )
+    selection_str = input(prompt)
 
-        if selection_str.strip() == "":
-            num_empty += 1
-            print('\n One empty string selected, exit the loop by inputting another empty string.')
+    # Handled empty input exit logic cleanly
+    if selection_str.strip() == "":
+      num_empty += 1
+      if num_empty >= 2:
+        print(
+            "\n You have decided to exit the loop by inputting another empty"
+            " string. Returning the empty list."
+        )
+        return []
+      print(
+          "\n One empty string selected, exit the loop by inputting another"
+          " empty string."
+      )
+      loop_i += 1
+      continue
+    else:
+      num_empty = 0
 
-        elif selection_str.strip() == "" and num_empty > 0:
-            print('\n You have decided to exit the loop by inputting another empty string. Returning the empty list.')
-            return []
+    try:
+      selections = selection_str.split(",")
+      if lim_length is not None:
+        if len(selections) > lim_length:
+          print(
+              "\n Too many options selected, you are restricted to"
+              f" {lim_length} selectons"
+          )
 
-        elif selection_str.strip() != "" and num_empty > 0:
-            num_empty = 0
-
+      for selection in selections:
+        selection = selection.strip()
         try:
-            selections = selection_str.split(',')
-            if lim_length is not None:
-                if len(selections) > lim_length:
-                    print(f'\n Too many options selected, you are restricted to {lim_length} selectons')
-
-            for selection in selections:
-                selection = selection.strip()
-                try:
-                    i_selection = int(selection)
-                    if i_selection < 0 or i_selection > len(choices) - 1:
-                        print(
-                            f'\n {selection} is not an integer between 0 and {len(choices) - 1} corresponding to a valid '
-                            f'option. Please try again.')
-                        bad_selections += 1
-                    else:
-                        if i_selection not in selected_options_idxs:
-                            selected_options_idxs.append(i_selection)
-
-                except ValueError:
-                    print(f'\n {selection} is not a valid integer')
-                    bad_selections += 1
-
-            if len(selected_options_idxs) > 0 and bad_selections == 0:
-                break
-            loop_i += 1
+          i_selection = int(selection)
+          if i_selection < 0 or i_selection > len(choices) - 1:
+            print(
+                f"\n {selection} is not an integer between 0 and"
+                f" {len(choices) - 1} corresponding to a valid option. Please"
+                " try again."
+            )
+            bad_selections += 1
+          else:
+            if i_selection not in selected_options_idxs:
+              selected_options_idxs.append(i_selection)
 
         except ValueError:
-            print("Please enter a comma-separated list of integers.")
+          print(f"\n {selection} is not a valid integer")
+          bad_selections += 1
 
+      if len(selected_options_idxs) > 0 and bad_selections == 0:
+        break
+      loop_i += 1
 
+    except ValueError:
+      print("Please enter a comma-separated list of integers.")
 
-    selected_options = []
-    for idx in selected_options_idxs:
-        choice = choices[idx]
-        selected_options.append(choice)
-        print(f"\n {choice}")
+  selected_options = []
+  for idx in selected_options_idxs:
+    choice = choices[idx]
+    selected_options.append(choice)
+    print(f"\n {choice}")
 
-
-    if return_idxs:
-        return selected_options_idxs
-    else:
-        return selected_options
+  if return_idxs:
+    return selected_options_idxs
+  else:
+    return selected_options
 
 
 def ask_yes_or_no(prompt):

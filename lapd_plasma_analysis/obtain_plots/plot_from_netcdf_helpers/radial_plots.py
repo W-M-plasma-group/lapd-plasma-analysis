@@ -14,6 +14,9 @@ from lapd_plasma_analysis.obtain_plots.plot_from_netcdf_helpers.process_temp_den
 from lapd_plasma_analysis.file_access import *
 from lapd_plasma_analysis.Read_hdf5.read_metadata import *
 from lapd_plasma_analysis.Read_hdf5.primary_functions import *
+from scipy.signal import savgol_filter
+from lapd_plasma_analysis.langmuir.characterization import isolate_ramps
+from lapd_plasma_analysis.langmuir.getIVsweep import get_shot_positions
 
 def create_radial_plot(
     ds,
@@ -297,28 +300,6 @@ def create_density_radial_plots(ds, probe, run_identifier = '', see_plots = True
         dataset_clor = 'royalblue'
         dataset_mark = 'o'
     n_e_to_plot_vals, n_e_std_to_plot_vals, x_vals = process_variable_data(ds, probe, var_name = 'n_e')
-    if (np.any(np.isnan(n_e_to_plot_vals))) and (hdf5_folder is not None):
-        updated_ds = double_check_temp_data(hdf5_folder, ds, probe, x_vals=x_vals, y_vals=n_e_to_plot_vals,
-                                            save_plots=save_plots, figure_folder=figure_folder)
-
-        if updated_ds is not None:
-            # Recompute every t_e-dependent variable (n_e, n_i, nu_ei, p_e, p_ei)
-            # now that t_e has changed.  v_f/v_p/ion_isat/electron_isat are untouched.
-            updated_ds = recalculate_derived_variables(updated_ds)
-
-            base_name = os.path.splitext(os.path.basename(ds_save_path))[0]
-            if base_name.endswith('_updated'):
-                # Keep the exact same name, no extra tags
-                updated_ds_save_path = os.path.join(updated_nc_folder, f"{base_name}.nc")
-                print("Existing updated file detected. Overwriting with new modifications...")
-            else:
-                # It's a raw file being updated for the first time
-                updated_ds_save_path = os.path.join(updated_nc_folder, f"{base_name}_updated.nc")
-                print("Raw file detected. Creating new _updated.nc file...")
-
-            updated_ds.to_netcdf(updated_ds_save_path, mode='w', engine='netcdf4')
-
-            print(f'Successfully saved the dataset at: \n {updated_ds_save_path}.')
     n_e_name = ds['n_e'].attrs.get("long_name", 'n_e')
     ylabel = fr"$n_e$ [$\mathregular{{{ds['n_e'].attrs.get('units', 'n_e')}}}$]"
     xlabel = f'x [{ds.attrs.get("x_units")}]'
@@ -446,6 +427,39 @@ def create_temperature_radial_plots(ds, probe, run_identifier = '', see_plots = 
         dataset_mark = 'o'
 
     t_e_to_plot_vals, t_e_std_to_plot_vals, x_vals = process_variable_data(ds, probe, var_name='t_e')
+    base_name = os.path.splitext(os.path.basename(ds_save_path))[0]
+    if base_name + '_updated.nc' in os.listdir(updated_nc_folder):
+        print(f"{base_name}_updated already exists, overwriting if choose to update")
+        ds_to_update = xr.load_dataset(os.path.join(updated_nc_folder, base_name + '_updated.nc'))
+    else:
+        ds_to_update = ds
+
+    if (np.any(np.isnan(t_e_to_plot_vals))) and (hdf5_folder is not None):
+        updated_ds = double_check_temp_data(hdf5_folder, ds_to_update, probe, x_vals=x_vals, y_vals=t_e_to_plot_vals,
+                                            save_plots=save_plots, figure_folder=figure_folder)
+
+        if updated_ds is not None:
+            # Recompute every t_e-dependent variable (n_e, n_i, nu_ei, p_e, p_ei)
+            # now that t_e has changed.  v_f/v_p/ion_isat/electron_isat are untouched.
+            updated_ds = recalculate_derived_variables(updated_ds, probe = probe)
+
+            if base_name.endswith('_updated'):
+                # Keep the exact same name, no extra tags
+                updated_ds_save_path = os.path.join(updated_nc_folder, f"{base_name}.nc")
+                print("Existing updated file detected. Overwriting with new modifications...")
+            elif not base_name.endswith('_updated') and base_name + '_updated.nc' in os.listdir(updated_nc_folder):
+                # Updated ds already exists overwriting with new modifications
+                updated_ds_save_path = os.path.join(updated_nc_folder, f"{base_name}_updated.nc")
+                print("Existing updated file detected. Overwriting with new modifications...")
+
+            else:
+                updated_ds_save_path = os.path.join(updated_nc_folder, f"{base_name}_updated.nc")
+                print("Raw file detected. Creating new _updated.nc file...")
+
+
+            updated_ds.to_netcdf(updated_ds_save_path, mode='w', engine='netcdf4')
+
+            print(f'Successfully saved the dataset at: \n {updated_ds_save_path}.')
 
     ylabel = fr"$T_e$ [{ds['t_e'].attrs.get('units', 't_e')}]"
     xlabel = f'x [{ds.attrs.get("x_units")}]'
@@ -490,8 +504,9 @@ def create_temperature_radial_plots(ds, probe, run_identifier = '', see_plots = 
             t_e_to_plot_vals = t_e_to_plot_vals/core_temp
             t_e_std_to_plot_vals = t_e_std_to_plot_vals/core_temp
         if axes is None:
-            fig = plt.figure()
-            axes = fig.add_subplot(111)
+            fig, axes, letters = build_subplots([[1]])
+            axes = axes[letters[0]]
+
         axes.errorbar(x_vals, t_e_to_plot_vals, yerr=t_e_std_to_plot_vals, fmt=dataset_mark, capsize=3,
                       color = dataset_clor)
 
@@ -810,6 +825,7 @@ def find_pedestals_strict_thresh(x, y, slope_ratio=0.25, stop_ratio=0.05, max_sl
 
 def double_check_temp_data(hdf5_folder, ds, probe, x_vals_to_check = None, x_vals = None, y_vals = None,
                            save_plots = False, figure_folder = None):
+    print(f'Probe {probe} ')
     min_time = ds.attrs[f'steady state start probe {probe}']
     max_time = ds.attrs[f'steady state end probe {probe}']
     run_check = False
@@ -1538,7 +1554,7 @@ def double_check_temp_data(hdf5_folder, ds, probe, x_vals_to_check = None, x_val
     return ds
 
 
-def recalculate_derived_variables(ds):
+def recalculate_derived_variables(ds, probe = None):
     """
     Recompute every t_e-dependent diagnostic (n_i, n_e, nu_ei, p_e, p_ei) from the
     stored electron temperature and the stored ion-saturation current, for EVERY
@@ -1561,45 +1577,69 @@ def recalculate_derived_variables(ds):
     )
     from lapd_plasma_analysis.net_cdf_infrastructure.Build_netcdf import safe_value
 
-    # ------------------------------------------------------------------ #
-    #  Hard-coded probe area (one entry per probe index in ds['probe']).
-    #  Fill these in; if every probe shares an area, set them equal.
-    # ------------------------------------------------------------------ #
-    A_p_by_probe = {
-        0: 2.0 * u.mm ** 2,   # <-- FILL IN probe 0 area
-        1: 4.0 * u.mm ** 2,   # <-- FILL IN probe 1 area
-        2: 4.0 * u.mm ** 2,   # <-- FILL IN probe 2 area (jan24 uses [0, 2]); remove if unused
-    }
+    from lapd_plasma_analysis.obtain_plots.Auxillary_functions import (
+        get_ion_density,
+        get_electron_ion_collision_frequency,
+        l_get_pressure,
+    )
+    from lapd_plasma_analysis.net_cdf_infrastructure.Build_netcdf import safe_value
 
-    # ------------------------------------------------------------------ #
-    #  Constants
-    # ------------------------------------------------------------------ #
-    ion_type = ds.attrs['ion_type']    # e.g. "He-4+", read from the dataset
-    t_i = 1.0 * u.eV                    # ion temperature: always 1 eV
+    # 1. Resolve experiment config_id
+    exp_name_map = {'April_2018': 0, 'March_2022': 1, 'November_2022': 2, 'January_2024': 3}
+    exp_name = ds.attrs['Exp name']
+    config_id = exp_name_map[exp_name]
+    configs = get_langmuir_config(config_id=config_id)
 
-    # Pull raw numpy arrays out once (dims: probe, x, y, shot, sweep)
-    t_e_arr  = ds['t_e'].values
+    # 2. Map probe indices to areas
+    ports = ds['port'].values
+    faces = ds['face'].values if 'face' in ds.coords else [''] * len(ports)
+
+    A_p_by_probe_idx = {}
+    for ip in range(len(ds['probe'])):
+        p_port = int(ports[ip])
+        p_face = str(faces[ip]).strip()
+
+        exact_matches = [
+            row for row in configs
+            if int(row['port']) == p_port and str(row['face']).strip() == p_face
+        ]
+
+        if exact_matches:
+            A_p_by_probe_idx[ip] = exact_matches[0]['area']
+        else:
+            port_matches = [row for row in configs if int(row['port']) == p_port]
+            left_matches = [r for r in port_matches if str(r['face']).strip() == 'L']
+            A_p_by_probe_idx[ip] = left_matches[0]['area'] if left_matches else port_matches[0]['area']
+
+    # 3. Filter which probe indices to calculate
+    if probe is not None:
+        if probe in ds['probe'].values:
+            probe_indices = [int(np.where(ds['probe'].values == probe)[0][0])]
+        else:
+            raise ValueError(f"Probe {probe} not found in dataset probe coordinates: {ds['probe'].values}")
+    else:
+        probe_indices = list(range(len(ds['probe'])))
+
+    # 4. Perform recalculation loop
+    ion_type = ds.attrs['ion_type']
+    t_i = float(ds.attrs['ion_temperature']) * u.Unit(ds.attrs['ion_temperature_units'])
+
+    t_e_arr = ds['t_e'].values
     isat_arr = ds['ion_isat'].values
 
-    n_e_arr   = np.full_like(t_e_arr, np.nan, dtype=float)
-    n_i_arr   = np.full_like(t_e_arr, np.nan, dtype=float)
-    nu_ei_arr = np.full_like(t_e_arr, np.nan, dtype=float)
-    p_e_arr   = np.full_like(t_e_arr, np.nan, dtype=float)
-    p_ei_arr  = np.full_like(t_e_arr, np.nan, dtype=float)
+    # Copy current arrays so unselected probes remain unchanged
+    n_e_arr = ds['n_e'].values.copy()
+    n_i_arr = ds['n_i'].values.copy()
+    nu_ei_arr = ds['nu_ei'].values.copy()
+    p_e_arr = ds['p_e'].values.copy()
+    p_ei_arr = ds['p_ei'].values.copy()
 
-    probe_vals = ds['probe'].values
     shape = t_e_arr.shape
-    n_cells = int(np.prod(shape))
-    print(f"Recalculating derived variables for {n_cells} cells "
-          f"(probe x x x y x shot x sweep = {shape})...")
 
-    done = 0
-    for ip in range(shape[0]):
-        probe_id = int(probe_vals[ip])
-        if probe_id not in A_p_by_probe:
-            raise KeyError(f"No probe area defined for probe index {probe_id}; "
-                           f"add it to A_p_by_probe.")
-        A_p = A_p_by_probe[probe_id]
+    for ip in probe_indices:
+        A_p = A_p_by_probe_idx[ip]
+        port_num = ports[ip]
+
         for ix in range(shape[1]):
             for iy in range(shape[2]):
                 for ish in range(shape[3]):
@@ -1607,13 +1647,14 @@ def recalculate_derived_variables(ds):
                         t_e_value = t_e_arr[ip, ix, iy, ish, isw]
                         i_ion_sat_value = isat_arr[ip, ix, iy, ish, isw]
 
-                        # No valid temperature -> the whole cascade is NaN
-                        # (matches the original t_e-is-NaN branch).
                         if not np.isfinite(t_e_value):
-                            done += 1
+                            n_i_arr[ip, ix, iy, ish, isw] = np.nan
+                            n_e_arr[ip, ix, iy, ish, isw] = np.nan
+                            nu_ei_arr[ip, ix, iy, ish, isw] = np.nan
+                            p_e_arr[ip, ix, iy, ish, isw] = np.nan
+                            p_ei_arr[ip, ix, iy, ish, isw] = np.nan
                             continue
 
-                        # Rebuild the astropy Quantities the helpers expect.
                         t_e_q = t_e_value * u.eV
                         i_ion_sat_q = (i_ion_sat_value * u.A
                                        if np.isfinite(i_ion_sat_value) else np.nan)
@@ -1622,12 +1663,10 @@ def recalculate_derived_variables(ds):
                             n_i_value = get_ion_density(ion_type, i_ion_sat_q, A_p, t_e_q)
                             n_e_value = n_i_value
                         except Exception:
-                            n_i_value = np.nan
-                            n_e_value = np.nan
+                            n_i_value = n_e_value = np.nan
 
                         try:
-                            nu_ei_value = get_electron_ion_collision_frequency(
-                                n_e_value, ion_type, t_e_q)
+                            nu_ei_value = get_electron_ion_collision_frequency(n_e_value, ion_type, t_e_q)
                         except Exception:
                             nu_ei_value = np.nan
 
@@ -1641,21 +1680,24 @@ def recalculate_derived_variables(ds):
                         except Exception:
                             p_ei_value = np.nan
 
-                        n_i_arr[ip, ix, iy, ish, isw]   = safe_value(n_i_value)
-                        n_e_arr[ip, ix, iy, ish, isw]   = safe_value(n_e_value)
+                        n_i_arr[ip, ix, iy, ish, isw] = safe_value(n_i_value)
+                        n_e_arr[ip, ix, iy, ish, isw] = safe_value(n_e_value)
                         nu_ei_arr[ip, ix, iy, ish, isw] = safe_value(nu_ei_value)
-                        p_e_arr[ip, ix, iy, ish, isw]   = safe_value(p_e_value)
-                        p_ei_arr[ip, ix, iy, ish, isw]  = safe_value(p_ei_value)
-                        done += 1
-        print(f"  probe {probe_id} done ({done}/{n_cells} cells).")
+                        p_e_arr[ip, ix, iy, ish, isw] = safe_value(p_e_value)
+                        p_ei_arr[ip, ix, iy, ish, isw] = safe_value(p_ei_value)
 
-    # Write the recomputed arrays back into the dataset in place.
-    ds['n_e'][:]   = n_e_arr
-    ds['n_i'][:]   = n_i_arr
+        print(f"  Probe idx {ip} (Port {port_num}) recalculated.")
+
+    # Write back updated arrays
+    ds['n_e'][:] = n_e_arr
+    ds['n_i'][:] = n_i_arr
     ds['nu_ei'][:] = nu_ei_arr
-    ds['p_e'][:]   = p_e_arr
-    ds['p_ei'][:]  = p_ei_arr
+    ds['p_e'][:] = p_e_arr
+    ds['p_ei'][:] = p_ei_arr
 
-    print("Done recalculating derived variables "
-          "(n_e, n_i, nu_ei, p_e, p_ei updated; v_f/v_p/ion_isat/electron_isat unchanged).")
+
+    if probe is not None:
+        print(f"Done recalculating for probe {probe}")
+    else:
+        print(f"Done recalculating")
     return ds

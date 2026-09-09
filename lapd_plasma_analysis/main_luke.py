@@ -98,8 +98,6 @@ if __name__ == "__main__":
                        "Create plots from HDF5 files",
                        "Check NaNs",
                        "Obtain plasma parameters from netCDF files",
-                       "Plasma Py HDF5 to NetCDF",
-                       "Convert NetCDF to usable form for fluctuations",
                        "Get HDF5 metadata",
                        "Obtain Fluctuations from HDF5",
                        "Build Mach Datasets",
@@ -131,33 +129,6 @@ if __name__ == "__main__":
         hdf5_choice = int_choose_multiple_from_list(hdf5_list, 'HDF5 file',
                                                     null_action="not retrieve data from HDF5 files.")
 
-        # The following loop ensures that the user inputs values that the rest of the main can understand. If the user selects
-        # any unavailable files or a non-alphabetic character, this forces the user to reselect.
-        # hdf5_proper_input = False
-        # hdf5_choice = None # For Py Charm warning handling
-
-
-
-        # while not hdf5_proper_input:
-        #     try:
-        #         # hdf5_choice = choose_multiple_from_list(hdf5_list, 'HDF5 file',
-        #         #                                         null_action="not retrieve data from HDF5 files.")
-        #         # hdf5_choice = list(set(hdf5_choice))
-        #
-        #
-        #         boolean_list = [(i >= len(hdf5_list)) or (i < 0) for i in hdf5_choice]
-        #         has_error = any(boolean_list)
-        #         if has_error:
-        #
-        #             print('Invalid input - Ensure all selected letters correspond to a listed HDF5 file.')
-        #             time.sleep(1)
-        #             continue
-        #
-        #         hdf5_proper_input = True
-        #     except ValueError:
-        #         print('Invalid input - please input a LETTER associated with a file in the list.')
-        #         time.sleep(1)
-
         # So long as the user selects a file to view it will run through this section
         if hdf5_choice:
             # Specific: User wants to look at individual sweep data
@@ -173,29 +144,6 @@ if __name__ == "__main__":
 
 
                 plot_choices = int_choose_multiple_from_list(IV_plots_prompt, "parameter plot")
-                # # The following loop allows the user to select which type of plots they want to see while limiting user
-                # # inputs to only valid characters
-                # IV_plots_proper_input = False
-                # IV_plots_choice = None # For Py Charm warning handling
-                # while not IV_plots_proper_input:
-                #     try:
-                #         IV_plots_choice = choose_multiple_from_list(IV_plots_prompt, 'parameter plot')
-                #         # Ensures there are no duplicates
-                #         IV_plots_choice = list(set(IV_plots_choice))
-                #         choices_long = [i >= len(IV_plots_prompt) for i in IV_plots_choice]
-                #         choices_neg = [i < 0 for i in IV_plots_choice]
-                #         if (IV_plots_choice == [] or
-                #                 any(choices_long or choices_neg)):
-                #             print('Invalid input - Ensure all selected letters correspond to a listed plot format')
-                #             time.sleep(1)
-                #             continue
-                #
-                #         IV_plots_proper_input = True
-                #     except ValueError:
-                #         print('Invalid input - please input a LETTER associated with a plot format in the list.')
-                #         time.sleep(1)
-                #
-                # plot_choices = [IV_plots_prompt[choice] for choice in IV_plots_choice]
 
                 # Allow the user to select if they would like to save the plots that are created
                 save_plots = ask_yes_or_no("Do you want to save the plots? (Will be saved in a directory labelled by the run name)"
@@ -203,8 +151,8 @@ if __name__ == "__main__":
 
         # Create lists of path names corresponding to the user's chosen hdf5 files
         hdf5_pathname_list = []
-        for i in range(len(hdf5_choice)):
-            hdf5_pathname_list.append(hdf5_folder + hdf5_list[hdf5_choice[i]])
+        for choice in hdf5_choice:
+            hdf5_pathname_list.append(hdf5_folder + choice)
 
         pathname_index = 0
         data_dict = {}
@@ -412,23 +360,6 @@ if __name__ == "__main__":
                 ds.to_netcdf(nc_save_path)
                 print('file saved to: ', nc_save_path)
 
-                # If the user selects to use Leo's Method to generate NETCDF files
-                if 'Plasma Py HDF5 to NetCDF' in chosen_options:
-                    stacked_bias = np.stack(bias_list, axis=0)
-                    stacked_current = np.stack(current_list, axis=0)
-                    # Make sure we have equal dimensions across the same x-y positions and if so passes just one of the
-                    # position arrays to the dataset builder
-                    assert all(np.array_equal(position_list[0], pa) for pa in position_list)
-                    shared_positions = position_list[0]
-
-                    ion_type = get_ion(exp_params_dict['Run name'])
-                    ds = build_pp_xarray(stacked_bias, stacked_current, shared_positions, ramp_times, dt,
-                                         langmuir_configs,
-                                         ion_type)
-                    hdf5_filename = os.path.splitext(hdf5_list[hdf5_choice[pathname_index]])[0]
-                    nc_save_path = os.path.join(langmuir_nc_folder, hdf5_filename + "_pp.nc")
-                    ds.to_netcdf(nc_save_path)
-
 
     if 'Check NaNs' in chosen_options:
         nc_list = [f for f in os.listdir(langmuir_nc_folder) if f.endswith(".nc")]
@@ -576,13 +507,10 @@ if __name__ == "__main__":
                     ds.close()
 
         datasets = []
-        pathnames=[]
         for i in range(len(selected_file_paths)):
             pathname = selected_file_paths[i]
-
             # Select data sets to plot from saved .nc files in the selected folder and load them in read only mode
             # because nothing might need to be appended
-            pathnames.append(pathname)
             ds = xr.load_dataset(pathname)
             datasets.append(ds)
 
@@ -596,8 +524,6 @@ if __name__ == "__main__":
 
 
             diagnostics_to_plot_list = get_diagnostics_to_plot(diagnostic_name_dict)
-
-
 
         if 'contour' in plot_choices:
             i = 0
@@ -635,7 +561,7 @@ if __name__ == "__main__":
 
         if 'contour_subplots - Only for 0 probe' in plot_choices:
             for diagnostic_to_plot in diagnostics_to_plot_list:
-                contour_subplots(datasets,diagnostic_to_plot,e, nc_choice)
+                contour_subplots(datasets,diagnostic_to_plot)
 
         if 'Show Isat time series' in plot_choices:
             plot_ion_sat_curr_vs_time(datasets, figure_folder)
@@ -660,12 +586,14 @@ if __name__ == "__main__":
             i = 0
             # list_run_identifiers = []
             filename_list = []
-            for dataset in datasets:
+            for idx, dataset in enumerate(datasets):
                 run_identifier = f_run_identifier(ds = dataset)
                 # print(run_identifier)
                 # list_run_identifiers.append(run_identifier)
+                filename = selected_file_paths[idx].split('/')[-1]
 
-                ion_mass, z_eff, e_charge, b_field = dim_num_params(filename,dataset)
+
+                ion_mass, z_eff, e_charge, b_field = dim_num_params(filename, dataset)
                 probe_dict = compute_dimesionless_plots(dataset, ion_mass, z_eff, e_charge, b_field, a, L,
                                                         run_identifier)
                 probe_num_dict.append(len(probe_dict.keys()))
@@ -865,13 +793,14 @@ if __name__ == "__main__":
             see_plots = ask_yes_or_no('See plots? (y/n) ')
             save_plots = ask_yes_or_no('Save plots? (y/n) ')
 
-            build_isat_radial_plot(datasets, pathnames = pathnames, figure_folder = figure_folder,
+            build_isat_radial_plot(datasets, pathnames = selected_file_paths, figure_folder = figure_folder,
                                    see_plots = see_plots, save_plots = save_plots)
         if "Radial plot" in plot_choices:
 
             make_presentable = ask_yes_or_no('Make for presentation rather than for analysis? (y/n) ')
             see_intermediate_plots = ask_yes_or_no('See individual radial plots (T_e and n_e)? (y/n) ')
             save_plots = ask_yes_or_no('Save plots? (y/n) ')
+            one_probe = ask_yes_or_no('One probe? (y/n) ')
             lined_grads = ask_yes_or_no('Plot radial plot with lines indicating where the gradients are? (y/n) ')
             if not lined_grads:
                 shaded_grads = ask_yes_or_no(
@@ -880,18 +809,18 @@ if __name__ == "__main__":
             else:
                 shaded_grads = False
             fit_lines = ask_yes_or_no('Plot a linear fit of the data bounded by the gradient regions? (y/n) ')
-            build_radial_plot(datasets, pathnames,
+            build_radial_plot(datasets, selected_file_paths,
                               figure_folder,
                               make_presentable=make_presentable, see_temp_and_dens_plots=see_intermediate_plots,
                               lines=lined_grads, shaded=shaded_grads,
                               plot_final_fits=fit_lines, save_plots=save_plots,
-                              from_main=True, one_probe=True, hdf5_folder=hdf5_folder,
+                              from_main=True, one_probe=one_probe, hdf5_folder=hdf5_folder,
                               updated_nc_folder = updated_nc_folder)
 
         if 'Overlapping Radial plot' in plot_choices:
             see_plots = ask_yes_or_no('See final overlapping radial plot? (y/n) ')
             save_plots = ask_yes_or_no('Save final overlapping radial plot? (y/n) ')
-            overlapping_radial_plots(datasets, pathnames, figure_folder,see_plots=see_plots, save_plots=save_plots,
+            overlapping_radial_plots(datasets, selected_file_paths, figure_folder,see_plots=see_plots, save_plots=save_plots,
                                      one_probe = True)
 
 
@@ -913,41 +842,6 @@ if __name__ == "__main__":
             center_grads_vs_experimental_params(datasets, figure_folder=figure_folder, axes=None,
                                                 save_plots=save_plots, show_plots=show_plots,
                                                 make_presentable=make_presentable)
-
-
-
-
-    if 'Convert NetCDF to usable form for fluctuations' in chosen_options:
-        nc_list = [f for f in os.listdir(langmuir_nc_folder) if f.endswith(".nc")]
-        # nc_choice = choose_multiple_from_list(nc_list, 'NetCDF file',
-        #                                       null_action="not retrieve data from NetCDF files.")
-        nc_name_choice = int_choose_multiple_from_list(nc_list, 'NetCDF file',
-                                              null_action="not retrieve data from NetCDF files.")
-
-        datasets = []
-        steady_state_times_runs = []
-
-        # Select data sets to plot from saved .nc files in the selected folder
-        for choice in nc_name_choice:
-            ds = xr.load_dataset(os.path.join(langmuir_nc_folder, choice))
-            datasets.append(ds)
-
-        # Get temperature into a form where it is indexed by probe, x, y shot, time to be used in Michael's fluctuation
-        # calculations
-        for dataset in datasets:
-            try:
-                index = datasets.index(dataset)
-                filename = nc_list[nc_choice[index]]
-                filename = filename.split('_2024')[0]
-                t_e = dataset['t_e']
-                t_e = t_e.swap_dims({'sweep': 'time'})
-                run_identifier = '2024_Jan_Run_' + filename + '_t_e.nc'
-                fluctuations_nc_folder = ensure_directory(langmuir_nc_folder + "fluctuations_nc/")
-                save_path = os.path.join(fluctuations_nc_folder, run_identifier)
-                t_e.to_netcdf(save_path)
-                print(f'Saved to {save_path}')
-            except Exception as e:
-                print(f'Failed to save dataset')
 
     if "Obtain Fluctuations from HDF5" in chosen_options:
         print("\n===== Flux probe analysis =====")

@@ -715,306 +715,396 @@ def plot_ion_sat_curr_vs_time(datasets, figure_folder):
                             plt.savefig(f"{ds_folder}{fig_name}", bbox_inches='tight')
                             plt.close(fig)
 
+def center_grads_vs_experimental_params(
+    datasets,
+    figure_folder="",
+    axes=None,
+    save_plots=False,
+    show_plots=False,
+    make_presentable=False,
+):
 
+  if figure_folder != "":
+    figure_folder = ensure_directory(
+        figure_folder + "machine_params_vs_plasma_width/"
+    )
+  plt.rcParams.update({
+      "font.size": 20,
+      "axes.labelsize": 22,
+      "axes.titlesize": 22,
+      "xtick.labelsize": 18,
+      "ytick.labelsize": 18,
+      "legend.fontsize": 16,
+      "axes.formatter.use_mathtext": True,
+      "lines.linewidth": 2.5,
+      "lines.markersize": 10,
+      "errorbar.capsize": 4,
+  })
 
-
-
-
-
-
-
-
-
-
-
-def center_grads_vs_experimental_params(datasets, figure_folder='', axes=None,
-                                        save_plots=False, show_plots=False, make_presentable=False):
-
-    if figure_folder != '':
-        figure_folder = ensure_directory(figure_folder + 'machine_params_vs_plasma_width/')
+  if make_presentable:
     plt.rcParams.update({
-        'font.size': 20,
-        'axes.labelsize': 22,
-        'axes.titlesize': 22,
-        'xtick.labelsize': 18,
-        'ytick.labelsize': 18,
-        'legend.fontsize': 16,
-        'axes.formatter.use_mathtext': True,
-        'lines.linewidth': 2.5,
-        'lines.markersize': 10,
-        'errorbar.capsize': 4
+        "figure.facecolor": "none",
+        "axes.facecolor": "none",
+        "savefig.transparent": True,
     })
 
-    if make_presentable:
-        plt.rcParams.update({
-            'figure.facecolor': 'none',
-            'axes.facecolor': 'none',
-            'savefig.transparent': True
-        })
+  options_to_plot = [
+      "B-field",
+      "GP Voltage",
+      "Cathode Current",
+      "Gradient Centers",
+      "Core width",
+      "ion_type",
+  ]
 
-    options_to_plot = [
-        'B-field',
-        'GP Voltage',
-        'Cathode Current',
-        'Gradient Centers',
-        'Core width',
-        'ion_type'
-    ]
+  clor, mark = determine_colors(datasets)
 
-    clor, mark = determine_colors(datasets)
+  print("\nChoose the axes that you would like to plot")
 
-    print('\nChoose the axes that you would like to plot')
+  while True:
+    y_ax_params = int_choose_multiple_from_list(options_to_plot, "y axes")
+    x_ax_params = int_choose_multiple_from_list(options_to_plot, "x axes")
+    if len(y_ax_params) == len(x_ax_params):
+      if all(
+          y_ax_params[p] != x_ax_params[p] for p in range(len(y_ax_params))
+      ):
+        break
+      print(
+          "You cannot plot the same parameters for y and x axes. Please try"
+          " again."
+      )
+    else:
+      print(
+          f"Number of y parameters ({len(y_ax_params)}) != x parameters"
+          f" ({len(x_ax_params)})."
+      )
 
-    while True:
-        y_ax_params = int_choose_multiple_from_list(options_to_plot, 'y axes')
-        x_ax_params = int_choose_multiple_from_list(options_to_plot, 'x axes')
-        if len(y_ax_params) == len(x_ax_params):
-            if all(y_ax_params[p] != x_ax_params[p] for p in range(len(y_ax_params))):
-                break
-            print('You cannot plot the same parameters for y and x axes. Please try again.')
+  plot_color = ask_yes_or_no(
+      "Plot color axes (if nothing is chosen ion_type is the color)? (y/n) "
+  )
+
+  # Added prompt for splitting temperature and density gradients
+  split_diags = ask_yes_or_no(
+      "Split Temperature (Te) and Density (ne) gradients into separate plots?"
+      " (y/n) "
+  )
+
+  color_ax = []
+  for p_idx in range(len(y_ax_params)):
+    x_p, y_p = x_ax_params[p_idx], y_ax_params[p_idx]
+    if plot_color:
+      color_plot_options = [
+          opt
+          for opt in options_to_plot
+          if opt not in (x_p, y_p, "Gradient Centers", "Core width")
+      ]
+      color_ax_list = int_choose_multiple_from_list(
+          color_plot_options, "color axes", lim_length=1
+      )
+      color_ax.append(color_ax_list[0] if color_ax_list else "ion_type")
+    else:
+      if "ion_type" in (x_p, y_p):
+        while_num = 0
+        while True:
+          color_plot_options = [
+              opt for opt in options_to_plot if opt not in (x_p, y_p)
+          ]
+          color_ax_list = int_choose_multiple_from_list(
+              color_plot_options, "color axes", lim_length=1
+          )
+          if color_ax_list:
+            color_ax.append(color_ax_list[0])
+            break
+          elif while_num > 0:
+            color_ax.append("Black")
+            break
+          else:
+            print(
+                "\nIon type is an x/y axis. Select another color axis or leave"
+                " blank for black."
+            )
+            while_num += 1
+      else:
+        color_ax.append("ion_type")
+
+  (
+      dens_grad_regions_str,
+      _,
+      _,
+      temp_grad_regions_str,
+      _,
+      _,
+  ) = xarray_gradient_strings()
+
+  def safe_mean(data):
+    return np.mean(data) if len(data) > 0 else np.nan
+
+  def extract_param_value(ds, ax_param):
+    if ax_param in ["B-field", "GP Voltage", "Cathode Current"]:
+      attr_raw = str(ds.attrs.get(ax_param, "0.0 a.u."))
+      parts = attr_raw.split()
+      val = float(parts[0])
+      unit = parts[1] if len(parts) > 1 else ""
+      return val, val, unit
+
+    elif ax_param == "ion_type":
+      ion = ds.attrs.get("ion_type", "Unknown")
+      return ion, ion, ""
+
+    elif ax_param in ["Core width", "Gradient Centers"]:
+      has_temp = temp_grad_regions_str in ds.attrs
+      has_dens = dens_grad_regions_str in ds.attrs
+
+      temp_less, temp_big, dens_less, dens_big = [], [], [], []
+      if has_temp:
+        t_edges = [
+            tuple(e) for e in json.loads(ds.attrs[temp_grad_regions_str])
+        ]
+        for start, stop in t_edges:
+          mid = (start + stop) / 2.0
+          (temp_less if mid < 0 else temp_big).append(mid)
+
+      if has_dens:
+        d_edges = [
+            tuple(e) for e in json.loads(ds.attrs[dens_grad_regions_str])
+        ]
+        for start, stop in d_edges:
+          mid = (start + stop) / 2.0
+          (dens_less if mid < 0 else dens_big).append(mid)
+
+      if ax_param == "Core width":
+        t_lower, t_upper = safe_mean(temp_less), safe_mean(temp_big)
+        d_lower, d_upper = safe_mean(dens_less), safe_mean(dens_big)
+
+        t_width = (
+            (t_upper - t_lower)
+            if (not np.isnan(t_lower) and not np.isnan(t_upper))
+            else np.nan
+        )
+        d_width = (
+            (d_upper - d_lower)
+            if (not np.isnan(d_lower) and not np.isnan(d_upper))
+            else np.nan
+        )
+        return t_width, d_width, "cm"
+
+      elif ax_param == "Gradient Centers":
+        t_centers = np.array(temp_less + temp_big)
+        d_centers = np.array(dens_less + dens_big)
+        return t_centers, d_centers, "cm"
+
+    return np.nan, np.nan, ""
+
+  def broadcast_data(x_val, y_val, c_val):
+    x_arr = np.atleast_1d(x_val)
+    y_arr = np.atleast_1d(y_val)
+    c_arr = np.atleast_1d(c_val) if c_val is not None else None
+
+    max_len = max(len(x_arr), len(y_arr))
+    if max_len == 0:
+      return np.array([]), np.array([]), np.array([])
+
+    if len(x_arr) == 1 and max_len > 1:
+      x_arr = np.repeat(x_arr, max_len)
+    if len(y_arr) == 1 and max_len > 1:
+      y_arr = np.repeat(y_arr, max_len)
+    if c_arr is not None and len(c_arr) == 1 and max_len > 1:
+      c_arr = np.repeat(c_arr, max_len)
+
+    return x_arr, y_arr, c_arr
+
+  # Diagnostics routing setup
+  diag_groups = [["Te"], ["ne"]] if split_diags else [["Te", "ne"]]
+
+  for p_idx in range(len(y_ax_params)):
+    y_param = y_ax_params[p_idx]
+    x_param = x_ax_params[p_idx]
+    c_param = color_ax[p_idx]
+
+    for current_group in diag_groups:
+      if axes is None:
+        fig, ax_dict, letters = build_subplots([[1]])
+        ax = ax_dict[letters[0]]
+      else:
+        ax = axes
+
+      x_unit, y_unit, c_unit = "", "", ""
+
+      is_b_field = c_param == "B-field"
+      is_numeric_color = (
+          c_param in ["GP Voltage", "Cathode Current"] or is_b_field
+      )
+      is_black = c_param == "Black"
+
+      if is_numeric_color:
+        all_c_vals = []
+        for ds in datasets:
+          c_val, _, c_u = extract_param_value(ds, c_param)
+          c_unit = c_u
+          if not np.isnan(c_val):
+            all_c_vals.append(c_val)
+
+        if len(all_c_vals) > 0:
+          c_min, c_max = np.min(all_c_vals), np.max(all_c_vals)
+          if c_min == c_max:
+            c_min, c_max = (
+                c_min - 0.1 * abs(c_min) if c_min != 0 else -1,
+                c_max + 0.1 * abs(c_max) if c_max != 0 else 1,
+            )
+          norm = mcolors.Normalize(vmin=c_min, vmax=c_max)
+
+          if is_b_field:
+            cmap = mcolors.LinearSegmentedColormap.from_list(
+                "BluePink", ["royalblue", "deeppink"]
+            )
+          else:
+            cmap = plt.cm.viridis
         else:
-            print(f"Number of y parameters ({len(y_ax_params)}) != x parameters ({len(x_ax_params)}).")
+          is_numeric_color = False
 
-    plot_color = ask_yes_or_no('Plot color axes (if nothing is chosen ion_type is the color)? (y/n) ')
+      is_profile_plot = any(
+          p in ["Core width", "Gradient Centers"] for p in [x_param, y_param]
+      )
 
-    color_ax = []
-    for p_idx in range(len(y_ax_params)):
-        x_p, y_p = x_ax_params[p_idx], y_ax_params[p_idx]
-        if plot_color:
-            color_plot_options = [opt for opt in options_to_plot if
-                                  opt not in (x_p, y_p, 'Gradient Centers', 'Core width')]
-            color_ax_list = int_choose_multiple_from_list(color_plot_options, 'color axes', lim_length=1)
-            color_ax.append(color_ax_list[0] if color_ax_list else 'ion_type')
-        else:
-            if 'ion_type' in (x_p, y_p):
-                while_num = 0
-                while True:
-                    color_plot_options = [opt for opt in options_to_plot if opt not in (x_p, y_p)]
-                    color_ax_list = int_choose_multiple_from_list(color_plot_options, 'color axes', lim_length=1)
-                    if color_ax_list:
-                        color_ax.append(color_ax_list[0])
-                        break
-                    elif while_num > 0:
-                        color_ax.append('Black')
-                        break
-                    else:
-                        print('\nIon type is an x/y axis. Select another color axis or leave blank for black.')
-                        while_num += 1
-            else:
-                color_ax.append('ion_type')
+      for i, ds in enumerate(datasets):
+        ds_color = clor[i]
+        ds_marker = mark[i]
+        ion_label = ds.attrs.get("ion_type", f"Run {i + 1}")
 
-    (dens_grad_regions_str, _, _, temp_grad_regions_str, _, _) = xarray_gradient_strings()
+        x_t, x_d, x_u = extract_param_value(ds, x_param)
+        y_t, y_d, y_u = extract_param_value(ds, y_param)
+        c_t, c_d, _ = extract_param_value(ds, c_param)
 
-    def safe_mean(data):
-        return np.mean(data) if len(data) > 0 else np.nan
+        x_unit, y_unit = x_u, y_u
 
-    def extract_param_value(ds, ax_param):
-        if ax_param in ['B-field', 'GP Voltage', 'Cathode Current']:
-            attr_raw = str(ds.attrs.get(ax_param, '0.0 a.u.'))
-            parts = attr_raw.split()
-            val = float(parts[0])
-            unit = parts[1] if len(parts) > 1 else ''
-            return val, val, unit
+        for diag_name, (x_val, y_val, c_val) in [
+            ("Te", (x_t, y_t, c_t)),
+            ("ne", (x_d, y_d, c_d)),
+        ]:
+          # Filter diagnostic based on choice
+          if diag_name not in current_group:
+            continue
 
-        elif ax_param == 'ion_type':
-            ion = ds.attrs.get('ion_type', 'Unknown')
-            return ion, ion, ''
+          x_b, y_b, c_b = broadcast_data(x_val, y_val, c_val)
 
-        elif ax_param in ['Core width', 'Gradient Centers']:
-            has_temp = temp_grad_regions_str in ds.attrs
-            has_dens = dens_grad_regions_str in ds.attrs
+          valid_mask = ~np.isnan(np.asarray(x_b, dtype=float)) & ~np.isnan(
+              np.asarray(y_b, dtype=float)
+          )
 
-            temp_less, temp_big, dens_less, dens_big = [], [], [], []
-            if has_temp:
-                t_edges = [tuple(e) for e in json.loads(ds.attrs[temp_grad_regions_str])]
-                for start, stop in t_edges:
-                    mid = (start + stop) / 2.0
-                    (temp_less if mid < 0 else temp_big).append(mid)
+          x_plot = x_b[valid_mask]
+          y_plot = y_b[valid_mask]
+          c_plot = c_b[valid_mask]
 
-            if has_dens:
-                d_edges = [tuple(e) for e in json.loads(ds.attrs[dens_grad_regions_str])]
-                for start, stop in d_edges:
-                    mid = (start + stop) / 2.0
-                    (dens_less if mid < 0 else dens_big).append(mid)
+          if len(x_plot) == 0:
+            continue
 
-            if ax_param == 'Core width':
-                t_lower, t_upper = safe_mean(temp_less), safe_mean(temp_big)
-                d_lower, d_upper = safe_mean(dens_less), safe_mean(dens_big)
+          if is_numeric_color:
+            base_color = cmap(norm(c_plot.astype(float)))
+          elif is_black:
+            base_color = "black"
+          else:
+            base_color = ds_color
 
-                t_width = (t_upper - t_lower) if (not np.isnan(t_lower) and not np.isnan(t_upper)) else np.nan
-                d_width = (d_upper - d_lower) if (not np.isnan(d_lower) and not np.isnan(d_upper)) else np.nan
-                return t_width, d_width, 'cm'
+          if is_profile_plot:
+            if diag_name == "Te":
+              face_col = "none"
+              edge_col = base_color
+              hatch_pattern = None
+              lw = 2.0
+            else:  # Density ('ne')
+              face_col = "none"
+              edge_col = base_color
+              hatch_pattern = r"\\\\\\"
+              lw = 1.2
 
-            elif ax_param == 'Gradient Centers':
-                t_centers = np.array(temp_less + temp_big)
-                d_centers = np.array(dens_less + dens_big)
-                return t_centers, d_centers, 'cm'
+            legend_label = ion_label if not is_numeric_color else None
+          else:
+            face_col = base_color
+            edge_col = "k"
+            hatch_pattern = None
+            lw = 1.0
 
-        return np.nan, np.nan, ''
-
-    def broadcast_data(x_val, y_val, c_val):
-        x_arr = np.atleast_1d(x_val)
-        y_arr = np.atleast_1d(y_val)
-        c_arr = np.atleast_1d(c_val) if c_val is not None else None
-
-        max_len = max(len(x_arr), len(y_arr))
-        if max_len == 0:
-            return np.array([]), np.array([]), np.array([])
-
-        if len(x_arr) == 1 and max_len > 1:
-            x_arr = np.repeat(x_arr, max_len)
-        if len(y_arr) == 1 and max_len > 1:
-            y_arr = np.repeat(y_arr, max_len)
-        if c_arr is not None and len(c_arr) == 1 and max_len > 1:
-            c_arr = np.repeat(c_arr, max_len)
-
-        return x_arr, y_arr, c_arr
-
-    for p_idx in range(len(y_ax_params)):
-        y_param = y_ax_params[p_idx]
-        x_param = x_ax_params[p_idx]
-        c_param = color_ax[p_idx]
-
-        if axes is None:
-            fig, ax_dict, letters = build_subplots([[1]])
-            ax = ax_dict[letters[0]]
-        else:
-            ax = axes
-
-        x_unit, y_unit, c_unit = '', '', ''
-
-        is_b_field = (c_param == 'B-field')
-        is_numeric_color = c_param in ['GP Voltage', 'Cathode Current'] or is_b_field
-        is_black = (c_param == 'Black')
-
-        if is_numeric_color:
-            all_c_vals = []
-            for ds in datasets:
-                c_val, _, c_u = extract_param_value(ds, c_param)
-                c_unit = c_u
-                if not np.isnan(c_val):
-                    all_c_vals.append(c_val)
-
-            if len(all_c_vals) > 0:
-                c_min, c_max = np.min(all_c_vals), np.max(all_c_vals)
-                if c_min == c_max:
-                    c_min, c_max = c_min - 0.1 * abs(c_min) if c_min != 0 else -1, c_max + 0.1 * abs(
-                        c_max) if c_max != 0 else 1
-                norm = mcolors.Normalize(vmin=c_min, vmax=c_max)
-
-                if is_b_field:
-                    cmap = mcolors.LinearSegmentedColormap.from_list("BluePink", ["royalblue", "deeppink"])
-                else:
-                    cmap = plt.cm.viridis
-            else:
-                is_numeric_color = False
-
-        is_profile_plot = any(p in ['Core width', 'Gradient Centers'] for p in [x_param, y_param])
-
-        for i, ds in enumerate(datasets):
-            ds_color = clor[i]
-            ds_marker = mark[i]
-            ion_label = ds.attrs.get('ion_type', f'Run {i + 1}')
-
-            x_t, x_d, x_u = extract_param_value(ds, x_param)
-            y_t, y_d, y_u = extract_param_value(ds, y_param)
-            c_t, c_d, _ = extract_param_value(ds, c_param)
-
-            x_unit, y_unit = x_u, y_u
-
-            for diag_name, (x_val, y_val, c_val) in [('Te', (x_t, y_t, c_t)), ('ne', (x_d, y_d, c_d))]:
-                x_b, y_b, c_b = broadcast_data(x_val, y_val, c_val)
-
-                valid_mask = ~np.isnan(np.asarray(x_b, dtype=float)) & \
-                             ~np.isnan(np.asarray(y_b, dtype=float))
-
-                x_plot = x_b[valid_mask]
-                y_plot = y_b[valid_mask]
-                c_plot = c_b[valid_mask]
-
-                if len(x_plot) == 0:
-                    continue
-
-                if is_numeric_color:
-                    base_color = cmap(norm(c_plot.astype(float)))
-                elif is_black:
-                    base_color = 'black'
-                else:
-                    base_color = ds_color
-
-                if is_profile_plot:
-                    if diag_name == 'Te':
-                        face_col = 'none'
-                        edge_col = base_color
-                        hatch_pattern = None
-                        lw = 2.0
-                    else:  # Density ('ne') -> Option 3 Dense Hatched
-                        face_col = 'none'
-                        edge_col = base_color
-                        hatch_pattern = r'\\\\\\'
-                        lw = 1.2
-
-                    legend_label = ion_label if not is_numeric_color else None
-                else:
-                    face_col = base_color
-                    edge_col = 'k'
-                    hatch_pattern = None
-                    lw = 1.0
-
-                    legend_label = f"{ion_label} ({diag_name})" if not is_numeric_color else f"{diag_name}"
-
-                ax.scatter(
-                    x_plot, y_plot,
-                    facecolors=face_col,
-                    edgecolors=edge_col,
-                    hatch=hatch_pattern,
-                    linewidths=lw,
-                    marker=ds_marker,
-                    s=130,
-                    label=legend_label
-                )
-
-        if is_profile_plot:
-            ax.scatter([], [], facecolors='none', edgecolors='black', marker='o', s=130, linewidths=2.0,
-                       label=r'$T_e$ (Hollow)')
-            ax.scatter([], [], facecolors='none', edgecolors='black', hatch=r'\\\\\\', marker='o', s=130,
-                       linewidths=1.2, label=r'$n_e$ (Hatched)')
-
-        xlabel_str = f"{x_param} [{x_unit}]" if x_unit else x_param
-        ylabel_str = f"{y_param} [{y_unit}]" if y_unit else y_param
-        ax.set_xlabel(xlabel_str)
-        ax.set_ylabel(ylabel_str)
-
-        handles, labels = ax.get_legend_handles_labels()
-        by_label = dict(zip(labels, handles))
-        if by_label:
-            ax.legend(
-                by_label.values(),
-                by_label.keys(),
-                loc='lower center',
-                bbox_to_anchor=(0.5, 1.02),
-                ncol=len(by_label),
-                frameon=True
+            legend_label = (
+                f"{ion_label} ({diag_name})"
+                if not is_numeric_color
+                else f"{diag_name}"
             )
 
-        if is_numeric_color:
-            sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
-            sm.set_array([])
-            cbar = plt.colorbar(sm, ax=ax)
-            cbar_label = f"{c_param} [{c_unit}]" if c_unit else c_param
-            cbar.set_label(cbar_label)
+          ax.scatter(
+              x_plot,
+              y_plot,
+              facecolors=face_col,
+              edgecolors=edge_col,
+              hatch=hatch_pattern,
+              linewidths=lw,
+              marker=ds_marker,
+              s=130,
+              label=legend_label,
+          )
 
-        if save_plots and figure_folder:
-            plot_title = f"{figure_folder}{y_param}_vs_{x_param}"
-            add_to_title = ask_yes_or_no(f"To be saved as {figure_folder}{y_param}_vs_{x_param}.png. Add anything? (y/n) ")
-            if add_to_title:
-                addition = input('What do you want to add to the save title?')
-                plot_title = plot_title + addition
-            plt.savefig(f"{plot_title}.png", bbox_inches='tight')
-            print(f"Saved plot to: {plot_title}.png")
+      if is_profile_plot:
+        if "Te" in current_group:
+          ax.scatter(
+              [],
+              [],
+              facecolors="none",
+              edgecolors="black",
+              marker="o",
+              s=130,
+              linewidths=2.0,
+              label=r"$T_e$ (Hollow)",
+          )
+        if "ne" in current_group:
+          ax.scatter(
+              [],
+              [],
+              facecolors="none",
+              edgecolors="black",
+              hatch=r"\\\\\\",
+              marker="o",
+              s=130,
+              linewidths=1.2,
+              label=r"$n_e$ (Hatched)",
+          )
 
-        if show_plots:
-            plt.show()
+      xlabel_str = f"{x_param} [{x_unit}]" if x_unit else x_param
+      ylabel_str = f"{y_param} [{y_unit}]" if y_unit else y_param
+      ax.set_xlabel(xlabel_str)
+      ax.set_ylabel(ylabel_str)
+
+      handles, labels = ax.get_legend_handles_labels()
+      by_label = dict(zip(labels, handles))
+      if by_label:
+        ax.legend(
+            by_label.values(),
+            by_label.keys(),
+            loc="lower center",
+            bbox_to_anchor=(0.5, 1.02),
+            ncol=len(by_label),
+            frameon=True,
+        )
+
+      if is_numeric_color:
+        sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+        sm.set_array([])
+        cbar = plt.colorbar(sm, ax=ax)
+        cbar_label = f"{c_param} [{c_unit}]" if c_unit else c_param
+        cbar.set_label(cbar_label)
+
+      if save_plots and figure_folder:
+        suffix = f"_{current_group[0]}" if split_diags else ""
+        plot_title = f"{figure_folder}{y_param}_vs_{x_param}{suffix}"
+        add_to_title = ask_yes_or_no(
+            f"To be saved as {plot_title}.png. Add anything? (y/n) "
+        )
+        if add_to_title:
+          addition = input("What do you want to add to the save title?")
+          plot_title = plot_title + addition
+        plt.savefig(f"{plot_title}.png", bbox_inches="tight")
+        print(f"Saved plot to: {plot_title}.png")
+
+      if show_plots:
+        plt.show()
 
 
 
