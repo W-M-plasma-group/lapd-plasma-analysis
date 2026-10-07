@@ -367,8 +367,8 @@ def get_diagnostics_to_plot(diagnostic_name_dict):
     """ Ask users for a list of diagnostics to plot. """
     print("The following diagnostics are available to plot: ")
     diagnostics_sort_indices = np.argsort(list(diagnostic_name_dict.values()))
-    diagnostics_to_plot_ints = choose_multiple_from_list(
-        np.array(list(diagnostic_name_dict.values()))[diagnostics_sort_indices], "diagnostic", null_action="skip")
+    diagnostics_to_plot_ints = int_choose_multiple_from_list(
+        np.array(list(diagnostic_name_dict.values()))[diagnostics_sort_indices], "diagnostic", null_action="skip", return_idxs= True)
     return [np.array(list(diagnostic_name_dict.keys()))[diagnostics_sort_indices][choice]
             for choice in diagnostics_to_plot_ints]
 

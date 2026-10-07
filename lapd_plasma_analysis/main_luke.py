@@ -409,8 +409,11 @@ if __name__ == "__main__":
                           'Michael gradient plot',
                           'Show Isat time series',
                           'Show steady state',
+                          "Connect Machine Parameters to Plasma Parameters",
                           'Isat radial plot',
                           'Radial plot',
+                          'Core width vs time',
+                          'Gradient Slopes vs time',
                           'Overlapping Radial plot',
                           'Plot center of gradients vs experiment parameters',
                           'Dimensionless comparison'
@@ -424,6 +427,7 @@ if __name__ == "__main__":
         plot_choices = int_choose_multiple_from_list(possible_plots, 'action', null_action='not plot data')
 
         if ('Show steady state' in plot_choices or
+            "Connect Machine Parameters to Plasma Parameters" or
                 'Isat radial plot' in plot_choices or
                 'Radial plot' in plot_choices or
                 'Overlapping Radial plot' in plot_choices or
@@ -516,7 +520,7 @@ if __name__ == "__main__":
 
         # TODO Make this a function and input it into individual if statements below
         if ('contour' in plot_choices or
-            'contour_subplots - Only for 0 probe' in plot_choices or
+        'contour_subplots - Only for 0 probe' in plot_choices or
             'Michael gradient plot' in plot_choices):
             # What variables are in common between all the datasets selected
             common_vars = set.intersection(*[set(dataset.data_vars.keys()) for dataset in datasets])
@@ -567,10 +571,64 @@ if __name__ == "__main__":
             plot_ion_sat_curr_vs_time(datasets, figure_folder)
 
         if 'Show steady state' in plot_choices:
+            see_plots = ask_yes_or_no("Show steady state plot? (y/n) ")
+            save_plots = ask_yes_or_no("Save plots? (y/n) ")
             for i, dataset in enumerate(datasets):
                 run_identifier = f_run_identifier(ds=dataset)
                 for probe in range(dataset.sizes['probe']):
-                    show_steady_state(dataset, probe, run_identifier)
+                    show_steady_state(dataset, probe, run_identifier, figure_folder = figure_folder,
+                                      see_plots = see_plots, save_plots = save_plots)
+
+        if "Connect Machine Parameters to Plasma Parameters" in plot_choices:
+            if "Connect Machine Parameters to Plasma Parameters" in plot_choices:
+                see_plots = ask_yes_or_no("See Plots? (y/n) ")
+                save_plots = ask_yes_or_no("Save plots? (y/n) ")
+
+                machine_params_list = ["Gas Puff Voltage", "Cathode Current"]
+
+                # Common variable keys across all datasets
+                common_vars = set.intersection(
+                    *[set(dataset.data_vars.keys()) for dataset in datasets]
+                )
+
+                # Create lookups: key -> long_name and long_name -> key
+                diagnostic_name_dict = {
+                    var: datasets[0][var].attrs.get("long_name", var) for var in common_vars
+                }
+                long_to_var = {
+                    long_name: var for var, long_name in diagnostic_name_dict.items()
+                }
+
+                chosen_machine_params = int_choose_multiple_from_list(
+                    machine_params_list, "Machine Parameters"
+                )
+
+                for param in chosen_machine_params:
+                    if param == "Gas Puff Voltage":
+                        att_name = "GP Voltage"
+                    elif param == "Cathode Current":
+                        att_name = "Cathode Current"
+                    else:
+                        att_name = None
+
+                    print(
+                        f"Choose all plasma parameters to plot against {param}. "
+                        f"Each diagnostic parameter will be plotted separately against {param}."
+                    )
+                    time.sleep(0.5)
+
+                    sorted_long_names = sorted(diagnostic_name_dict.values())
+                    selected_names = int_choose_multiple_from_list(
+                        sorted_long_names, "diagnostic", null_action="skip"
+                    )
+
+                    # Map selected display names directly to dataset variable keys (e.g., ['t_e', 'n_e'])
+                    diagnostics_to_plot = [long_to_var[name] for name in selected_names]
+
+                    for diag_key in diagnostics_to_plot:
+                        connect_machine_param_to_plasma_param()
+
+
 
         if 'Dimensionless comparison' in plot_choices:
             a = core_radius.to(u.m)
@@ -789,6 +847,11 @@ if __name__ == "__main__":
                 df.to_csv(csv_path, index=False)
                 print(f"Saved CSV to: {csv_path}")
 
+
+
+
+
+
         if 'Isat radial plot' in plot_choices:
             see_plots = ask_yes_or_no('See plots? (y/n) ')
             save_plots = ask_yes_or_no('Save plots? (y/n) ')
@@ -815,7 +878,771 @@ if __name__ == "__main__":
                               lines=lined_grads, shaded=shaded_grads,
                               plot_final_fits=fit_lines, save_plots=save_plots,
                               from_main=True, one_probe=one_probe, hdf5_folder=hdf5_folder,
-                              updated_nc_folder = updated_nc_folder)
+                              updated_nc_folder = updated_nc_folder, time = None)
+        if "Core width vs time" in plot_choices:
+            see_plots = ask_yes_or_no("See plot? (y/n) ")
+            save_plots = ask_yes_or_no("Save plots? (y/n) ")
+            make_presentable = ask_yes_or_no(
+                "Make for presentation rather than for analysis? (y/n) "
+            )
+            one_probe = ask_yes_or_no("One probe? (y/n) ")
+            by_shot = (
+                ask_yes_or_no(
+                    "Calculate core width by shot to get error bars? (y/n) "
+                )
+                if any(
+                    ("shot" in ds.coords or "shot" in ds.dims) for ds in datasets
+                )
+                else False
+            )
+            redo_grad_regions = ask_yes_or_no(
+                "Check/redo gradient regions across all probes/times? (y/n) "
+            )
+
+            err_suffix = "_errorBars" if by_shot else ""
+            markers = ["o", "s", "^", "D", "v", "p"]
+
+
+            def compute_width(regions):
+                if not regions:
+                    return np.nan
+                centers = np.array([(start + stop) / 2.0 for start, stop in regions])
+                right_centers = centers[centers > 0]
+                left_centers = centers[centers < 0]
+                if len(right_centers) > 0 and len(left_centers) > 0:
+                    return np.mean(right_centers) - np.mean(left_centers)
+                return np.nan
+
+
+            if save_plots:
+                save_folder = ensure_directory(
+                    os.path.join(figure_folder, "core_width_vs_time")
+                )
+
+            # Process and save plots immediately per dataset
+            for ds_idx, dataset in enumerate(datasets):
+                pathname = selected_file_paths[ds_idx]
+                run_str = f_run_identifier(ds=dataset, filename=pathname)
+                safe_run_str = "".join(
+                    [c if c.isalnum() or c in ("-", "_") else "_" for c in run_str]
+                )
+
+                print(
+                    f"\nProcessing core width for dataset {ds_idx + 1}/{len(datasets)}:"
+                    f" {run_str}"
+                )
+
+                # Run radial plot builder for a SINGLE dataset
+                gradient_colors, single_ds_grad_dict = build_radial_plot(
+                    [dataset],
+                    [pathname],
+                    figure_folder,
+                    make_presentable=make_presentable,
+                    see_temp_and_dens_plots=False,
+                    lines=True,
+                    shaded=True,
+                    plot_final_fits=False,
+                    save_plots=save_plots,
+                    from_main=True,
+                    one_probe=one_probe,
+                    hdf5_folder=hdf5_folder,
+                    updated_nc_folder=updated_nc_folder,
+                    time=None,
+                    core_width=True,
+                    by_shot=by_shot,
+                    redo_grad_regions=redo_grad_regions,
+                )
+
+                if not single_ds_grad_dict:
+                    print(
+                        f"Warning: No gradient data returned for dataset {ds_idx}"
+                        f" ({run_str}). Skipping."
+                    )
+                    continue
+
+                probe_core_widths = {}
+
+                for probe, time_data in single_ds_grad_dict.items():
+                    if not isinstance(time_data, dict):
+                        continue
+
+                    time_steps = sorted([t for t in time_data.keys() if t is not None])
+                    if not time_steps:
+                        continue
+
+                    temp_widths, temp_errs = [], []
+                    dens_widths, dens_errs = [], []
+                    press_widths, press_errs = [], []
+
+                    for t_val in time_steps:
+                        t_entry = time_data[t_val]
+
+                        # Shot-by-shot sub-dictionary check
+                        if (
+                                isinstance(t_entry, dict)
+                                and "full_temp_grads" not in t_entry
+                        ):
+                            s_temp_w = [
+                                compute_width(s_grads.get("full_temp_grads", []))
+                                for s_grads in t_entry.values()
+                            ]
+                            s_dens_w = [
+                                compute_width(s_grads.get("full_density_grads", []))
+                                for s_grads in t_entry.values()
+                            ]
+                            s_press_w = [
+                                compute_width(s_grads.get("full_pressure_grads", []))
+                                for s_grads in t_entry.values()
+                            ]
+
+                            valid_temp = [w for w in s_temp_w if not np.isnan(w)]
+                            valid_dens = [w for w in s_dens_w if not np.isnan(w)]
+                            valid_press = [w for w in s_press_w if not np.isnan(w)]
+
+                            t_mean = np.mean(valid_temp) if valid_temp else np.nan
+                            t_err = (
+                                (np.std(valid_temp, ddof=1) / np.sqrt(len(valid_temp)))
+                                if len(valid_temp) > 1
+                                else 0.0
+                            )
+
+                            d_mean = np.mean(valid_dens) if valid_dens else np.nan
+                            d_err = (
+                                (np.std(valid_dens, ddof=1) / np.sqrt(len(valid_dens)))
+                                if len(valid_dens) > 1
+                                else 0.0
+                            )
+
+                            p_mean = np.mean(valid_press) if valid_press else np.nan
+                            p_err = (
+                                (
+                                        np.std(valid_press, ddof=1)
+                                        / np.sqrt(len(valid_press))
+                                )
+                                if len(valid_press) > 1
+                                else 0.0
+                            )
+
+                            temp_widths.append(t_mean)
+                            temp_errs.append(t_err)
+                            dens_widths.append(d_mean)
+                            dens_errs.append(d_err)
+                            press_widths.append(p_mean)
+                            press_errs.append(p_err)
+                        else:
+                            t_w = compute_width(t_entry.get("full_temp_grads", []))
+                            d_w = compute_width(t_entry.get("full_density_grads", []))
+                            p_w = compute_width(t_entry.get("full_pressure_grads", []))
+
+                            temp_widths.append(t_w)
+                            temp_errs.append(0.0)
+                            dens_widths.append(d_w)
+                            dens_errs.append(0.0)
+                            press_widths.append(p_w)
+                            press_errs.append(0.0)
+
+                    probe_core_widths[probe] = {
+                        "times": time_steps,
+                        "temp": temp_widths,
+                        "temp_err": temp_errs,
+                        "dens": dens_widths,
+                        "dens_err": dens_errs,
+                        "press": press_widths,
+                        "press_err": press_errs,
+                    }
+
+                if not probe_core_widths:
+                    print(
+                        f"Warning: No valid core width time steps found for {run_str}."
+                    )
+                    continue
+
+                # --- Plot 1: Temperature Core Width vs Time ---
+                fig_temp, axes_temp, letters_temp = build_subplots([[1]])
+                ax_temp = axes_temp[letters_temp[0]]
+                for idx, (probe, data) in enumerate(probe_core_widths.items()):
+                    marker = markers[idx % len(markers)]
+                    if any(e > 0 for e in data["temp_err"]):
+                        ax_temp.errorbar(
+                            data["times"],
+                            data["temp"],
+                            yerr=data["temp_err"],
+                            marker=marker,
+                            capsize=3,
+                            elinewidth=1.2,
+                            linewidth=1.5,
+                            linestyle="None",
+                            label=f"Probe {probe}",
+                        )
+                    else:
+                        ax_temp.plot(
+                            data["times"],
+                            data["temp"],
+                            marker=marker,
+                            linewidth=2,
+                            linestyle="None",
+                            label=f"Probe {probe}",
+                        )
+
+                ax_temp.set_xlabel("Time (ms)", fontsize=14)
+                ax_temp.set_ylabel("Core Width (cm)", fontsize=14)
+                ax_temp.set_xlim(0, 42)
+                ax_temp.set_ylim(10, 45)
+                ax_temp.set_title(
+                    f"{run_str}\n" + r"$T_e$ Core Width vs. Time", fontsize=16
+                )
+                ax_temp.legend(fontsize=12)
+                plt.tight_layout()
+
+                if save_plots:
+                    save_path_temp = os.path.join(
+                        save_folder,
+                        f"{safe_run_str}_temperature_core_width{err_suffix}.png",
+                    )
+                    fig_temp.savefig(save_path_temp, dpi=300, bbox_inches="tight")
+                    print(f"Saved temperature core width plot to: {save_path_temp}")
+
+                if see_plots:
+                    show_keep_focus(fig_temp)
+                plt.close(fig_temp)
+
+                # --- Plot 2: Density Core Width vs Time ---
+                fig_dens, axes_dens, letters_dens = build_subplots([[1]])
+                ax_dens = axes_dens[letters_dens[0]]
+                for idx, (probe, data) in enumerate(probe_core_widths.items()):
+                    marker = markers[idx % len(markers)]
+                    if any(e > 0 for e in data["dens_err"]):
+                        ax_dens.errorbar(
+                            data["times"],
+                            data["dens"],
+                            yerr=data["dens_err"],
+                            marker=marker,
+                            capsize=3,
+                            elinewidth=1.2,
+                            linewidth=1.5,
+                            linestyle="None",
+                            label=f"Probe {probe}",
+                        )
+                    else:
+                        ax_dens.plot(
+                            data["times"],
+                            data["dens"],
+                            marker=marker,
+                            linewidth=2,
+                            linestyle="None",
+                            label=f"Probe {probe}",
+                        )
+
+                ax_dens.set_xlabel("Time (ms)", fontsize=14)
+                ax_dens.set_ylabel("Core Width (cm)", fontsize=14)
+                ax_dens.set_xlim(0, 42)
+                ax_dens.set_ylim(10, 45)
+                ax_dens.set_title(
+                    f"{run_str}\n" + r"$n_e$ Core Width vs. Time", fontsize=16
+                )
+                ax_dens.legend(fontsize=12)
+                plt.tight_layout()
+
+                if save_plots:
+                    save_path_dens = os.path.join(
+                        save_folder,
+                        f"{safe_run_str}_density_core_width{err_suffix}.png",
+                    )
+                    fig_dens.savefig(save_path_dens, dpi=300, bbox_inches="tight")
+                    print(f"Saved density core width plot to: {save_path_dens}")
+
+                if see_plots:
+                    show_keep_focus(fig_dens)
+                plt.close(fig_dens)
+
+                # --- Plot 3: Pressure Core Width vs Time ---
+                fig_press, axes_press, letters_press = build_subplots([[1]])
+                ax_press = axes_press[letters_press[0]]
+                for idx, (probe, data) in enumerate(probe_core_widths.items()):
+                    marker = markers[idx % len(markers)]
+                    if any(e > 0 for e in data["press_err"]):
+                        ax_press.errorbar(
+                            data["times"],
+                            data["press"],
+                            yerr=data["press_err"],
+                            marker=marker,
+                            capsize=3,
+                            elinewidth=1.2,
+                            linewidth=1.5,
+                            linestyle="None",
+                            label=f"Probe {probe}",
+                        )
+                    else:
+                        ax_press.plot(
+                            data["times"],
+                            data["press"],
+                            marker=marker,
+                            linewidth=2,
+                            linestyle="None",
+                            label=f"Probe {probe}",
+                        )
+
+                ax_press.set_xlabel("Time (ms)", fontsize=14)
+                ax_press.set_ylabel("Core Width (cm)", fontsize=14)
+                ax_press.set_xlim(0, 42)
+                ax_press.set_ylim(10, 45)
+                ax_press.set_title(
+                    f"{run_str}\n" + r"$P_e$ Core Width vs. Time", fontsize=16
+                )
+                ax_press.legend(fontsize=12)
+                plt.tight_layout()
+
+                if save_plots:
+                    save_path_press = os.path.join(
+                        save_folder,
+                        f"{safe_run_str}_pressure_core_width{err_suffix}.png",
+                    )
+                    fig_press.savefig(save_path_press, dpi=300, bbox_inches="tight")
+                    print(f"Saved pressure core width plot to: {save_path_press}")
+
+                if see_plots:
+                    show_keep_focus(fig_press)
+                plt.close(fig_press)
+
+        # if "Gradient Slopes vs time" in plot_choices:
+
+        def parse_attr_val(val):
+            """Safely parse attribute values from dataset.attrs into numbers or numeric lists."""
+            if val is None:
+                return None
+            if isinstance(val, str):
+                try:
+                    val = json.loads(val)
+                except Exception:
+                    try:
+                        return float(val)
+                    except Exception:
+                        pass
+            if isinstance(val, (list, tuple, np.ndarray)):
+                res = []
+                for x in val:
+                    res.append(parse_attr_val(x))
+                return res
+            try:
+                return float(val)
+            except Exception:
+                return val
+
+
+        def extract_region_bounds(reg_val, idx):
+            """Extracts a 2-element float tuple (r_start, r_end) for side idx (0=Left, 1=Right)."""
+            if reg_val is None:
+                return None
+
+            # Unwrap single-element outer containers
+            while isinstance(reg_val, list) and len(reg_val) == 1 and isinstance(reg_val[0], list):
+                reg_val = reg_val[0]
+
+            if not isinstance(reg_val, list):
+                return None
+
+            # Case A: Nested list of sublists [[r1, r2], [r3, r4]]
+            if len(reg_val) > idx and isinstance(reg_val[idx], list) and len(reg_val[idx]) == 2:
+                try:
+                    return float(reg_val[idx][0]), float(reg_val[idx][1])
+                except (ValueError, TypeError):
+                    return None
+
+            # Case B: Flat list of 4 numbers [r1, r2, r3, r4]
+            if len(reg_val) == 4 and all(not isinstance(x, list) for x in reg_val):
+                try:
+                    if idx == 0:
+                        return float(reg_val[0]), float(reg_val[1])
+                    elif idx == 1:
+                        return float(reg_val[2]), float(reg_val[3])
+                except (ValueError, TypeError):
+                    return None
+
+            # Case C: Flat list of 2 numbers [r1, r2] (Left side only)
+            if idx == 0 and len(reg_val) == 2 and all(not isinstance(x, list) for x in reg_val):
+                try:
+                    return float(reg_val[0]), float(reg_val[1])
+                except (ValueError, TypeError):
+                    return None
+
+            return None
+
+
+        def extract_scalar_for_side(val, idx):
+            """Extracts scalar float for side idx (0=Left, 1=Right) without falling back to index 0."""
+            if val is None:
+                return None
+            if isinstance(val, (list, tuple, np.ndarray)):
+                if len(val) == 0 or idx >= len(val):
+                    return None  # Do NOT recycle index 0 when index 1 is requested
+                elem = val[idx]
+                while isinstance(elem, (list, tuple, np.ndarray)):
+                    if len(elem) > 0:
+                        elem = elem[0]
+                    else:
+                        return None
+                try:
+                    return float(elem)
+                except (ValueError, TypeError):
+                    return None
+
+            # Single scalar is valid only for Left side (idx=0)
+            if idx == 0:
+                try:
+                    return float(val)
+                except (ValueError, TypeError):
+                    return None
+            return None
+
+
+        def compute_scale_length_by_side(slp_val, reg_val, int_val, normalize):
+            """
+            Computes scale lengths separately for Left (idx 0) and Right (idx 1) sides.
+            Returns (left_scale_length, right_scale_length).
+            """
+
+            def _calc_side(idx):
+                raw_slp = extract_scalar_for_side(slp_val, idx)
+                if raw_slp is None:
+                    return None
+
+                slp_mag = abs(raw_slp)
+
+                if not normalize:
+                    return slp_mag
+
+                bounds = extract_region_bounds(reg_val, idx)
+                int_num = extract_scalar_for_side(int_val, idx)
+
+                if bounds is not None and int_num is not None:
+                    r_mid = (bounds[0] + bounds[1]) / 2.0
+                    # Use SIGNED raw_slp so y(r_mid) = m*r_mid + b calculates correct local amplitude
+                    local_val = abs(raw_slp * r_mid + int_num)
+                    if local_val != 0:
+                        return slp_mag / local_val
+                return None
+
+            return _calc_side(0), _calc_side(1)
+
+        if "Gradient Slopes vs time" in plot_choices:
+            see_plots = ask_yes_or_no("Do you want to see the slope vs time plot? (y/n) ")
+            save_plots = ask_yes_or_no("Do you want to save the plot? (y/n) ")
+            normalize = ask_yes_or_no("Do you want to normalize? (y/n) ")
+            by_shot = (
+                ask_yes_or_no(
+                    "Do you want to show error bars by splitting up by shot? (y/n) "
+                )
+                if any(
+                    ("shot" in ds.coords or "shot" in ds.dims) for ds in datasets
+                )
+                else False
+            )
+            redo_grad_regions = ask_yes_or_no(
+                "Check/redo gradient regions across all probes/times? (y/n) "
+            )
+
+            norm_suffix = "_normalized" if normalize else ""
+            err_suffix = "_errorBars" if by_shot else ""
+
+            # Unpack base gradient attribute key strings
+            (
+                base_dens_reg,
+                base_dens_slp,
+                base_dens_int,
+                base_temp_reg,
+                base_temp_slp,
+                base_temp_int,
+            ) = xarray_gradient_strings()
+
+            base_press_slp = base_dens_slp.replace("dens", "press")
+            base_press_reg = base_dens_reg.replace("dens", "press")
+            base_press_int = base_dens_int.replace("dens", "press")
+
+            # Step 1: Run radial plot calculation for ALL datasets in batch
+            print("\nProcessing/updating gradient regions across all datasets...")
+            build_radial_plot(
+                datasets,
+                selected_file_paths,
+                figure_folder,
+                from_main=True,
+                one_probe=False,
+                hdf5_folder=hdf5_folder,
+                updated_nc_folder=updated_nc_folder,
+                core_width=True,
+                by_shot=by_shot,
+                redo_grad_regions=redo_grad_regions,
+            )
+
+            # Generate combined run identifier for plot titles and filenames
+            run_ids = [
+                f_run_identifier(ds=ds, filename=p)
+                for ds, p in zip(datasets, selected_file_paths)
+            ]
+            combined_runs_str = (
+                "_".join(run_ids)
+                if len(run_ids) > 1
+                else (run_ids[0] if run_ids else "")
+            )
+
+            # Detect unique probes across all datasets
+            all_probes = sorted(
+                list(
+                    set(
+                        p
+                        for ds in datasets
+                        for p in (
+                            [int(x) for x in ds.coords["probe"].values]
+                            if "probe" in ds.coords
+                            else [0]
+                        )
+                    )
+                )
+            )
+
+            quantity_specs = [
+                (
+                    "density",
+                    base_dens_slp,
+                    base_dens_reg,
+                    base_dens_int,
+                    r"$1/L_n = \nabla n_e / n(r_{\mathrm{mid}})$ ($\mathrm{cm}^{-1}$)",
+                ),
+                (
+                    "temperature",
+                    base_temp_slp,
+                    base_temp_reg,
+                    base_temp_int,
+                    r"$1/L_T = \nabla T_e / T(r_{\mathrm{mid}})$ ($\mathrm{cm}^{-1}$)",
+                ),
+                (
+                    "pressure",
+                    base_press_slp,
+                    base_press_reg,
+                    base_press_int,
+                    r"$1/L_P = \nabla P_e / P(r_{\mathrm{mid}})$ ($\mathrm{cm}^{-1}$)",
+                ),
+            ]
+
+            # Step 2: Create multi-panel figures (horizontal subplots per probe)
+            for q_name, base_slp_key, base_reg_key, base_int_key, y_label in quantity_specs:
+                layout = [[len(all_probes)]]
+                fig, axes, letters = build_subplots(layout)
+
+                markers = ["o", "s", "^", "D", "v", "p"]
+                has_plotted_any = False
+
+                for p_idx, probe in enumerate(all_probes):
+                    ax = axes[letters[p_idx]]
+
+                    for ds_idx, dataset in enumerate(datasets):
+                        pathname = selected_file_paths[ds_idx]
+                        run_str = f_run_identifier(ds=dataset, filename=pathname)
+
+                        time_vals = (
+                            dataset.coords["time"].values
+                            if "time" in dataset.coords
+                            else [None]
+                        )
+                        has_shot_dim = ("shot" in dataset.coords) or (
+                                "shot" in dataset.dims
+                        )
+                        shot_vals = (
+                            dataset.coords["shot"].values
+                            if (by_shot and has_shot_dim)
+                            else [None]
+                        )
+
+                        sides_data = {
+                            "Left": {"means": [], "errs": [], "times": []},
+                            "Right": {"means": [], "errs": [], "times": []},
+                        }
+
+                        for t_val in sorted([t for t in time_vals if t is not None]):
+                            t_suffix = f"_t_{t_val}"
+
+                            if by_shot and has_shot_dim:
+                                shot_left_list, shot_right_list = [], []
+
+                                for s_val in shot_vals:
+                                    slp_key = f"probe_{probe}_{base_slp_key}{t_suffix}_shot_{s_val}"
+                                    reg_key = f"probe_{probe}_{base_reg_key}{t_suffix}_shot_{s_val}"
+                                    int_key = f"probe_{probe}_{base_int_key}{t_suffix}_shot_{s_val}"
+
+                                    slp_val = parse_attr_val(dataset.attrs.get(slp_key, None))
+                                    reg_val = parse_attr_val(dataset.attrs.get(reg_key, None))
+                                    int_val = parse_attr_val(dataset.attrs.get(int_key, None))
+
+                                    if slp_val is None:
+                                        matching_keys = [
+                                            k for k in dataset.attrs
+                                            if k.startswith(f"probe_{probe}_{base_slp_key}")
+                                               and f"_t_{t_val}" in k and f"_shot_{s_val}" in k
+                                        ]
+                                        if matching_keys:
+                                            slp_val = parse_attr_val(dataset.attrs[matching_keys[0]])
+
+                                    if reg_val is None:
+                                        matching_keys = [
+                                            k for k in dataset.attrs
+                                            if k.startswith(f"probe_{probe}_{base_reg_key}")
+                                               and f"_t_{t_val}" in k and f"_shot_{s_val}" in k
+                                        ]
+                                        if matching_keys:
+                                            reg_val = parse_attr_val(dataset.attrs[matching_keys[0]])
+
+                                    if int_val is None:
+                                        matching_keys = [
+                                            k for k in dataset.attrs
+                                            if k.startswith(f"probe_{probe}_{base_int_key}")
+                                               and f"_t_{t_val}" in k and f"_shot_{s_val}" in k
+                                        ]
+                                        if matching_keys:
+                                            int_val = parse_attr_val(dataset.attrs[matching_keys[0]])
+
+                                    left_val, right_val = compute_scale_length_by_side(
+                                        slp_val, reg_val, int_val, normalize
+                                    )
+                                    if left_val is not None:
+                                        shot_left_list.append(left_val)
+                                    if right_val is not None:
+                                        shot_right_list.append(right_val)
+
+                                if shot_left_list:
+                                    sides_data["Left"]["means"].append(np.mean(shot_left_list))
+                                    sides_data["Left"]["errs"].append(
+                                        (np.std(shot_left_list, ddof=1) / np.sqrt(len(shot_left_list)))
+                                        if len(shot_left_list) > 1 else 0.0
+                                    )
+                                    sides_data["Left"]["times"].append(t_val)
+
+                                if shot_right_list:
+                                    sides_data["Right"]["means"].append(np.mean(shot_right_list))
+                                    sides_data["Right"]["errs"].append(
+                                        (np.std(shot_right_list, ddof=1) / np.sqrt(len(shot_right_list)))
+                                        if len(shot_right_list) > 1 else 0.0
+                                    )
+                                    sides_data["Right"]["times"].append(t_val)
+
+                            else:
+                                slp_key = f"probe_{probe}_{base_slp_key}{t_suffix}"
+                                reg_key = f"probe_{probe}_{base_reg_key}{t_suffix}"
+                                int_key = f"probe_{probe}_{base_int_key}{t_suffix}"
+
+                                slp_val = parse_attr_val(dataset.attrs.get(slp_key, None))
+                                reg_val = parse_attr_val(dataset.attrs.get(reg_key, None))
+                                int_val = parse_attr_val(dataset.attrs.get(int_key, None))
+
+                                if slp_val is None:
+                                    matching_keys = [
+                                        k for k in dataset.attrs
+                                        if k.startswith(f"probe_{probe}_{base_slp_key}") and f"_t_{t_val}" in k
+                                    ]
+                                    if matching_keys:
+                                        slp_val = parse_attr_val(dataset.attrs[matching_keys[0]])
+
+                                if reg_val is None:
+                                    matching_keys = [
+                                        k for k in dataset.attrs
+                                        if k.startswith(f"probe_{probe}_{base_reg_key}") and f"_t_{t_val}" in k
+                                    ]
+                                    if matching_keys:
+                                        reg_val = parse_attr_val(dataset.attrs[matching_keys[0]])
+
+                                if int_val is None:
+                                    matching_keys = [
+                                        k for k in dataset.attrs
+                                        if k.startswith(f"probe_{probe}_{base_int_key}") and f"_t_{t_val}" in k
+                                    ]
+                                    if matching_keys:
+                                        int_val = parse_attr_val(dataset.attrs[matching_keys[0]])
+
+                                left_val, right_val = compute_scale_length_by_side(
+                                    slp_val, reg_val, int_val, normalize
+                                )
+
+                                if left_val is not None:
+                                    sides_data["Left"]["means"].append(left_val)
+                                    sides_data["Left"]["errs"].append(0.0)
+                                    sides_data["Left"]["times"].append(t_val)
+
+                                if right_val is not None:
+                                    sides_data["Right"]["means"].append(right_val)
+                                    sides_data["Right"]["errs"].append(0.0)
+                                    sides_data["Right"]["times"].append(t_val)
+
+                        marker = markers[ds_idx % len(markers)]
+
+                        # Plot Left (filled) and Right (hollow) markers without connecting lines
+                        for side, style_kwargs, label_suffix in [
+                            ("Left", {"mfc": None}, "Left"),
+                            ("Right", {"mfc": "none"}, "Right"),
+                        ]:
+                            times = sides_data[side]["times"]
+                            means = sides_data[side]["means"]
+                            errs = sides_data[side]["errs"]
+
+                            if not means:
+                                continue
+
+                            label_str = f"{run_str} ({label_suffix})"
+
+                            if any(e > 0 for e in errs):
+                                ax.errorbar(
+                                    times,
+                                    means,
+                                    yerr=errs,
+                                    marker=marker,
+                                    capsize=3,
+                                    elinewidth=1.2,
+                                    linestyle="None",
+                                    label=label_str,
+                                    markerfacecolor=style_kwargs["mfc"],
+                                )
+                            else:
+                                ax.plot(
+                                    times,
+                                    means,
+                                    marker=marker,
+                                    linestyle="None",
+                                    label=label_str,
+                                    markerfacecolor=style_kwargs["mfc"],
+                                )
+                            has_plotted_any = True
+
+                    ax.set_xlabel("Time (ms)", fontsize=13)
+                    ax.set_ylabel(
+                        y_label if normalize else r"Raw $\nabla$ Slope", fontsize=13
+                    )
+                    ax.set_title(f"Probe {probe}", fontsize=14)
+                    ax.legend(fontsize=10)
+
+                if not has_plotted_any:
+                    print(
+                        f"Skipping plot for {q_name} as no valid slope data was found."
+                    )
+                    plt.close(fig)
+                    continue
+
+                fig.suptitle(
+                    f"Gradient Scale Lengths vs. Time ({q_name.capitalize()})\n{combined_runs_str}",
+                    fontsize=15,
+                )
+                plt.tight_layout()
+
+                if save_plots:
+                    save_dir = ensure_directory(
+                        os.path.join(figure_folder, "gradient_slopes_vs_time", q_name)
+                    )
+                    save_path = os.path.join(
+                        save_dir,
+                        f"Gradient_slopes_{q_name}_runs_{combined_runs_str}{norm_suffix}{err_suffix}.png",
+                    )
+                    fig.savefig(save_path, dpi=300, bbox_inches="tight")
+                    print(f"Saved {q_name} figure to {save_path}")
+
+                if see_plots:
+                    show_keep_focus(fig)
+                plt.close(fig)
 
         if 'Overlapping Radial plot' in plot_choices:
             see_plots = ask_yes_or_no('See final overlapping radial plot? (y/n) ')
@@ -890,6 +1717,7 @@ if __name__ == "__main__":
                     or 'Dimensionless matches, radial plot, and spectrograms' in plots_to_make
                     or '\delta n/n vs x for multiple datasets' in plots_to_make
                     or '\delta n/n vs L_n for multiple datasets' in plots_to_make):
+                fluct_figure_folder = ensure_directory(figure_folder + 'fluctuations/')
                 quantities = ['density', 'isat', 'vf', 'dvf']
                 if len(plots_to_make) == 1 and ('\delta n/n vs x for multiple datasets' in plots_to_make or
                                                 '\delta n/n vs L_n for multiple datasets' in plots_to_make):
@@ -912,16 +1740,17 @@ if __name__ == "__main__":
                         print('time series for single x for each dataset')
                         save_plots = ask_yes_or_no('Save plots? (y/n) ')
                         see_plots = ask_yes_or_no('See plots? (y/n) ')
-                        save_full_folder = ensure_directory(figure_folder + "Time series/")
+                        save_full_folder = ensure_directory(fluct_figure_folder + "Time series/")
                         valid_runs = generate_colors_valid_ds_ri(datasets, files_to_plot, langmuir_nc_folder, mach_nc_folder,
                                                                  make_presentable = False)
+                        print('Valid runs in function : ', len(valid_runs))
 
                         select_shots = ask_yes_or_no('Look at specific shots? '
                                                      'Choosing no averages over all shots (y/n) ')
 
                         all_same_x = ask_yes_or_no("Choose xs for all datasets? "
                                                    "\n y - Choose x's once"
-                                                   "\n n - Choose x's for every dataset individually\n")
+                                                   "\n n - Choose x's for every dataset individually \n")
 
                         if select_shots:
                             all_same_shot = ask_yes_or_no("Choose shots for all datasets? "
@@ -978,8 +1807,8 @@ if __name__ == "__main__":
                                 min_time = np.min(lang_z_times)
                                 max_time = np.max(lang_z_times)
                                 time = (min_time, max_time)
-                                min_steady_state = round(lang_ds.attrs[f"steady state start probe {lang_z_idx}"])
-                                max_steady_state = round(lang_ds.attrs[f"steady state end probe {lang_z_idx}"])
+                                # min_steady_state = round(lang_ds.attrs[f"steady state start probe {lang_z_idx}"])
+                                # max_steady_state = round(lang_ds.attrs[f"steady state end probe {lang_z_idx}"])
                                 for x in x_list:
                                     for shot in shot_list:
                                         layout = [[1]]
@@ -987,22 +1816,22 @@ if __name__ == "__main__":
                                         ax = axes[letters[0]]
                                         get_time_series(fluct_ds[quantity].sel(z=z), x=x, time = time, shot=shot, z=z,
                                                         plot=True, axis = ax)
-                                        ax.axvspan(min_steady_state, max_steady_state, color='green', alpha=0.2,
-                                                   label = 'Steady State')
+                                        # ax.axvspan(min_steady_state, max_steady_state, color='green', alpha=0.2,
+                                        #            label = 'Steady State')
 
-                                        lgd = fig.legend(loc='lower center', bbox_to_anchor=(0.5, -.18), ncol=2)
+                                        # lgd = fig.legend(loc='lower center', bbox_to_anchor=(0.5, -.18), ncol=2)
 
                                         fig.canvas.draw()
-                                        legend_height_inches = lgd.get_window_extent().height / fig.dpi
+                                        # legend_height_inches = lgd.get_window_extent().height / fig.dpi
                                         standard_w, standard_h = fig.get_size_inches()
-                                        fig.set_size_inches(standard_w, standard_h + legend_height_inches)
-                                        calculated_bottom = legend_height_inches / (standard_h + legend_height_inches)
-                                        fig.subplots_adjust(bottom=calculated_bottom, wspace=0.2)
+                                        # fig.set_size_inches(standard_w, standard_h + legend_height_inches)
+                                        # calculated_bottom = legend_height_inches / (standard_h + legend_height_inches)
+                                        # fig.subplots_adjust(bottom=calculated_bottom, wspace=0.2)
 
                                         if save_plots:
                                             ri = f_run_identifier(lang_ds)
                                             run_save_folder = ensure_directory(save_full_folder + ri + f'_z_{z:.2f}/')
-                                            save_folder = ensure_directory(run_save_folder + f'{quantity}/')
+                                            save_folder = ensure_directory(run_save_folder + f'{quantity}/x_{x}')
                                             fig_save_name = f'x_{x}_shot_{shot}' if shot is not None \
                                                 else f'x_{x}_shot_ALL'
                                             plt.savefig(save_folder + fig_save_name + '.png', bbox_inches='tight')
@@ -1410,9 +2239,11 @@ if __name__ == "__main__":
                                                        null_action="not retrieve data from "
                                                                    "HDF5 files.")
             if choice_names:
+                use_updated_ds = ask_yes_or_no(
+                    '\n If it exists, use the updated Langmuir Dataset for temperatures? (y/n) ')
                 for name in tqdm(choice_names, desc="Processing data from fluctuation probes..."):
                     get_isat_vf(hdf5_folder + name, hdf5_folder, flux_nc_folder,
-                                main_luke = True)
+                                main_luke = True, use_updated_ds = use_updated_ds)
 
 
 

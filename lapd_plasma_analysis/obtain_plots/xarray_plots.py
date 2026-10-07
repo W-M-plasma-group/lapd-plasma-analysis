@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import xarray as xr
 import math
+import re
 import colorsys
 import ast
 import json
@@ -348,7 +349,7 @@ def contour_subplots(datasets, diagnostic_to_plot):
     plt.tight_layout()
     plt.show()
 
-def show_steady_state(ds, probe, run_identifier):
+def show_steady_state(ds, probe, run_identifier, figure_folder = '', see_plots = True, save_plots = False):
     """
     Purely visual function to display the currently saved steady state bounds.
 
@@ -360,6 +361,12 @@ def show_steady_state(ds, probe, run_identifier):
         Probe number in ds where the time series was saved.
     run_identifier: str
         Unique run identifier for the selected dataset
+    figure_folder: str, optional
+        Path to the folder where the figures should be saved.
+    see_plots: bool, optional
+        Whether to show the time series plots.
+    save_plots: bool, optional
+        Whether to save the time series plots.
 
     """
 
@@ -383,13 +390,66 @@ def show_steady_state(ds, probe, run_identifier):
     temp_ax.axvline(x=end, color='k', linestyle=':', linewidth=2, label='SS End')
     dens_ax.axvline(x=end, color='k', linestyle=':', linewidth=2, label='SS End')
 
-    # Update legend
-    for ax in axes:
-        handles, labels = ax.get_legend_handles_labels()
-        by_label = dict(zip(labels, handles))
-        ax.legend(by_label.values(), by_label.keys(), loc='best', fontsize=14)
+    # Clear the old legend created inside plot_time_series so they don't stack
+    fig.legends.clear()
 
-    plt.show()
+    # Gather all unique handles across both subplots (x-positions + SS Start/End)
+    handles, labels = [], []
+    for ax in axes:
+        h, l = ax.get_legend_handles_labels()
+        handles.extend(h)
+        labels.extend(l)
+    by_label = dict(zip(labels, handles))
+
+    # Place a single combined legend cleanly at the bottom
+    fig.legend(
+        by_label.values(),
+        by_label.keys(),
+        loc='lower center',
+        bbox_to_anchor=(0.5, 0.02),
+        ncol=min(len(by_label), 7),
+        fontsize=11,
+        frameon=True
+    )
+
+    # Tighten margins around title and legend
+    plt.tight_layout()
+
+    # Save figure functionality
+    if save_plots:
+        save_folder = ensure_directory(f"{figure_folder}time_series/")
+        save_path = f"{save_folder}{run_identifier}_probe_{probe}_time_series.png"
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        print(f"Saved steady state plot to: {save_path}")
+
+    # Display and clean up
+    if see_plots:
+        show_keep_focus()
+    plt.close(fig)
+
+def connect_machine_param_to_plasma_param(datasets,machine_param, plasma_param, see_plots = False, save_plots = False,
+                                          figure_folder = ''):
+    """
+
+    Parameters
+    ----------
+    datasets: list of xarray.Datasets
+        List of xarary datasets to obtain the diagnostic and machine parameter data from
+    machine_param: String
+        Name of the machine parameter to be plotted.
+    plasma_param: String
+        Name of the plasma parameter to be plotted.
+    see_plots: bool
+        Whether to see the plot in the python window
+    save_plots: bool
+        Whether to save the plot to a specific location in the figure_folder
+    figure_folder: str
+        Path to the folder where the figures should be saved.
+
+    Returns
+    -------
+    """
+
 
 
 def plot_time_series(ds, probe, run_identifier, return_range = False):
@@ -417,91 +477,91 @@ def plot_time_series(ds, probe, run_identifier, return_range = False):
         Contains all the x values used to plot the temperature and the density
     """
 
-    # Average, get the standard deviation, and filter the temperature across shots
+    # Average, calculate std, and filter temperature across shots
     mean_data = ds['t_e'].sel(probe=probe).mean('shot')
     std_data = ds['t_e'].sel(probe=probe).std('shot')
-    filtered_data = filter_data(mean_data, std_data)
 
-    min_x = int(min(filtered_data['x'].values))
-    max_x = int(max(filtered_data['x'].values))
-
-
-    # Starting from x = 0, list all values up to the maximum x value in increments of 5
-    range_up = list(range(0, max_x + 1, 5))
-
-    # Starting from x = -5 list all values from x = -5 to the minimum x value in increments of 5
-    if min_x <= - 5:
-        range_down = list(range(-5, min_x + 1, -5))
+    if 'sweep' in mean_data.dims and mean_data.sizes['sweep'] > 1:
+        filtered_data = filter_data(mean_data, std_data)
     else:
-        range_down = []
+        filtered_data = mean_data
 
-    # Combine the two up and down lists
-    range_tot = range_down + range_up
-    range_tot = sorted(range_tot)
+    min_x = int(np.floor(min(filtered_data['x'].values)))
+    max_x = int(np.ceil(max(filtered_data['x'].values)))
 
-    # Build the figure and axis objects
+    # Select x-values in increments of 5
+    range_up = list(range(0, max_x + 1, 5))
+    range_down = list(range(-5, min_x - 1, -5)) if min_x <= -5 else []
+    range_tot = sorted(range_down + range_up)
+
+    # Build figure and subplot axes
     layout = [[2]]
-    fig, ax, letters = build_subplots(layout = layout)
-    temp_letter, dens_letter = letters
-    temp_axis = ax[temp_letter]
-    dens_axis = ax[dens_letter]
+    fig, ax, letters = build_subplots(layout=layout)
+    temp_axis = ax[letters[0]]
+    dens_axis = ax[letters[1]]
 
-    # For each x in the selected x's, plot the temperature and density on their respective axes
+    # Plot time series across valid x-positions
     for x_test in range_tot:
-        test_data_t_e = filtered_data.sel(x=x_test, y=0)
-        test_data_n_e = ds['n_e'].sel(probe=probe, x=x_test, y=0).mean('shot')
+        test_data_t_e = filtered_data.sel(x=x_test, y=0, method='nearest')
+        test_data_n_e = ds['n_e'].sel(probe=probe, x=x_test, y=0, method='nearest').mean('shot')
+
         num_nan = test_data_t_e.isnull().sum().item()
         if num_nan < len(test_data_t_e) / 2:
-            test_data_t_e.plot(ax=temp_axis,
-                               x='time',
-                               marker='o',
-                               label=f'x = {x_test}',
-                               linestyle='None')
-            test_data_n_e.plot(ax=dens_axis,
-                               x='time',
-                               marker='o',
-                               label=f'x = {x_test}',
-                               linestyle='None')
+            test_data_t_e.plot(
+                ax=temp_axis,
+                x='time',
+                marker='o',
+                label=f'x = {x_test} cm',
+                linestyle='None'
+            )
+            test_data_n_e.plot(
+                ax=dens_axis,
+                x='time',
+                marker='o',
+                label=f'x = {x_test} cm',
+                linestyle='None'
+            )
 
-    # Temperature axis formatting
-    temp_axis.set_xlabel(f'Time ({ds.attrs.get("time_units")})', fontsize=28)
-    temp_axis.set_ylabel(rf'$T_{{e}}$ ({ds["t_e"].attrs.get("units", "t_e")})', fontsize=28)
-    temp_axis.set_title(f'{ds["t_e"].attrs.get("long_name", "t_e")}', fontsize=28)
-    temp_axis.tick_params(labelsize=20)
+    time_unit = ds.attrs.get("time_units", "ms")
 
-    # Density axis formatting
-    dens_axis.set_xlabel(f'Time ({ds.attrs.get("time_units")})', fontsize=28)
-    dens_axis.set_ylabel(rf'$n_{{e}}$ (${ds["n_e"].attrs.get("units", "n_e")}$)', fontsize=28)
-    dens_axis.set_title(f'{ds["n_e"].attrs.get("long_name", "n_e")}', fontsize=28)
-    dens_axis.tick_params(labelsize=24)
+    # Temperature axis formatting (Top Panel - hide x-label to prevent collision)
+    temp_axis.set_xlabel('')
+    temp_axis.set_ylabel(rf'$T_{{e}}$ ({ds["t_e"].attrs.get("units", "eV")})', fontsize=22)
+    temp_axis.set_xlabel(f'Time [{time_unit}]', fontsize=22)
+    temp_axis.set_title(f'{ds["t_e"].attrs.get("long_name", "Electron Temperature")}', fontsize=22)
+    temp_axis.tick_params(labelsize=18)
+
+    temp_axis.tick_params(labelsize=18, labelbottom=True)
+
+    # Density axis formatting (Bottom Panel - retains time x-label)
+    dens_axis.set_xlabel(f'Time [{time_unit}]', fontsize=22)
+    dens_axis.set_ylabel(rf'$n_{{e}}$ ({ds["n_e"].attrs.get("units", "m$^{-3}$")})', fontsize=22)
+    dens_axis.set_title(f'{ds["n_e"].attrs.get("long_name", "Electron Density")}', fontsize=22)
+    dens_axis.tick_params(labelsize=18)
     dens_axis.ticklabel_format(style='sci', axis='y', scilimits=(0, 0))
-    dens_axis.yaxis.get_offset_text().set_fontsize(24)
+    dens_axis.yaxis.get_offset_text().set_fontsize(18)
 
-    # Extract legend items from temp_axis (since both axes plot the same x labels)
+    # Figure Super Title
+    probe_z = ds['z'].isel(probe=probe).item() if 'z' in ds else 'N/A'
+    fig.suptitle(f"Time Series: \n {run_identifier} | Probe {probe} (z = {probe_z} m)", fontsize=24)
+
+    # Centered Bottom Legend
     handles, labels = temp_axis.get_legend_handles_labels()
+    num_cols = min(len(labels), 5) if labels else 1
 
-    # Determine columns so legend entries span horizontally across the bottom
-    num_cols = min(len(labels), 3) if labels else 1
-
-    # Place one single legend centered underneath the figure
     fig.legend(
         handles,
         labels,
         loc='lower center',
         bbox_to_anchor=(0.5, 0.01),
         ncol=num_cols,
-        fontsize=16,
-        frameon=True
+        fontsize=14,
+        frameon=True,
+        framealpha=0.8
     )
+
+    # Reserve top (for suptitle), bottom (for legend), and add vertical gap between panels
     plt.tight_layout()
-
-    # Get the z position of the probe
-    probe_z = ds['z'].isel(probe=probe).item()
-
-    # Set super title
-    fig.suptitle(f"Time Series: {run_identifier},  z: {probe_z} m", fontsize=28)
-    fig.subplots_adjust(top=0.91, bottom=0.14)
-
 
     axes = [temp_axis, dens_axis]
 
@@ -693,7 +753,34 @@ def f_run_identifier(ds = None, filename = ''):
         else:
             run_identifier = "filename not yet supported"
 
+    # --- Check for 'tanh' in filename/path ---
+    file_ref = filename if filename else ds.encoding.get('source', '')
+
+    if 'tanh' in file_ref.lower():
+        run_identifier += " (tanh)"  # Or use " | tanh" / "_tanh" as preferred
+
     return run_identifier
+
+def get_short_run_tag(ri):
+    """
+    Extracts run number from 'ri' and appends 't' if 'tanh' is present.
+    Example: 'Mar 22, 09, He+ (tanh)' -> '09t'
+             'Mar 22, 09, He+'        -> '09'
+    """
+    has_tanh = 't' if 'tanh' in ri.lower() else ''
+
+    if ',' in ri:
+        # Extract the segment after the first comma
+        run_num = ri.split(',')[1].strip()
+    else:
+        # Fallback: find digits if no comma exists
+        match = re.search(r'\d+', ri)
+        run_num = match.group(0) if match else ''
+
+    return f"{run_num}{has_tanh}"
+
+
+
 
 
 def generic_run_identifiers(lang_datasets):

@@ -158,313 +158,629 @@ def  build_isat_radial_plot(datasets, pathnames = None, figure_folder = '', see_
                 plt.close(fig_dens)
 
 
+def build_radial_plot(
+    datasets,
+    pathnames="",
+    figure_folder="",
+    make_presentable=False,
+    see_temp_and_dens_plots=False,
+    lines=False,
+    shaded=False,
+    plot_final_fits=False,
+    save_plots=False,
+    clor=None,
+    mark=None,
+    from_main=False,
+    one_probe=True,
+    axes=None,
+    dens_bottomx=True,
+    temp_bottomx=False,
+    press_bottomx=False,
+    run_identifiers="",
+    hdf5_folder=None,
+    updated_nc_folder=None,
+    time=None,
+    core_width=False,
+    by_shot=False,
+    redo_grad_regions=None,
+):
+    # print('Building radial plots...')
 
+    # 1. Standard base strings from dataset configuration (returns 6 values)
+    (
+        base_dens_reg,
+        base_dens_slp,
+        base_dens_int,
+        base_temp_reg,
+        base_temp_slp,
+        base_temp_int,
+    ) = xarray_gradient_strings()
 
-def build_radial_plot(datasets, pathnames ='',
-                      figure_folder = '',
-                      make_presentable = False, see_temp_and_dens_plots = False, lines = False, shaded = False,
-                      plot_final_fits = False, save_plots = False, clor = None, mark = None,
-                      from_main = False, one_probe = True, axes = None, dens_bottomx = True, temp_bottomx = False,
-                      run_identifiers = "", hdf5_folder = None, updated_nc_folder = None):
-    print('Building radial plots...')
+    # Define base strings for pressure directly
+    base_press_reg = base_dens_reg.replace("dens", "press")
+    base_press_slp = base_dens_slp.replace("dens", "press")
+    base_press_int = base_dens_int.replace("dens", "press")
 
-    dens_regions_str, dens_slopes_str, dens_intercepts_str, temp_regions_str, temp_slopes_str, temp_intercepts_str = (
-        xarray_gradient_strings())
-
-    c_temp = '#999999'  # Light Gray
-    c_dens = '#56B4E9'  # Okabe-Ito Sky Blue
-    c_opp = '#009E73'  # Okabe-Ito Bluish Green
-    c_same = '#F0E442'  # Okabe-Ito Yellow
+    c_temp = "#999999"  # Light Gray
+    c_dens = "#56B4E9"  # Okabe-Ito Sky Blue
+    c_opp = "#009E73"  # Okabe-Ito Bluish Green
+    c_same = "#F0E442"  # Okabe-Ito Yellow
     gradient_regions_colors = {
-    'c_temp' : '#999999',  # Light Gray
-    'c_dens' : '#56B4E9',  # Okabe-Ito Sky Blue
-    'c_opp' : '#009E73',  # Okabe-Ito Bluish Green
-    'c_same' : '#F0E442',
+        "c_temp": c_temp,
+        "c_dens": c_dens,
+        "c_opp": c_opp,
+        "c_same": c_same,
     }
     default_fig_height, default_fig_width = default_fig_params()
 
     if make_presentable:
         plt.rcParams.update({
-            'figure.facecolor': 'none',
-            'axes.facecolor': 'none',
-            'savefig.transparent': True
+            "figure.facecolor": "none",
+            "axes.facecolor": "none",
+            "savefig.transparent": True,
         })
 
     if clor is None:
         clor, mark = determine_colors(datasets)
 
-    i = 0
-    if len(datasets) == 1:
-        gradient_regions_dict = {}
+    gradient_regions_dict = {}
 
     for j, dataset in enumerate(datasets):
-        pathname = pathnames[j]
-
-        if (dens_regions_str not in dataset.attrs or
-                temp_regions_str not in dataset.attrs):
-            redo_grad_regions = ask_yes_or_no('Determine gradient regions? (y/n) ')
-        else:
-            if from_main:
-                redo_grad_regions = ask_yes_or_no('Redo determination of gradient regions? (y/n) ')
-            else:
-                redo_grad_regions = False
-
+        print('ds: ', j)
+        ds_grad_dict = {}
+        pathname = (
+            pathnames[j] if isinstance(pathnames, (list, tuple)) else pathnames
+        )
         run_identifier = f_run_identifier(dataset)
-        if one_probe:
-            probes = [0]
-        else:
-            probes = [probe for probe in dataset.coords['probe'].values]
 
-        for probe in probes:
-            if axes is None:
-                # Subplots oriented as 1 plot on top of the other
-                layout = [[1],
-                          [1]]
-                fig, ax, letters = build_subplots(layout, 1.2 * default_fig_width, 1.2 * default_fig_height,
-                                                  sharex=True)
-                temperature_ax = ax[letters[0]]
-                density_ax = ax[letters[1]]
+        # 1. Determine active probes
+        probes = (
+            [0]
+            if one_probe
+            else [int(p) for p in dataset.coords["probe"].values]
+        )
+
+        # 2. Determine time vector
+        if core_width:
+            if time is not None:
+                time_vals = np.atleast_1d(time)
+            elif "time" in dataset.coords:
+                time_vals = dataset.coords["time"].values
             else:
-                temperature_ax = axes[0]
-                density_ax = axes[1]
+                time_vals = [None]
 
+            if redo_grad_regions is None:
+                check_all = ask_yes_or_no(
+                    f"Check/redo gradient regions across all probes/times for"
+                    f" Dataset {j}? (y/n) "
+                )
+            else:
+                check_all = redo_grad_regions
+        else:
+            time_vals = [time]
+            check_all = False
 
-            create_temperature_radial_plots(dataset, probe, run_identifier=run_identifier,
-                                            see_plots=True,
-                                            axes=temperature_ax, dataset_clor=clor[i], dataset_mark=mark[i],
-                                            make_presentable=make_presentable, sharex=True, bottomx = temp_bottomx,
-                                            redo_grad_regions=redo_grad_regions, gradient_regions= lines,
-                                            regions_str=temp_regions_str, slopes_str=temp_slopes_str,
-                                            intercepts_str=temp_intercepts_str, ds_save_path=pathname,
-                                            plot_final_fit = plot_final_fits, hdf5_folder = hdf5_folder,
-                                            figure_folder = figure_folder, save_plots = save_plots,
-                                            updated_nc_folder = updated_nc_folder)
+        # 3. Determine shot vector if by_shot is True
+        has_shot_dim = ("shot" in dataset.coords) or ("shot" in dataset.dims)
+        shot_vals = (
+            dataset.coords["shot"].values
+            if (by_shot and has_shot_dim)
+            else [None]
+        )
 
-            create_density_radial_plots(dataset, probe, run_identifier=run_identifier,
-                                            see_plots=True,
-                                            axes=density_ax, dataset_clor=clor[i], dataset_mark=mark[i],
-                                            make_presentable=make_presentable, sharex=True, bottomx = dens_bottomx,
-                                            redo_grad_regions=redo_grad_regions, gradient_regions= lines,
-                                            regions_str=dens_regions_str, slopes_str=dens_slopes_str,
-                                            intercepts_str=dens_intercepts_str, ds_save_path=pathname,
-                                            plot_final_fit = plot_final_fits, hdf5_folder = hdf5_folder,
-                                            figure_folder = figure_folder, save_plots = save_plots,
-                                            updated_nc_folder = updated_nc_folder)
+        # 4. Iterate over Probes
+        for probe in probes:
+            if probe not in ds_grad_dict:
+                ds_grad_dict[probe] = {}
 
+            # 5. Iterate over Time Steps
+            for t_val in time_vals:
+                if core_width and by_shot and has_shot_dim:
+                    if t_val not in ds_grad_dict[probe]:
+                        ds_grad_dict[probe][t_val] = {}
 
-            if dens_regions_str in dataset.attrs and temp_regions_str in dataset.attrs:
-                if shaded:
-                    if len(datasets) == 1:
-                        gradient_regions_dict[probe] = {}
-                    # Obtain the locations of the edges and slopes from the dataset
-                    x_vals = dataset.coords['x'].values
-                    temp_load_regions = json.loads(dataset.attrs[temp_regions_str])
-                    temp_regions = [tuple(edge) for edge in temp_load_regions]
-                    temp_slopes = dataset.attrs[temp_slopes_str]
-                    dens_load_regions = json.loads(dataset.attrs[dens_regions_str])
-                    dens_regions = [tuple(edge) for edge in dens_load_regions]
-                    dens_slopes = dataset.attrs[dens_slopes_str]
-
-                    grad_T = np.zeros_like(x_vals)
-                    grad_N = np.zeros_like(x_vals)
-
-                    # Assign the slope to each point in the region (slope does not exist if there is no defined
-                    # region there
-                    for (start, stop), slope in zip(temp_regions, temp_slopes):
-                        grad_T[(x_vals >= start) & (x_vals <= stop)] = slope
-
-                    for (start, stop), slope in zip(dens_regions, dens_slopes):
-                        grad_N[(x_vals >= start) & (x_vals <= stop)] = slope
-
-                    # print('grad T', grad_T)
-                    # The edge of the core happens at |x| >= 15. BUT, if a gradient exists, we want to capture
-                    # it even if it extends inwards past 15.
-                    spatial_mask = (np.abs(x_vals) >= 15) | (grad_T != 0) | (grad_N != 0)
-
-                    # Temp gradient only
-                    mask_T_only = (grad_T != 0) & (grad_N == 0) & spatial_mask
-
-                    # Dens gradient only
-                    mask_N_only = (grad_T == 0) & (grad_N != 0) & spatial_mask
-
-                    # Same Sign (Both exist, multiplying them yields a positive number)
-                    mask_same = (grad_T * grad_N > 0) & spatial_mask
-
-                    # Opposite Sign (Both exist, multiplying them yields a negative number)
-                    mask_opp = (grad_T * grad_N < 0) & spatial_mask
-
-                    # Neither exists, but we are outside |15|
-                    mask_flat = (grad_T == 0) & (grad_N == 0) & spatial_mask
-
-                    # Convert masks back to tuples for plotting
-                    def extract_intervals(mask, min_width=0.5):
-                        """Finds continuous blocks of True in a mask and returns (start, stop) x-coords."""
-                        # Pad the mask so we can detect edges if a region goes all the way to the end of the array
-                        padded = np.pad(mask, (1, 1), mode='constant', constant_values=False)
-                        diffs = np.diff(padded.astype(int))
-                        starts = np.where(diffs == 1)[0]
-                        stops = np.where(diffs == -1)[0] - 1
-
-                        raw_intervals = [(x_vals[s], x_vals[e]) for s, e in zip(starts, stops)]
-
-                        # Filter out microscopic noise regions (e.g., anything narrower than 1.5 cm)
-                        clean_intervals = [(start, stop) for start, stop in raw_intervals if
-                                           abs(stop - start) >= min_width]
-
-                        return clean_intervals
-
-                    # Create non-overlapping lists of tuples
-                    regions_T_only = extract_intervals(mask_T_only)
-                    regions_N_only = extract_intervals(mask_N_only)
-                    regions_same = extract_intervals(mask_same)
-                    regions_opp = extract_intervals(mask_opp)
-                    regions_flat = extract_intervals(mask_flat)
-
-                    if len(datasets) == 1:
-                        gradient_regions_dict[probe]['temp_grads'] = regions_T_only
-                        gradient_regions_dict[probe]['density_grads'] = regions_N_only
-                        gradient_regions_dict[probe]['dt_same'] = regions_same
-                        gradient_regions_dict[probe]['dt_opposite'] = regions_opp
-                        gradient_regions_dict[probe]['flat'] = regions_flat
-                        gradient_regions_dict[probe]['full_temp_grads'] = temp_regions
-                        gradient_regions_dict[probe]['full_density_grads'] = dens_regions
-
-                    # Plot the regions
-                    alpha_val = 0.3
-                    legend_handles = []
-
-                    i = 0
-                    t_grads_handle = mpatches.Patch(
-                        facecolor=c_temp,
-                        alpha=alpha_val,
-                        label=r'$\nabla T \neq 0, \nabla n \approx 0$'
+                # 6. Iterate over Shots
+                for s_val in shot_vals:
+                    ds_curr = (
+                        dataset.sel(shot=s_val)
+                        if s_val is not None
+                        else dataset
                     )
-                    legend_handles.append(t_grads_handle)
-                    for start, stop in regions_T_only:
-                        # t_grads_handle = mpatches.Patch(
-                        #     facecolor=c_temp,
-                        #     alpha=alpha_val,
-                        #     label=r'$\nabla T \neq 0, \nabla n \approx 0$'
-                        # )
-                        # if i == 0:
-                        #     legend_handles.append(t_grads_handle)
-                        temperature_ax.axvspan(start, stop, facecolor=c_temp, alpha=alpha_val)
-                        density_ax.axvspan(start, stop, facecolor=c_temp, alpha=alpha_val)
-                        i += 1
 
-                    i = 0
-                    n_grads_handle = mpatches.Patch(
-                        facecolor=c_dens,
-                        alpha=alpha_val,
-                        label=r'$\nabla T \approx 0, \nabla n \neq 0$'
+                    t_suffix = (
+                        f"_t_{t_val}"
+                        if (core_width and t_val is not None)
+                        else ""
                     )
-                    legend_handles.append(n_grads_handle)
+                    s_suffix = f"_shot_{s_val}" if s_val is not None else ""
+                    full_suffix = f"{t_suffix}{s_suffix}"
 
-                    for start, stop in regions_N_only:
-                        # n_grads_handle = mpatches.Patch(
-                        #     facecolor=c_dens,
-                        #     alpha=alpha_val,
-                        #     label=r'$\nabla T \approx 0, \nabla n \neq 0$'
-                        # )
-                        # if i == 0:
-                        #     legend_handles.append(n_grads_handle)
-                        temperature_ax.axvspan(start, stop, facecolor=c_dens, alpha=alpha_val)
-                        density_ax.axvspan(start, stop, facecolor=c_dens, alpha=alpha_val)
-                        i += 1
+                    p_temp_reg = f"probe_{probe}_{base_temp_reg}{full_suffix}"
+                    p_temp_slp = f"probe_{probe}_{base_temp_slp}{full_suffix}"
+                    p_temp_int = f"probe_{probe}_{base_temp_int}{full_suffix}"
 
-                    i = 0
+                    p_dens_reg = f"probe_{probe}_{base_dens_reg}{full_suffix}"
+                    p_dens_slp = f"probe_{probe}_{base_dens_slp}{full_suffix}"
+                    p_dens_int = f"probe_{probe}_{base_dens_int}{full_suffix}"
 
-                    same_grads_handle = mpatches.Patch(
-                        facecolor=c_same,
-                        alpha=alpha_val,
-                        label=r'$\frac{\nabla n}{\nabla T} > 0$'
+                    p_press_reg = f"probe_{probe}_{base_press_reg}{full_suffix}"
+                    p_press_slp = f"probe_{probe}_{base_press_slp}{full_suffix}"
+                    p_press_int = f"probe_{probe}_{base_press_int}{full_suffix}"
+
+                    # Check saved locations for temp and dens to prevent unnecessary interactive prompts
+                    has_saved_location = (p_temp_reg in ds_curr.attrs) and (
+                        p_dens_reg in ds_curr.attrs
                     )
-                    legend_handles.append(same_grads_handle)
-                    for start, stop in regions_same:
-                        # same_grads_handle = mpatches.Patch(
-                        #     facecolor=c_same,
-                        #     alpha=alpha_val,
-                        #     label=r'$\frac{\nabla n}{\nabla T} > 0$'
-                        # )
-                        # if i == 0:
-                        #     legend_handles.append(same_grads_handle)
-                        temperature_ax.axvspan(start, stop, facecolor=c_same, alpha=alpha_val)
-                        density_ax.axvspan(start, stop, facecolor=c_same, alpha=alpha_val)
-                        i += 1
 
-                    i = 0
-                    diff_grads_handle = mpatches.Patch(
-                        facecolor=c_opp,
-                        alpha=alpha_val,
-                        label=r'$\frac{\nabla n}{\nabla T} < 0$'
-                    )
-                    legend_handles.append(diff_grads_handle)
-                    for start, stop in regions_opp:
-                        # diff_grads_handle = mpatches.Patch(
-                        #     facecolor=c_opp,
-                        #     alpha=alpha_val,
-                        #     label=r'$\frac{\nabla n}{\nabla T} < 0$'
-                        # )
-                        # if i == 0:
-                        #     legend_handles.append(diff_grads_handle)
-                        temperature_ax.axvspan(start, stop, facecolor=c_opp, alpha=alpha_val)
-                        density_ax.axvspan(start, stop, facecolor=c_opp, alpha=alpha_val)
-                        i += 1
-                    #     axes.axvspan(start, stop, facecolor='grey', alpha=0.1)
-
-                    if not make_presentable:
-                        density_ax.legend(
-                            handles=legend_handles,
-                            loc='upper center',  # The top-center of the legend box...
-                            bbox_to_anchor=(0.5, -0.2),  # ...is anchored at x=0.5 (center), y=-0.2 (below the plot)
-                            ncol=2,  # Spread the 4 items horizontally instead of stacking them
-                            framealpha=0.8,
-                            fontsize = 24
+                    if core_width:
+                        redo_grad_regions = (
+                            check_all if check_all else not has_saved_location
                         )
                     else:
-                        print('No Legend')
-                        # if len(datasets) == 1:
-                        #     dataset_handle = mlines.Line2D(
-                        #         [], [],
-                        #         color=clor[0],
-                        #         marker=mark[0],
-                        #         linestyle='None',
-                        #         markersize=10,
-                        #         label=f'{run_identifiers}')
-                        #     legend_handles.append(dataset_handle)
-                        # temperature_ax.legend(handles=legend_handles,
-                        #     loc='upper center',  # The top-center of the legend box...
-                        #     bbox_to_anchor=(0.5, 1.30),  # ...is anchored at x=0.5 (center), y=-0.2 (below the plot)
-                        #     ncol=2,  # Spread the 4 items horizontally instead of stacking them
-                        #     framealpha=0.8,
-                        #     fontsize = 24)
+                        if not has_saved_location:
+                            redo_grad_regions = ask_yes_or_no(
+                                f"Determine gradient regions for Dataset {j},"
+                                f" Probe {probe}? (y/n) "
+                            )
+                        else:
+                            redo_grad_regions = (
+                                ask_yes_or_no(
+                                    f"Redo gradient regions for Dataset {j},"
+                                    f" Probe {probe}? (y/n) "
+                                )
+                                if from_main
+                                else False
+                            )
 
-            plt.tight_layout()
-            if save_plots:
-                save_folder = ensure_directory(figure_folder + 'gradient_regions/')
-                run_str = pathname.split('/')[-1]
-                plot_name = run_str.split('_')[0] + '_' + run_str.split('_')[1]
-                if not shaded and not lines:
-                    plot_name += f'_probe{probe}_bare.svg'
-                elif shaded and not lines:
-                    plot_name += f'_probe{probe}_shaded.svg'
-                elif not shaded and lines:
-                    plot_name += f'_probe{probe}_lines.svg'
-                plt.savefig(save_folder + plot_name)
-                print(f'Figure saved to: {save_folder + plot_name}')
+                    # Setup Subplots independently for each dataset if axes is None
+                    if not core_width:
+                        if axes is None:
+                            layout = [[1], [1], [1]]  # 3 rows for Te, Ne, Pe
+                            fig, ax, letters = build_subplots(
+                                layout,
+                                1.2 * default_fig_width,
+                                1.2 * default_fig_height,
+                                sharex=True,
+                            )
+                            temperature_ax = ax[letters[0]]
+                            density_ax = ax[letters[1]]
+                            pressure_ax = ax[letters[2]]
+                        else:
+                            temperature_ax = axes[0]
+                            density_ax = axes[1]
+                            pressure_ax = axes[2]
+                    else:
+                        density_ax = None
+                        temperature_ax = None
+                        pressure_ax = None
 
-            if axes is None:
-                if see_temp_and_dens_plots:
-                    plt.show()
-                    plt.close()
+                    # Temperature
+                    te_edges, te_slopes, te_intercepts = (
+                        create_temperature_radial_plots(
+                            ds_curr,
+                            probe,
+                            run_identifier=run_identifier,
+                            see_plots=False,
+                            axes=temperature_ax,
+                            dataset_clor=clor[j],
+                            dataset_mark=mark[j],
+                            make_presentable=make_presentable,
+                            sharex=True,
+                            bottomx=temp_bottomx,
+                            redo_grad_regions=redo_grad_regions,
+                            gradient_regions=lines,
+                            check_all=check_all,
+                            min_points=3,
+                            regions_str=p_temp_reg,
+                            slopes_str=p_temp_slp,
+                            intercepts_str=p_temp_int,
+                            ds_save_path=pathname,
+                            plot_final_fit=plot_final_fits,
+                            hdf5_folder=hdf5_folder,
+                            figure_folder=figure_folder,
+                            save_plots=save_plots,
+                            updated_nc_folder=updated_nc_folder,
+                            time=t_val,
+                            core_width=core_width,
+                        )
+                    )
+
+                    # Density
+                    ne_edges, ne_slopes, ne_intercepts = (
+                        create_density_radial_plots(
+                            ds_curr,
+                            probe,
+                            run_identifier=run_identifier,
+                            see_plots=False,
+                            axes=density_ax,
+                            dataset_clor=clor[j],
+                            dataset_mark=mark[j],
+                            make_presentable=make_presentable,
+                            sharex=True,
+                            bottomx=dens_bottomx,
+                            redo_grad_regions=redo_grad_regions,
+                            gradient_regions=lines,
+                            check_all=check_all,
+                            min_points=3,
+                            regions_str=p_dens_reg,
+                            slopes_str=p_dens_slp,
+                            intercepts_str=p_dens_int,
+                            ds_save_path=pathname,
+                            plot_final_fit=plot_final_fits,
+                            hdf5_folder=hdf5_folder,
+                            figure_folder=figure_folder,
+                            save_plots=save_plots,
+                            updated_nc_folder=updated_nc_folder,
+                            time=t_val,
+                        )
+                    )
+
+                    # Pressure
+                    pe_edges, pe_slopes, pe_intercepts = (
+                        create_pressure_radial_plots(
+                            ds_curr,
+                            probe,
+                            run_identifier=run_identifier,
+                            see_plots=False,
+                            axes=pressure_ax,
+                            dataset_clor=clor[j],
+                            dataset_mark=mark[j],
+                            make_presentable=make_presentable,
+                            sharex=True,
+                            bottomx=press_bottomx,
+                            redo_grad_regions=redo_grad_regions,
+                            gradient_regions=lines,
+                            check_all=check_all,
+                            min_points=3,
+                            regions_str=p_press_reg,
+                            slopes_str=p_press_slp,
+                            intercepts_str=p_press_int,
+                            ds_save_path=pathname,
+                            plot_final_fit=plot_final_fits,
+                            hdf5_folder=hdf5_folder,
+                            figure_folder=figure_folder,
+                            save_plots=save_plots,
+                            updated_nc_folder=updated_nc_folder,
+                            time=t_val,
+                        )
+                    )
+
+                    # Mirror attributes back to primary dataset
+                    if p_temp_reg in ds_curr.attrs:
+                        dataset.attrs[p_temp_reg] = ds_curr.attrs[p_temp_reg]
+                    if p_dens_reg in ds_curr.attrs:
+                        dataset.attrs[p_dens_reg] = ds_curr.attrs[p_dens_reg]
+                    if p_press_reg in ds_curr.attrs:
+                        dataset.attrs[p_press_reg] = ds_curr.attrs[p_press_reg]
+
+                    # 7. Extract Gradient Regions
+                    temp_reg_val = ds_curr.attrs.get(
+                        p_temp_reg, dataset.attrs.get(p_temp_reg, None)
+                    )
+                    dens_reg_val = ds_curr.attrs.get(
+                        p_dens_reg, dataset.attrs.get(p_dens_reg, None)
+                    )
+                    press_reg_val = ds_curr.attrs.get(
+                        p_press_reg, dataset.attrs.get(p_press_reg, None)
+                    )
+
+                    if temp_reg_val is not None or dens_reg_val is not None:
+                        x_vals = dataset.coords["x"].values
+
+                        def parse_regions(val):
+                            if val is None:
+                                return []
+                            if isinstance(val, str):
+                                try:
+                                    val = json.loads(val)
+                                except Exception:
+                                    return []
+                            return [tuple(edge) for edge in val]
+
+                        temp_regions = parse_regions(temp_reg_val)
+                        dens_regions = parse_regions(dens_reg_val)
+                        press_regions = parse_regions(press_reg_val)
+
+                        temp_slopes = ds_curr.attrs.get(
+                            p_temp_slp, dataset.attrs.get(p_temp_slp, [])
+                        )
+                        if isinstance(temp_slopes, str):
+                            temp_slopes = json.loads(temp_slopes)
+
+                        dens_slopes = ds_curr.attrs.get(
+                            p_dens_slp, dataset.attrs.get(p_dens_slp, [])
+                        )
+                        if isinstance(dens_slopes, str):
+                            dens_slopes = json.loads(dens_slopes)
+
+                        grad_T = np.zeros_like(x_vals, dtype=float)
+                        grad_N = np.zeros_like(x_vals, dtype=float)
+
+                        for (start, stop), slope in zip(
+                            temp_regions, temp_slopes
+                        ):
+                            grad_T[(x_vals >= start) & (x_vals <= stop)] = slope
+
+                        for (start, stop), slope in zip(
+                            dens_regions, dens_slopes
+                        ):
+                            grad_N[(x_vals >= start) & (x_vals <= stop)] = slope
+
+                        spatial_mask = (
+                            (np.abs(x_vals) >= 15)
+                            | (grad_T != 0)
+                            | (grad_N != 0)
+                        )
+                        mask_T_only = (
+                            (grad_T != 0) & (grad_N == 0) & spatial_mask
+                        )
+                        mask_N_only = (
+                            (grad_T == 0) & (grad_N != 0) & spatial_mask
+                        )
+                        mask_same = (grad_T * grad_N > 0) & spatial_mask
+                        mask_opp = (grad_T * grad_N < 0) & spatial_mask
+                        mask_flat = (grad_T == 0) & (grad_N == 0) & spatial_mask
+
+                        def extract_intervals(mask, min_width=0.5):
+                            padded = np.pad(
+                                mask,
+                                (1, 1),
+                                mode="constant",
+                                constant_values=False,
+                            )
+                            diffs = np.diff(padded.astype(int))
+                            starts = np.where(diffs == 1)[0]
+                            stops = np.where(diffs == -1)[0] - 1
+                            raw_intervals = [
+                                (x_vals[s], x_vals[e])
+                                for s, e in zip(starts, stops)
+                            ]
+                            return [
+                                (start, stop)
+                                for start, stop in raw_intervals
+                                if abs(stop - start) >= min_width
+                            ]
+
+                        t_grads_dict = {
+                            "temp_grads": extract_intervals(mask_T_only),
+                            "density_grads": extract_intervals(mask_N_only),
+                            "dt_same": extract_intervals(mask_same),
+                            "dt_opposite": extract_intervals(mask_opp),
+                            "flat": extract_intervals(mask_flat),
+                            "full_temp_grads": temp_regions,
+                            "full_density_grads": dens_regions,
+                            "full_pressure_grads": press_regions,
+                        }
+
+                        if core_width:
+                            if by_shot and has_shot_dim and s_val is not None:
+                                if t_val not in ds_grad_dict[probe]:
+                                    ds_grad_dict[probe][t_val] = {}
+                                ds_grad_dict[probe][t_val][s_val] = t_grads_dict
+                            else:
+                                ds_grad_dict[probe][t_val] = t_grads_dict
+                        else:
+                            ds_grad_dict[probe] = t_grads_dict
+
+                    # Render & Display/Save Individual Plots
+                    if core_width:
+                        if axes is None:
+                            plt.close()
+
+        # Store output dict cleanly per dataset index
+        if len(datasets) == 1:
+            gradient_regions_dict = ds_grad_dict
+        else:
+            gradient_regions_dict[j] = ds_grad_dict
+
+    return gradient_regions_colors, gradient_regions_dict
+
+def plot_slope_vs_time(
+    ds,
+    probe=0,
+    var_name="n_e",
+    slopes_base_str="probe_0_dens_grad_slopes",
+    color="blue",
+    mark="s",
+    ax=None,
+    label=None,
+    normalize=False,
+    show_err=True,
+    add_legend=None,  # Auto-detects based on ax
+    set_labels=None,  # Auto-detects based on ax
+):
+    """Searches ds.attrs for time-tagged slope keys, parses timestamps, and
+
+    plots slope regions over time.
+    """
+    # Track whether the caller provided an existing axis
+    ax_provided = ax is not None
+
+    # Default to False if ax was passed in, True if creating a new axis
+    if set_labels is None:
+        set_labels = not ax_provided
+    if add_legend is None:
+        add_legend = not ax_provided
+
+    time_data = {}
+
+    # --- 1. Search ds.attrs for matching key patterns ---
+    for key, value in ds.attrs.items():
+        if slopes_base_str in key and "_t_" in key and "_shots" not in key:
+            try:
+                t_str = key.split("_t_")[-1]
+                t_val = float(t_str)
+            except (ValueError, TypeError):
+                continue
+
+            slopes_list = _parse_attr_list(value)
+            if len(slopes_list) == 0:
+                continue
+
+            regions_key = key.replace("_slopes", "_regions")
+            intercepts_key = key.replace("_slopes", "_intercepts")
+            shot_slopes_key = key.replace("_slopes", "_slopes_shots")
+            shot_intercepts_key = key.replace("_slopes", "_intercepts_shots")
+
+            regions_list = _parse_attr_list(ds.attrs.get(regions_key))
+            intercepts_list = _parse_attr_list(ds.attrs.get(intercepts_key))
+            shot_slopes = _parse_attr_list(ds.attrs.get(shot_slopes_key))
+            shot_intercepts = _parse_attr_list(
+                ds.attrs.get(shot_intercepts_key)
+            )
+
+            # --- A. Process Ensemble Mean ---
+            mean_vals = []
+            for i, m in enumerate(slopes_list):
+                if (
+                    normalize
+                    and i < len(regions_list)
+                    and i < len(intercepts_list)
+                ):
+                    start_x, stop_x = regions_list[i]
+                    b = intercepts_list[i]
+                    x_mid = (start_x + stop_x) / 2.0
+                    y_local = m * x_mid + b
+
+                    if y_local > 0 and not np.isnan(y_local):
+                        mean_vals.append(m / y_local)
+                    else:
+                        mean_vals.append(np.nan)
                 else:
-                    plt.close()
-        i += 1
-    if len(datasets) == 1:
-        return gradient_regions_colors, gradient_regions_dict
-    else:
-        return None, None, None
+                    mean_vals.append(m)
 
+            # --- B. Process Individual Shots ---
+            processed_shots = []
+            if shot_slopes and isinstance(shot_slopes, list):
+                for s_idx, s_m_list in enumerate(shot_slopes):
+                    s_intercepts_list = (
+                        shot_intercepts[s_idx]
+                        if (shot_intercepts and s_idx < len(shot_intercepts))
+                        else []
+                    )
+                    s_vals = []
+                    for i, m_s in enumerate(s_m_list):
+                        if (
+                            normalize
+                            and i < len(regions_list)
+                            and i < len(s_intercepts_list)
+                        ):
+                            start_x, stop_x = regions_list[i]
+                            b_s = s_intercepts_list[i]
+                            x_mid = (start_x + stop_x) / 2.0
+                            y_local_s = m_s * x_mid + b_s
+
+                            if y_local_s > 0 and not np.isnan(y_local_s):
+                                s_vals.append(m_s / y_local_s)
+                            else:
+                                s_vals.append(np.nan)
+                        else:
+                            s_vals.append(m_s)
+                    processed_shots.append(s_vals)
+
+            time_data[t_val] = {
+                "mean_vals": mean_vals,
+                "shot_vals": processed_shots,
+            }
+
+    if not time_data:
+        print(f"No valid slope attributes found for pattern '{slopes_base_str}'")
+        return ax
+
+    sorted_times = sorted(time_data.keys())
+    max_regions = max(
+        len(time_data[t]["mean_vals"])
+        for t in sorted_times
+        if time_data[t]["mean_vals"]
+    )
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(8, 5))
+
+    # --- 2. Region-by-Region Aggregation & Plotting ---
+    for reg_idx in range(max_regions):
+        times_plot, y_plot, err_plot = [], [], []
+
+        for t_val in sorted_times:
+            entry = time_data[t_val]
+            mean_vals = entry["mean_vals"]
+            shot_vals = entry["shot_vals"]
+
+            if show_err and shot_vals and len(shot_vals) > 0:
+                reg_shot_values = [
+                    shot[reg_idx]
+                    for shot in shot_vals
+                    if len(shot) > reg_idx and not np.isnan(shot[reg_idx])
+                ]
+
+                if len(reg_shot_values) > 0:
+                    y_val = np.mean(reg_shot_values)
+                    y_err = (
+                        np.std(reg_shot_values, ddof=1)
+                        / np.sqrt(len(reg_shot_values))
+                        if len(reg_shot_values) > 1
+                        else 0.0
+                    )
+                else:
+                    y_val = (
+                        mean_vals[reg_idx]
+                        if reg_idx < len(mean_vals)
+                        else np.nan
+                    )
+                    y_err = 0.0
+
+                if not np.isnan(y_val):
+                    times_plot.append(t_val)
+                    y_plot.append(y_val)
+                    err_plot.append(y_err)
+
+            else:
+                y_val = (
+                    mean_vals[reg_idx] if reg_idx < len(mean_vals) else np.nan
+                )
+                if not np.isnan(y_val):
+                    times_plot.append(t_val)
+                    y_plot.append(y_val)
+
+        reg_lbl = (
+            f"{label} (Reg {reg_idx + 1})"
+            if label
+            else f"Region {reg_idx + 1}"
+        )
+
+        if show_err and len(err_plot) == len(y_plot) and len(err_plot) > 0:
+            ax.errorbar(
+                times_plot,
+                y_plot,
+                yerr=err_plot,
+                fmt=mark,
+                color=color,
+                capsize=4,
+                label=reg_lbl,
+            )
+        else:
+            ax.plot(
+                times_plot,
+                y_plot,
+                marker=mark,
+                color=color,
+                linestyle="-",
+                label=reg_lbl,
+            )
+
+    # --- 3. Conditional Axis Formatting ---
+    if set_labels:
+        ax.set_xlabel("Time [ms]")
+        if normalize:
+            ax.set_ylabel(r"Inverse Scale Length $L^{-1}$ [cm$^{-1}$]")
+        else:
+            ax.set_ylabel("Gradient Slope")
+        ax.grid(True, linestyle=":", alpha=0.6)
+
+    if add_legend:
+        ax.legend()
+
+    return ax
 
 def plot_ion_sat_curr_vs_time(datasets, figure_folder):
     figure_folder = ensure_directory(figure_folder + 'isat_figures/')

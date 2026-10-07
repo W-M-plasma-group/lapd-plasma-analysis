@@ -3,8 +3,11 @@ Provide functions to access files, to load NetCDF files, and to allow user selec
 """
 
 import os
+import sys
 import warnings
+import subprocess
 import xarray as xr
+import matplotlib.pyplot as plt
 
 
 def choose_multiple_from_list(choices, name, null_action=None):
@@ -58,8 +61,14 @@ def choose_multiple_from_list(choices, name, null_action=None):
 
     return [chr_to_num(letter) for letter in selection_str]
 
+
 def int_choose_multiple_from_list(
-    choices, name, null_action=None, return_idxs=False, lim_length=None
+    choices,
+    name,
+    null_action=None,
+    return_idxs=False,
+    lim_length=None,
+    allow_repeats=False,
 ):
   prompt = (
       "Input a list of integers corresponding to "
@@ -82,7 +91,7 @@ def int_choose_multiple_from_list(
   while not proper_input:
     bad_selections = 0
 
-    if loop_i > 0:
+    if loop_i > 0 and selected_options_idxs != []:
       print(
           *["  " + str(i) + ": " + str(choices[i]) for i in range(len(choices))],
           sep="\n",
@@ -111,6 +120,7 @@ def int_choose_multiple_from_list(
                   " removed."
               )
             else:
+              # Removes the first occurrence of the selected index
               selected_options_idxs.remove(idx)
           except ValueError:
             print(
@@ -152,7 +162,7 @@ def int_choose_multiple_from_list(
         if len(selections) > lim_length:
           print(
               "\n Too many options selected, you are restricted to"
-              f" {lim_length} selectons"
+              f" {lim_length} selections"
           )
 
       for selection in selections:
@@ -167,8 +177,14 @@ def int_choose_multiple_from_list(
             )
             bad_selections += 1
           else:
-            if i_selection not in selected_options_idxs:
+            # Check repeat permission
+            if allow_repeats or i_selection not in selected_options_idxs:
               selected_options_idxs.append(i_selection)
+            else:
+              print(
+                  f"\n Selection '{selection}' is already in your choices and"
+                  " duplicates are disabled."
+              )
 
         except ValueError:
           print(f"\n {selection} is not a valid integer")
@@ -489,3 +505,45 @@ def get_hdf5_filename(exp_name, run_number, file_list):
     # Fallback if the file is genuinely missing
     print(f"Warning: Could not find a matching file for {exp_name} run {run_number}.")
     return None
+
+
+def show_keep_focus(fig=None):
+    """
+    Displays active Matplotlib plot(s) while returning focus to the terminal.
+
+    Parameters
+    ----------
+    fig : matplotlib.figure.Figure, list of Figures, or None, optional
+        Specific figure or sequence of figures to display. If None, displays
+        all open figures via `plt.show()`.
+    """
+    if sys.platform == "darwin":
+        # Capture the currently focused app (PyCharm/Terminal) before showing plot
+        try:
+            get_app_cmd = 'tell application "System Events" to return name of first application process whose frontmost is true'
+            active_app = subprocess.check_output(['osascript', '-e', get_app_cmd]).decode('utf-8').strip()
+        except Exception:
+            active_app = "PyCharm"
+
+        # Show specific figure(s) or all open figures
+        if fig is not None:
+            figures = [fig] if not isinstance(fig, (list, tuple)) else fig
+            for f in figures:
+                if hasattr(f, 'canvas') and hasattr(f.canvas, 'manager') and f.canvas.manager:
+                    f.canvas.manager.show()
+                else:
+                    f.show()
+        else:
+            plt.show(block=False)
+
+        plt.pause(0.1)  # Brief pause to let figure window open
+
+        # Pull focus back to original app
+        os.system(f"osascript -e 'tell application \"{active_app}\" to activate'")
+    else:
+        if fig is not None:
+            figures = [fig] if not isinstance(fig, (list, tuple)) else fig
+            for f in figures:
+                f.show()
+        else:
+            plt.show()
