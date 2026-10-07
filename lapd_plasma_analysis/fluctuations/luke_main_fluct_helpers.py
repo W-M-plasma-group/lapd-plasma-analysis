@@ -24,16 +24,20 @@ def generate_colors_valid_ds_ri(fluct_datasets, fluct_files, langmuir_nc_folder,
     """
     # Match fluctuations data with Langmuir datasets
     valid_runs = joint_langmuir_flucts_ds(fluct_datasets, fluct_files, langmuir_nc_folder)
+    print('Valid runs first: ', len(valid_runs))
     for run in valid_runs:
         lang_pathname = run['lang_pathname']
         mach_filename, mach_filepath = connect_mach_nc_to_lang_nc(lang_pathname, mach_folder)
-        if os.path.exists(mach_filepath):
-            with xr.open_dataset(mach_filepath) as ds:
-                mach_ds = ds.load()
+        try:
+            if os.path.exists(mach_filepath):
+                with xr.open_dataset(mach_filepath) as ds:
+                    mach_ds = ds.load()
 
-            run['mach_ds'] = mach_ds
-            run['mach_filename'] = mach_filename
-
+                run['mach_ds'] = mach_ds
+                run['mach_filename'] = mach_filename
+        except TypeError:
+            run['mach_ds'] = ''
+            run['mach_filename'] = ''
 
     # Generate Colors and marks
     lang_ds_list = [run['lang_ds'] for run in valid_runs]
@@ -49,6 +53,8 @@ def generate_colors_valid_ds_ri(fluct_datasets, fluct_files, langmuir_nc_folder,
         run['color'] = clors[i]
         run['marker'] = marks[i]
         run['run_id'] = run_identifiers[i]
+
+    print('Valid runs pre : ', len(valid_runs))
 
     return valid_runs
 
