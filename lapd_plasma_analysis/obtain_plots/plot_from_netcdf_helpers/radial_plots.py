@@ -3,6 +3,7 @@ import numpy as np
 import ast
 import os
 import matplotlib
+import netCDF4
 
 from lapd_plasma_analysis.obtain_plots.xarray_plots import build_subplots
 
@@ -18,11 +19,147 @@ from scipy.signal import savgol_filter
 from lapd_plasma_analysis.langmuir.characterization import isolate_ramps
 from lapd_plasma_analysis.langmuir.getIVsweep import get_shot_positions
 
-def create_radial_plot(
+
+
+
+def get_time_aware_key(key_name, time=None):
+    if key_name is None:
+        return None
+    if time is not None and f"_t_{time}" not in str(key_name):
+        return f"{key_name}_t_{time}"
+    return key_name
+
+
+def _compute_slopes_and_intercepts(
+    edges, x_vals, vals, ds_proc=None, probe=0, var_name="t_e", min_points=3
+):
+    """Calculates region slopes and intercepts for the average profile as well
+
+    as for individual shots if multi-shot data exists in ds_proc.
+    """
+    # 1. Fit averaged profile
+    slopes, intercepts = [], []
+    for start_x, stop_x in edges:
+        region_mask = (
+            (x_vals >= start_x)
+            & (x_vals <= stop_x)
+            & ~np.isnan(x_vals)
+            & ~np.isnan(vals)
+        )
+        valid_x, valid_y = x_vals[region_mask], vals[region_mask]
+        if len(valid_x) >= min_points:
+            slope, intercept = np.polyfit(valid_x, valid_y, deg=1)
+            slopes.append(float(slope))
+            intercepts.append(float(intercept))
+        else:
+            slopes.append(np.nan)
+            intercepts.append(np.nan)
+
+    # 2. Fit individual shots if available
+    shot_slopes, shot_intercepts = None, None
+    if ds_proc is not None and var_name in ds_proc:
+        da = ds_proc[var_name]
+        if "probe" in da.dims:
+            da = (
+                da.sel(probe=probe)
+                if isinstance(probe, (int, str))
+                else da.isel(probe=probe)
+            )
+
+        if "shot" in da.dims and da.sizes["shot"] > 1:
+            shot_slopes = []
+            shot_intercepts = []
+            num_shots = da.sizes["shot"]
+
+            for s_idx in range(num_shots):
+                y_shot = da.isel(shot=s_idx).values
+                s_m, s_b = [], []
+                for start_x, stop_x in edges:
+                    region_mask = (
+                        (x_vals >= start_x)
+                        & (x_vals <= stop_x)
+                        & ~np.isnan(x_vals)
+                        & ~np.isnan(y_shot)
+                    )
+                    valid_x, valid_y = x_vals[region_mask], y_shot[region_mask]
+                    if len(valid_x) >= min_points:
+                        m, b = np.polyfit(valid_x, valid_y, deg=1)
+                        s_m.append(float(m))
+                        s_b.append(float(b))
+                    else:
+                        s_m.append(np.nan)
+                        s_b.append(np.nan)
+                shot_slopes.append(s_m)
+                shot_intercepts.append(s_b)
+
+    return slopes, intercepts, shot_slopes, shot_intercepts
+
+
+def _save_gradient_attributes(
+    ds,
+    ds_save_path,
+    reg_key,
+    edges,
+    slope_key,
+    slopes,
+    intercept_key,
+    intercepts,
+    shot_slopes=None,
+    shot_intercepts=None,
+):
+    """Saves region, slope, and intercept attributes to ds.attrs and NetCDF as
+
+    JSON strings using identical key transformations.
+    """
+    if reg_key is None:
+        return
+
+    # Derive shot-specific keys directly from slope/intercept base keys
+    slope_shots_key = (
+        slope_key.replace("_slopes", "_slopes_shots")
+        if slope_key and "_slopes" in slope_key
+        else f"{slope_key}_shots"
+    )
+    intercept_shots_key = (
+        intercept_key.replace("_intercepts", "_intercepts_shots")
+        if intercept_key and "_intercepts" in intercept_key
+        else f"{intercept_key}_shots"
+    )
+
+    # 1. Store serialized JSON strings in ds.attrs
+    ds.attrs[reg_key] = json.dumps(edges)
+
+    if slope_key:
+        ds.attrs[slope_key] = json.dumps(slopes)
+    if intercept_key:
+        ds.attrs[intercept_key] = json.dumps(intercepts)
+
+    if shot_slopes is not None:
+        ds.attrs[slope_shots_key] = json.dumps(shot_slopes)
+    if shot_intercepts is not None:
+        ds.attrs[intercept_shots_key] = json.dumps(shot_intercepts)
+
+    # 2. Store serialized JSON strings to NetCDF file on disk
+    if ds_save_path is not None:
+        with netCDF4.Dataset(ds_save_path, mode="r+") as nc:
+            nc.setncattr(reg_key, json.dumps(edges))
+
+            if slope_key:
+                nc.setncattr(slope_key, json.dumps(slopes))
+            if intercept_key:
+                nc.setncattr(intercept_key, json.dumps(intercepts))
+
+            if shot_slopes is not None:
+                nc.setncattr(slope_shots_key, json.dumps(shot_slopes))
+            if shot_intercepts is not None:
+                nc.setncattr(intercept_shots_key, json.dumps(shot_intercepts))
+
+
+def create_variable_radial_plot(
     ds,
     probe,
-    var_name='n_e',
-    run_identifier='',
+    var_name="t_e",
+    run_identifier="",
     see_plots=True,
     axes=None,
     dataset_clor=None,
@@ -32,6 +169,8 @@ def create_radial_plot(
     bottomx=True,
     gradient_regions=False,
     redo_grad_regions=False,
+    check_all=True,
+    min_points=3,
     regions_str=None,
     slopes_str=None,
     intercepts_str=None,
@@ -43,621 +182,1173 @@ def create_radial_plot(
     hdf5_folder=None,
     save_plots=False,
     figure_folder=None,
-    updated_nc_folder=None
+    updated_nc_folder=None,
+    time=None,
+    core_width=False,
+    shot=None,
+    mask_var="t_e",
 ):
-    """
-    Parameters
-    ----------
-    ds : xarray.Dataset
-        xarray dataset of diagnostics indexed by probe, x, y, shot, sweep
-    probe : int
-        Index of the probe to plot
-    var_name : str, optional
-        Diagnostic variable key inside ds to plot (e.g., 'n_e', 't_e')
-    run_identifier : str, optional
-        Formatted string identifying the experimental run
-    see_plots : bool, optional
-        Whether to generate and display the matplotlib figures
-    axes : matplotlib.axes.Axes, optional
-        Existing axis object to plot into
-    dataset_clor : str, optional
-        Color for plot points and error bars
-    dataset_mark : str, optional
-        Marker style for plot points
-    make_presentable : bool, optional
-        Apply clean presentation/publication style formatting
-    sharex : bool, optional
-        Whether the x-axis is shared across subplots
-    bottomx : bool, optional
-        Whether to draw the bottom x-axis labels
-    gradient_regions : bool, optional
-        Whether to calculate and display gradient region bounds
-    redo_grad_regions : bool, optional
-        Prompt user to interactively re-select gradient regions
-    regions_str : str, optional
-        Attribute key in ds storing gradient region start and end boundaries
-    slopes_str : str, optional
-        Attribute key in ds storing fitted slopes for each region
-    intercepts_str : str, optional
-        Attribute key in ds storing fitted intercepts for each region
-    ds_save_path : str, optional
-        File path location for saving updated netCDF datasets
-    plot_final_fit : bool, optional
-        Whether to plot the linear fit line over gradient regions
-    plot_axes : bool, optional
-        Whether to draw labels and ticks on axes
-    plot_title : bool, optional
-        Whether to display diagnostic titles on plots
-    normalize : bool, optional
-        Normalize profile values relative to core plasma average (-5 to 5 cm)
-    hdf5_folder : str, optional
-        Folder containing raw HDF5 files for reprocessing
-    save_plots : bool, optional
-        Whether to save figure images to disk
-    figure_folder : str, optional
-        Output folder path for saving figures
-    updated_nc_folder : str, optional
-        Output folder path for saving updated netCDF files
-
-    Returns
-    -------
-    ds : xarray.Dataset
-        The original or updated xarray dataset
-    """
-
-    # Map variable names to readable titles and LaTeX representations
-    var_title_map = {'n_e': 'Density', 't_e': 'Temperature'}
-    var_symbol_map = {'n_e': r'n_e', 't_e': r'T_e'}
-
-    var_label_name = var_title_map.get(var_name, var_name)
-    var_symbol = var_symbol_map.get(var_name, var_name)
-
-    print(f'Building {var_label_name.lower()} radial plots...')
-
     if dataset_clor is None:
-        dataset_clor = 'royalblue'
-        dataset_mark = 'o'
+        dataset_clor = "royalblue"
+        dataset_mark = "o"
 
-    # Extract plot values, standard deviation error, and radial positions
-    vals, std_vals, x_vals = process_variable_data(ds, probe, var_name=var_name)
-
-    # Double-check temperature/density data if NaNs are present and HDF5 directory exists
-    if np.any(np.isnan(vals)) and (hdf5_folder is not None) and (var_name == 'n_e'):
-        updated_ds = double_check_temp_data(
-            hdf5_folder, ds, probe, x_vals=x_vals, y_vals=vals,
-            save_plots=save_plots, figure_folder=figure_folder
-        )
-
-        if updated_ds is not None:
-            # Recompute every t_e-dependent variable (n_e, n_i, nu_ei, p_e, p_ei)
-            # now that t_e has changed. v_f/v_p/ion_isat/electron_isat are untouched.
-            updated_ds = recalculate_derived_variables(updated_ds)
-
-            base_name = os.path.splitext(os.path.basename(ds_save_path))[0]
-            if base_name.endswith('_updated'):
-                # Keep the exact same name, no extra tags
-                updated_ds_save_path = os.path.join(updated_nc_folder, f"{base_name}.nc")
-                print("Existing updated file detected. Overwriting with new modifications...")
-            else:
-                # It's a raw file being updated for the first time
-                updated_ds_save_path = os.path.join(updated_nc_folder, f"{base_name}_updated.nc")
-                print("Raw file detected. Creating new _updated.nc file...")
-
-            updated_ds.to_netcdf(updated_ds_save_path, mode='w', engine='netcdf4')
-            print(f'Successfully saved the dataset at: \n {updated_ds_save_path}.')
-
-            # Re-assign ds and update plot values so the rest of the function uses the newly fixed data
-            ds = updated_ds
-            vals, std_vals, x_vals = process_variable_data(ds, probe, var_name=var_name)
-
-    # Get metadata attributes for labels
-    long_var_name = ds[var_name].attrs.get("long_name", var_name)
-    units_str = ds[var_name].attrs.get('units', var_name)
-    ylabel = fr"${var_symbol}$ [{units_str}]"
-    xlabel = f'x [{ds.attrs.get("x_units")}]'
-
-    # Handle gradient region detection and linear polyfit calculations
-    if redo_grad_regions:
-        print(f'redo {var_name} str: ', redo_grad_regions)
-        edges = obtain_gradient_regions(
-            ds, x_vals, vals, std_vals,
-            color=dataset_clor, marker=dataset_mark,
-            ylabel=ylabel, xlabel=xlabel, regions_str=regions_str
-        )
-
-        slopes = []
-        intercepts = []
-        for start_x, stop_x in edges:
-            region_mask = (x_vals >= start_x) & (x_vals <= stop_x)
-            x_region = x_vals[region_mask]
-            var_region = vals[region_mask]
-            valid_mask = ~np.isnan(x_region) & ~np.isnan(var_region)
-            valid_x = x_region[valid_mask]
-            valid_var = var_region[valid_mask]
-
-            slope, intercept = np.polyfit(valid_x, valid_var, deg=1)
-            slopes.append(slope)
-            intercepts.append(intercept)
-
-        if ds_save_path is not None and regions_str:
-            ds.attrs[regions_str] = json.dumps(edges)
-            ds.attrs[slopes_str] = slopes
-            ds.attrs[intercepts_str] = intercepts
-            ds.to_netcdf(ds_save_path, mode='a', engine='netcdf4')
-            print(f'Updated the dataset at \n {ds_save_path} \n to include {var_label_name} gradient locations.')
-
-    elif not redo_grad_regions and (regions_str and regions_str in ds.attrs.keys()) and gradient_regions:
-        loaded_edges = json.loads(ds.attrs[regions_str])
-        edges = [tuple(edge) for edge in loaded_edges]
-        slopes = ds.attrs[slopes_str]
-        intercepts = ds.attrs[intercepts_str]
+    # --- 1. Setup Variable Metadata & Labels ---
+    var_lower = var_name.lower()
+    if "t_e" in var_lower or "temp" in var_lower:
+        display_name = "Temperature"
+        tex_symbol = "T_e"
+    elif "n_e" in var_lower or "dens" in var_lower:
+        display_name = "Density"
+        tex_symbol = "n_e"
+    elif "p" in var_lower or "press" in var_lower:
+        display_name = "Pressure"
+        tex_symbol = "P_e"
     else:
-        edges = []
-        slopes = []
-        intercepts = []
+        display_name = var_name.capitalize()
+        tex_symbol = var_name
 
-    # Construct plots
+    reg_key = get_time_aware_key(regions_str, time)
+    slope_key = get_time_aware_key(slopes_str, time)
+    intercept_key = get_time_aware_key(intercepts_str, time)
+
+    # --- 2. Slice Time & Auto-detect Shot ---
+    if time is not None and "time" in ds.coords:
+        if "time" in ds.indexes:
+            ds_proc = ds.sel(time=time)
+        else:
+            time_dim = ds["time"].dims[0] if ds["time"].dims else "time"
+            closest_idx = np.argmin(np.abs(ds["time"].values - time))
+            ds_proc = ds.isel({time_dim: closest_idx})
+    else:
+        ds_proc = ds
+
+    if (
+        shot is None
+        and "shot" in ds_proc.coords
+        and ds_proc.coords["shot"].ndim == 0
+    ):
+        shot = ds_proc.coords["shot"].item()
+
+    shot_str = f" | Shot {shot}" if shot is not None else ""
+
+    # --- 3. Process Data ---
+    vals, std_vals, x_vals = process_variable_data(
+        ds_proc, probe, var_name=var_name, mask_var=mask_var
+    )
+
+    base_name = (
+        os.path.splitext(os.path.basename(ds_save_path))[0]
+        if ds_save_path
+        else "dataset"
+    )
+
+    # Fix check for temperature if NaNs exist
+    if (
+        var_name == "t_e"
+        and (not core_width)
+        and (time is not None)
+        and (np.any(np.isnan(vals)))
+        and (hdf5_folder is not None)
+    ):
+        if updated_nc_folder and (
+            base_name + "_updated.nc" in os.listdir(updated_nc_folder)
+        ):
+            ds_to_update = xr.load_dataset(
+                os.path.join(updated_nc_folder, base_name + "_updated.nc")
+            )
+        else:
+            ds_to_update = ds
+
+        updated_ds = double_check_temp_data(
+            hdf5_folder,
+            ds_to_update,
+            probe,
+            x_vals=x_vals,
+            y_vals=vals,
+            save_plots=save_plots,
+            figure_folder=figure_folder,
+        )
+        if updated_ds is not None:
+            updated_ds = recalculate_derived_variables(updated_ds, probe=probe)
+            updated_ds_save_path = os.path.join(
+                updated_nc_folder, f"{base_name}_updated.nc"
+            )
+            updated_ds.to_netcdf(
+                updated_ds_save_path, mode="w", engine="netcdf4"
+            )
+
+    units_attr = (
+        ds[var_name].attrs.get("units", var_name) if var_name in ds else ""
+    )
+    ylabel = (
+        fr"${tex_symbol}$ [$\mathregular{{{units_attr}}}$]"
+        if units_attr
+        else fr"${tex_symbol}$"
+    )
+    xlabel = f'x [{ds.attrs.get("x_units", "cm")}]'
+
+    # --- 4. Gradient Region Fitting & Attribute Checking ---
+    has_existing_attr = (
+        reg_key in ds.attrs
+        and ds.attrs[reg_key] is not None
+        and str(ds.attrs[reg_key]).strip() not in ("", "[]", "None")
+    )
+
+    # BRANCH 1: Attribute exists and we are NOT forcing redo -> Keep existing
+    if has_existing_attr and not redo_grad_regions:
+        loaded_edges = json.loads(ds.attrs[reg_key])
+        edges = [tuple(edge) for edge in loaded_edges]
+
+        slope_val = ds.attrs.get(slope_key)
+        intercept_val = ds.attrs.get(intercept_key)
+        has_slopes = (
+            slope_val is not None
+            and isinstance(slope_val, (list, tuple, np.ndarray))
+            and len(slope_val) == len(edges)
+        )
+        has_intercepts = (
+            intercept_val is not None
+            and isinstance(intercept_val, (list, tuple, np.ndarray))
+            and len(intercept_val) == len(edges)
+        )
+
+        if has_slopes and has_intercepts:
+            slopes = list(ds.attrs[slope_key])
+            intercepts = list(ds.attrs[intercept_key])
+        else:
+            (
+                slopes,
+                intercepts,
+                shot_slopes,
+                shot_intercepts,
+            ) = _compute_slopes_and_intercepts(
+                edges,
+                x_vals,
+                vals,
+                ds_proc=ds_proc,
+                probe=probe,
+                var_name=var_name,
+                min_points=min_points,
+            )
+            _save_gradient_attributes(
+                ds,
+                ds_save_path,
+                reg_key,
+                edges,
+                slope_key,
+                slopes,
+                intercept_key,
+                intercepts,
+                shot_slopes,
+                shot_intercepts,
+            )
+
+    # BRANCH 2: check_all is FALSE -> AUTO-SELECT REGIONS
+    elif not check_all:
+        candidate_edges = find_pedestals_strict_thresh(x_vals, vals)
+
+        if isinstance(candidate_edges, dict):
+            raw_candidates = candidate_edges.get(
+                "left", []
+            ) + candidate_edges.get("right", [])
+        else:
+            raw_candidates = list(candidate_edges)
+
+        left_candidates = [e for e in raw_candidates if e[0] < 0]
+        right_candidates = [e for e in raw_candidates if e[0] >= 0]
+
+        selected_edges = []
+
+        if left_candidates:
+            central_left = min(
+                left_candidates, key=lambda e: abs((e[0] + e[1]) / 2.0)
+            )
+            pts_count = np.sum(
+                (x_vals >= central_left[0])
+                & (x_vals <= central_left[1])
+                & ~np.isnan(vals)
+            )
+            if pts_count >= min_points:
+                selected_edges.append(central_left)
+
+        if right_candidates:
+            central_right = min(
+                right_candidates, key=lambda e: abs((e[0] + e[1]) / 2.0)
+            )
+            pts_count = np.sum(
+                (x_vals >= central_right[0])
+                & (x_vals <= central_right[1])
+                & ~np.isnan(vals)
+            )
+            if pts_count >= min_points:
+                selected_edges.append(central_right)
+
+        edges = selected_edges
+
+        (
+            slopes,
+            intercepts,
+            shot_slopes,
+            shot_intercepts,
+        ) = _compute_slopes_and_intercepts(
+            edges,
+            x_vals,
+            vals,
+            ds_proc=ds_proc,
+            probe=probe,
+            var_name=var_name,
+            min_points=min_points,
+        )
+
+        _save_gradient_attributes(
+            ds,
+            ds_save_path,
+            reg_key,
+            edges,
+            slope_key,
+            slopes,
+            intercept_key,
+            intercepts,
+            shot_slopes,
+            shot_intercepts,
+        )
+
+    # BRANCH 3: check_all is TRUE -> INTERACTIVE MODE
+    elif check_all and (redo_grad_regions or gradient_regions):
+        print(
+            f"Redo {display_name.lower()} regions interactively for key: {reg_key}"
+        )
+        grad_title = (
+            f"{display_name} \n {run_identifier}, Probe {probe}"
+            + (f" | t = {time} ms" if time is not None else "")
+            + shot_str
+        )
+
+        edges = obtain_gradient_regions(
+            ds_proc,
+            x_vals,
+            vals,
+            std_vals,
+            color=dataset_clor,
+            marker=dataset_mark,
+            ylabel=ylabel,
+            xlabel=xlabel,
+            regions_str=reg_key,
+            title=grad_title,
+            min_points=min_points,
+        )
+
+        (
+            slopes,
+            intercepts,
+            shot_slopes,
+            shot_intercepts,
+        ) = _compute_slopes_and_intercepts(
+            edges,
+            x_vals,
+            vals,
+            ds_proc=ds_proc,
+            probe=probe,
+            var_name=var_name,
+            min_points=min_points,
+        )
+
+        _save_gradient_attributes(
+            ds,
+            ds_save_path,
+            reg_key,
+            edges,
+            slope_key,
+            slopes,
+            intercept_key,
+            intercepts,
+            shot_slopes,
+            shot_intercepts,
+        )
+    else:
+        edges, slopes, intercepts = [], [], []
+
+    # --- 5. Plotting ---
     if see_plots:
+        if axes is None:
+            fig, axes_dict, letters = build_subplots([[1]])
+            axes = axes_dict[letters[0]]
+
         if normalize:
             core_x_idxs = np.where((x_vals <= 5) & (x_vals >= -5))[0]
             core_vals = vals[core_x_idxs]
-            core_avg = np.mean(core_vals)
-            vals = vals / core_avg
-            std_vals = std_vals / core_avg
+            core_mean = np.mean(core_vals)
+            vals = vals / core_mean
+            std_vals = std_vals / core_mean
 
-        if axes is None:
-            fig, ax, letters = build_subplots(layout=[[1]])
-            axes = ax[letters[0]]
-
-        axes.errorbar(x_vals, vals, yerr=std_vals, fmt=dataset_mark, capsize=3, color=dataset_clor)
+        axes.errorbar(
+            x_vals,
+            vals,
+            yerr=std_vals,
+            fmt=dataset_mark,
+            capsize=3,
+            color=dataset_clor,
+        )
         axes.set_ylabel(ylabel, rotation=0, labelpad=60)
 
         if gradient_regions:
             for i, (start_x, stop_x) in enumerate(edges):
-                # Draw the start line
-                axes.axvline(x=start_x, color='black', linestyle='--', linewidth=2)
-                # Draw the stop line
-                axes.axvline(x=stop_x, color='black', linestyle='--', linewidth=2)
-                if plot_final_fit:
+                axes.axvline(
+                    x=start_x, color="black", linestyle="--", linewidth=2
+                )
+                axes.axvline(
+                    x=stop_x, color="black", linestyle="--", linewidth=2
+                )
+                if (
+                    plot_final_fit
+                    and i < len(slopes)
+                    and not np.isnan(slopes[i])
+                ):
                     region_mask = (x_vals >= start_x) & (x_vals <= stop_x)
                     axes.plot(
                         x_vals[region_mask],
                         slopes[i] * x_vals[region_mask] + intercepts[i],
-                        color='gold', linestyle='--'
+                        color="gold",
+                        linestyle="--",
                     )
 
         if not make_presentable:
             if plot_axes:
-                if plot_title:
-                    axes.set_title(f"{long_var_name}")
-                probe_z = ds['z'].isel(probe=probe).item()
-                ss_start = ds.attrs.get(f'steady state start probe {probe}', 0)
-                ss_end = ds.attrs.get(f'steady state end probe {probe}', 0)
+                probe_z = ds["z"].isel(probe=probe).item()
+                ss_start = ds.attrs.get(f"steady state start probe {probe}", 0)
+                ss_end = ds.attrs.get(f"steady state end probe {probe}", 0)
 
-                axes.set_title(
-                    f"{run_identifier} \n "
-                    f"{long_var_name} \n "
-                    f"z: {probe_z:.2f} \n "
-                    f"Between times ({ss_start:.2f},{ss_end:.2f}) ms"
+                title_str = (
+                    f"{run_identifier} \n {display_name} \n z: {probe_z:.2f}"
                 )
+                if time is not None:
+                    title_str += f" | t: {time} ms"
+                else:
+                    title_str += (
+                        f" \n Between times ({ss_start:.2f},{ss_end:.2f}) ms"
+                    )
+                if shot is not None:
+                    title_str += f" | Shot: {shot}"
+                axes.set_title(title_str)
+
                 if not sharex:
                     axes.set_xlabel(xlabel)
+
+    return edges, slopes, intercepts
+
+
+# --- Wrappers for Backwards Compatibility ---
+
+
+def create_temperature_radial_plots(*args, **kwargs):
+    kwargs["var_name"] = "t_e"
+    return create_variable_radial_plot(*args, **kwargs)
+
+
+def create_density_radial_plots(*args, **kwargs):
+    kwargs["var_name"] = "n_e"
+    return create_variable_radial_plot(*args, **kwargs)
+
+
+def create_pressure_radial_plots(*args, **kwargs):
+    kwargs["var_name"] = kwargs.pop("var_name", "p_e")
+    return create_variable_radial_plot(*args, **kwargs)
+
+# def create_radial_plot(
+#     ds,
+#     probe,
+#     var_name='n_e',
+#     run_identifier='',
+#     see_plots=True,
+#     axes=None,
+#     dataset_clor=None,
+#     dataset_mark=None,
+#     make_presentable=False,
+#     sharex=False,
+#     bottomx=True,
+#     gradient_regions=False,
+#     redo_grad_regions=False,
+#     regions_str=None,
+#     slopes_str=None,
+#     intercepts_str=None,
+#     ds_save_path=None,
+#     plot_final_fit=False,
+#     plot_axes=True,
+#     plot_title=True,
+#     normalize=False,
+#     hdf5_folder=None,
+#     save_plots=False,
+#     figure_folder=None,
+#     updated_nc_folder=None,
+#     time = None,
+#     core_width = False
+# ):
+#     """
+#     Parameters
+#     ----------
+#     ds : xarray.Dataset
+#         xarray dataset of diagnostics indexed by probe, x, y, shot, sweep
+#     probe : int
+#         Index of the probe to plot
+#     var_name : str, optional
+#         Diagnostic variable key inside ds to plot (e.g., 'n_e', 't_e')
+#     run_identifier : str, optional
+#         Formatted string identifying the experimental run
+#     see_plots : bool, optional
+#         Whether to generate and display the matplotlib figures
+#     axes : matplotlib.axes.Axes, optional
+#         Existing axis object to plot into
+#     dataset_clor : str, optional
+#         Color for plot points and error bars
+#     dataset_mark : str, optional
+#         Marker style for plot points
+#     make_presentable : bool, optional
+#         Apply clean presentation/publication style formatting
+#     sharex : bool, optional
+#         Whether the x-axis is shared across subplots
+#     bottomx : bool, optional
+#         Whether to draw the bottom x-axis labels
+#     gradient_regions : bool, optional
+#         Whether to calculate and display gradient region bounds
+#     redo_grad_regions : bool, optional
+#         Prompt user to interactively re-select gradient regions
+#     regions_str : str, optional
+#         Attribute key in ds storing gradient region start and end boundaries
+#     slopes_str : str, optional
+#         Attribute key in ds storing fitted slopes for each region
+#     intercepts_str : str, optional
+#         Attribute key in ds storing fitted intercepts for each region
+#     ds_save_path : str, optional
+#         File path location for saving updated netCDF datasets
+#     plot_final_fit : bool, optional
+#         Whether to plot the linear fit line over gradient regions
+#     plot_axes : bool, optional
+#         Whether to draw labels and ticks on axes
+#     plot_title : bool, optional
+#         Whether to display diagnostic titles on plots
+#     normalize : bool, optional
+#         Normalize profile values relative to core plasma average (-5 to 5 cm)
+#     hdf5_folder : str, optional
+#         Folder containing raw HDF5 files for reprocessing
+#     save_plots : bool, optional
+#         Whether to save figure images to disk
+#     figure_folder : str, optional
+#         Output folder path for saving figures
+#     updated_nc_folder : str, optional
+#         Output folder path for saving updated netCDF files
+#     time: list, optional
+#         A list of tuples of times to average over to get a radial plot
+#     core_width : bool, optional
+#         Make things more automated form the perspective of looking at a lot of times so extra plots are only generated
+#         if no current data exists
+#
+#     Returns
+#     -------
+#     ds : xarray.Dataset
+#         The original or updated xarray dataset
+#     """
+#
+#     # Map variable names to readable titles and LaTeX representations
+#     var_title_map = {'n_e': 'Density', 't_e': 'Temperature'}
+#     var_symbol_map = {'n_e': r'n_e', 't_e': r'T_e'}
+#
+#     var_label_name = var_title_map.get(var_name, var_name)
+#     var_symbol = var_symbol_map.get(var_name, var_name)
+#
+#     print(f'Building {var_label_name.lower()} radial plots...')
+#
+#     if dataset_clor is None:
+#         dataset_clor = 'royalblue'
+#         dataset_mark = 'o'
+#
+#     # Extract plot values, standard deviation error, and radial positions
+#     vals, std_vals, x_vals = process_variable_data(ds, probe, var_name=var_name)
+#
+#     # Double-check temperature/density data if NaNs are present and HDF5 directory exists
+#     if np.any(np.isnan(vals)) and (hdf5_folder is not None) and (var_name == 'n_e'):
+#         updated_ds = double_check_temp_data(
+#             hdf5_folder, ds, probe, x_vals=x_vals, y_vals=vals,
+#             save_plots=save_plots, figure_folder=figure_folder
+#         )
+#
+#         if updated_ds is not None:
+#             # Recompute every t_e-dependent variable (n_e, n_i, nu_ei, p_e, p_ei)
+#             # now that t_e has changed. v_f/v_p/ion_isat/electron_isat are untouched.
+#             updated_ds = recalculate_derived_variables(updated_ds)
+#
+#             base_name = os.path.splitext(os.path.basename(ds_save_path))[0]
+#             if base_name.endswith('_updated'):
+#                 # Keep the exact same name, no extra tags
+#                 updated_ds_save_path = os.path.join(updated_nc_folder, f"{base_name}.nc")
+#                 print("Existing updated file detected. Overwriting with new modifications...")
+#             else:
+#                 # It's a raw file being updated for the first time
+#                 updated_ds_save_path = os.path.join(updated_nc_folder, f"{base_name}_updated.nc")
+#                 print("Raw file detected. Creating new _updated.nc file...")
+#
+#             updated_ds.to_netcdf(updated_ds_save_path, mode='w', engine='netcdf4')
+#             print(f'Successfully saved the dataset at: \n {updated_ds_save_path}.')
+#
+#             # Re-assign ds and update plot values so the rest of the function uses the newly fixed data
+#             ds = updated_ds
+#             vals, std_vals, x_vals = process_variable_data(ds, probe, var_name=var_name)
+#
+#     # Get metadata attributes for labels
+#     long_var_name = ds[var_name].attrs.get("long_name", var_name)
+#     units_str = ds[var_name].attrs.get('units', var_name)
+#     ylabel = fr"${var_symbol}$ [{units_str}]"
+#     xlabel = f'x [{ds.attrs.get("x_units")}]'
+#
+#     # Handle gradient region detection and linear polyfit calculations
+#     if redo_grad_regions:
+#         print(f'redo {var_name} str: ', redo_grad_regions)
+#         edges = obtain_gradient_regions(
+#             ds, x_vals, vals, std_vals,
+#             color=dataset_clor, marker=dataset_mark,
+#             ylabel=ylabel, xlabel=xlabel, regions_str=regions_str
+#         )
+#
+#         slopes = []
+#         intercepts = []
+#         for start_x, stop_x in edges:
+#             region_mask = (x_vals >= start_x) & (x_vals <= stop_x)
+#             x_region = x_vals[region_mask]
+#             var_region = vals[region_mask]
+#             valid_mask = ~np.isnan(x_region) & ~np.isnan(var_region)
+#             valid_x = x_region[valid_mask]
+#             valid_var = var_region[valid_mask]
+#
+#             slope, intercept = np.polyfit(valid_x, valid_var, deg=1)
+#             slopes.append(slope)
+#             intercepts.append(intercept)
+#
+#         if ds_save_path is not None and regions_str:
+#             ds.attrs[regions_str] = json.dumps(edges)
+#             ds.attrs[slopes_str] = slopes
+#             ds.attrs[intercepts_str] = intercepts
+#             ds.to_netcdf(ds_save_path, mode='a', engine='netcdf4')
+#             print(f'Updated the dataset at \n {ds_save_path} \n to include {var_label_name} gradient locations.')
+#
+#     elif not redo_grad_regions and (regions_str and regions_str in ds.attrs.keys()) and gradient_regions:
+#         loaded_edges = json.loads(ds.attrs[regions_str])
+#         edges = [tuple(edge) for edge in loaded_edges]
+#         slopes = ds.attrs[slopes_str]
+#         intercepts = ds.attrs[intercepts_str]
+#     else:
+#         edges = []
+#         slopes = []
+#         intercepts = []
+#
+#     # Construct plots
+#     if see_plots:
+#         if normalize:
+#             core_x_idxs = np.where((x_vals <= 5) & (x_vals >= -5))[0]
+#             core_vals = vals[core_x_idxs]
+#             core_avg = np.mean(core_vals)
+#             vals = vals / core_avg
+#             std_vals = std_vals / core_avg
+#
+#         if axes is None:
+#             fig, ax, letters = build_subplots(layout=[[1]])
+#             axes = ax[letters[0]]
+#
+#         axes.errorbar(x_vals, vals, yerr=std_vals, fmt=dataset_mark, capsize=3, color=dataset_clor)
+#         axes.set_ylabel(ylabel, rotation=0, labelpad=60)
+#
+#         if gradient_regions:
+#             for i, (start_x, stop_x) in enumerate(edges):
+#                 # Draw the start line
+#                 axes.axvline(x=start_x, color='black', linestyle='--', linewidth=2)
+#                 # Draw the stop line
+#                 axes.axvline(x=stop_x, color='black', linestyle='--', linewidth=2)
+#                 if plot_final_fit:
+#                     region_mask = (x_vals >= start_x) & (x_vals <= stop_x)
+#                     axes.plot(
+#                         x_vals[region_mask],
+#                         slopes[i] * x_vals[region_mask] + intercepts[i],
+#                         color='gold', linestyle='--'
+#                     )
+#
+#         if not make_presentable:
+#             if plot_axes:
+#                 if plot_title:
+#                     axes.set_title(f"{long_var_name}")
+#                 probe_z = ds['z'].isel(probe=probe).item()
+#                 ss_start = ds.attrs.get(f'steady state start probe {probe}', 0)
+#                 ss_end = ds.attrs.get(f'steady state end probe {probe}', 0)
+#
+#                 axes.set_title(
+#                     f"{run_identifier} \n "
+#                     f"{long_var_name} \n "
+#                     f"z: {probe_z:.2f} \n "
+#                     f"Between times ({ss_start:.2f},{ss_end:.2f}) ms"
+#                 )
+#                 if not sharex:
+#                     axes.set_xlabel(xlabel)
+#         else:
+#             if plot_axes:
+#                 axes.ticklabel_format(style='sci', axis='y', scilimits=(-1, 2))
+#                 if bottomx:
+#                     axes.set_xlabel(xlabel)
+#                     axes.tick_params(axis='x', labelbottom=True)
+#                 else:
+#                     axes.set_xlabel("")
+#                     axes.tick_params(axis='x', labelbottom=False)
+#
+#                 # 2. FORCE THE MATH ENGINE (Bypass canvas.draw completely)
+#                 ax_formatter = axes.yaxis.get_major_formatter()
+#                 ax_formatter.set_locs(axes.yaxis.get_majorticklocs())
+#                 offset = ax_formatter.get_offset()
+#
+#                 # 3. Hide the default floating text
+#                 axes.yaxis.get_offset_text().set_visible(False)
+#
+#                 # 4. Build the dynamic label strings using f-strings
+#                 if not sharex:
+#                     if offset:
+#                         # Because we turned on 'use_mathtext' globally, offset is
+#                         # automatically formatted as beautiful LaTeX (e.g., $\times10^{4}$)
+#                         label_str = fr'{long_var_name} ({offset})'
+#                     else:
+#                         label_str = rf'{long_var_name}'
+#                 else:
+#                     label_str = fr'{offset}' if offset else ''
+#
+#                 axes.text(
+#                     0.5, 0.05, label_str,
+#                     transform=axes.transAxes,
+#                     horizontalalignment='center',
+#                     verticalalignment='bottom',
+#                     color='k'
+#                 )
+#
+#     return ds
+
+
+# def create_density_radial_plots(ds, probe, run_identifier='', see_plots=True,
+#                                 axes=None, dataset_clor=None,
+#                                 dataset_mark=None, make_presentable=False,
+#                                 sharex=False, bottomx=True, gradient_regions=False, redo_grad_regions=False,
+#                                 regions_str=None, slopes_str=None, intercepts_str=None, ds_save_path=None,
+#                                 plot_final_fit=False, plot_axes=True, plot_title=True, normalize=False,
+#                                 hdf5_folder=None, save_plots=False, figure_folder=None, updated_nc_folder=None,
+#                                 time=None, core_width=False, shot=None):
+#     print('Building density radial plots...')
+#     if dataset_clor is None:
+#         dataset_clor = 'royalblue'
+#         dataset_mark = 'o'
+#
+#     reg_key = get_time_aware_key(regions_str, time)
+#     slope_key = get_time_aware_key(slopes_str, time)
+#     intercept_key = get_time_aware_key(intercepts_str, time)
+#
+#     if time is not None and 'time' in ds.coords:
+#         if 'time' in ds.indexes:
+#             ds_proc = ds.sel(time=time)
+#         else:
+#             time_dim = ds['time'].dims[0] if ds['time'].dims else 'time'
+#             closest_idx = np.argmin(np.abs(ds['time'].values - time))
+#             ds_proc = ds.isel({time_dim: closest_idx})
+#     else:
+#         ds_proc = ds
+#
+#     # Auto-detect shot coordinate if sliced per shot
+#     if shot is None and 'shot' in ds_proc.coords and ds_proc.coords['shot'].ndim == 0:
+#         shot = ds_proc.coords['shot'].item()
+#
+#     shot_str = f" | Shot {shot}" if shot is not None else ""
+#
+#     n_e_to_plot_vals, n_e_std_to_plot_vals, x_vals = process_variable_data(ds_proc, probe, var_name='n_e')
+#     n_e_name = ds['n_e'].attrs.get("long_name", 'n_e')
+#     ylabel = fr"$n_e$ [$\mathregular{{{ds['n_e'].attrs.get('units', 'n_e')}}}$]"
+#     xlabel = f'x [{ds.attrs.get("x_units")}]'
+#
+#     if redo_grad_regions:
+#         print(f'Redo density regions for key: {reg_key}')
+#         grad_title = f"Density \n {run_identifier}, Probe {probe}" + (
+#             f" | t = {time} ms" if time is not None else "") + shot_str
+#
+#         ne_edges = obtain_gradient_regions(
+#             ds_proc, x_vals, n_e_to_plot_vals, n_e_std_to_plot_vals,
+#             color=dataset_clor, marker=dataset_mark,
+#             ylabel=ylabel, xlabel=xlabel, regions_str=reg_key,
+#             title=grad_title
+#         )
+#
+#         ne_slopes = []
+#         ne_intercepts = []
+#         for start_x, stop_x in ne_edges:
+#             region_mask = (x_vals >= start_x) & (x_vals <= stop_x)
+#             x_region = x_vals[region_mask]
+#             ne_region = n_e_to_plot_vals[region_mask]
+#             valid_mask = ~np.isnan(x_region) & ~np.isnan(ne_region)
+#             valid_x = x_region[valid_mask]
+#             valid_ne = ne_region[valid_mask]
+#
+#             if len(valid_x) >= 2:
+#                 ne_slope, ne_intercept = np.polyfit(valid_x, valid_ne, deg=1)
+#                 ne_slopes.append(float(ne_slope))
+#                 ne_intercepts.append(float(ne_intercept))
+#             else:
+#                 ne_slopes.append(np.nan)
+#                 ne_intercepts.append(np.nan)
+#
+#         if ds_save_path is not None and reg_key is not None:
+#             ds.attrs[reg_key] = json.dumps(ne_edges)
+#             ds.attrs[slope_key] = ne_slopes
+#             ds.attrs[intercept_key] = ne_intercepts
+#             ds.to_netcdf(ds_save_path, mode='a', engine='netcdf4')
+#             print(f'Saved Density gradient regions to NetCDF ({reg_key}) at:\n {ds_save_path}')
+#
+#     elif not redo_grad_regions and (reg_key in ds.attrs) and gradient_regions:
+#         loaded_edges = json.loads(ds.attrs[reg_key])
+#         ne_edges = [tuple(edge) for edge in loaded_edges]
+#
+#         slope_val = ds.attrs.get(slope_key)
+#         has_slopes = (
+#                 slope_val is not None
+#                 and isinstance(slope_val, (list, tuple, np.ndarray))
+#                 and len(slope_val) == len(ne_edges)
+#         )
+#         intercept_val = ds.attrs.get(intercept_key)
+#         has_intercepts = (
+#                 intercept_val is not None
+#                 and isinstance(intercept_val, (list, tuple, np.ndarray))
+#                 and len(intercept_val) == len(ne_edges)
+#         )
+#         if has_slopes and has_intercepts:
+#             ne_slopes = list(ds.attrs[slope_key])
+#             ne_intercepts = list(ds.attrs[intercept_key])
+#         else:
+#             print(f"Regions found for '{reg_key}', but slopes/intercepts missing. Calculating automatically...")
+#             ne_slopes = []
+#             ne_intercepts = []
+#             for start_x, stop_x in ne_edges:
+#                 region_mask = (x_vals >= start_x) & (x_vals <= stop_x)
+#                 x_region = x_vals[region_mask]
+#                 ne_region = n_e_to_plot_vals[region_mask]
+#                 valid_mask = ~np.isnan(x_region) & ~np.isnan(ne_region)
+#                 valid_x = x_region[valid_mask]
+#                 valid_ne = ne_region[valid_mask]
+#
+#                 if len(valid_x) >= 2:
+#                     ne_slope, ne_intercept = np.polyfit(valid_x, valid_ne, deg=1)
+#                     ne_slopes.append(float(ne_slope))
+#                     ne_intercepts.append(float(ne_intercept))
+#                 else:
+#                     ne_slopes.append(np.nan)
+#                     ne_intercepts.append(np.nan)
+#
+#             if ds_save_path is not None and slope_key is not None:
+#                 ds.attrs[slope_key] = ne_slopes
+#                 ds.attrs[intercept_key] = ne_intercepts
+#                 ds.to_netcdf(ds_save_path, mode='a', engine='netcdf4')
+#                 print(f"Saved computed slopes and intercepts ({slope_key}) to NetCDF at:\n {ds_save_path}")
+#     else:
+#         ne_edges = []
+#         ne_slopes = []
+#         ne_intercepts = []
+#
+#     if see_plots:
+#         if axes is None:
+#             fig = plt.figure()
+#             axes = fig.add_subplot(111)
+#         if normalize:
+#             core_x_idxs = np.where((x_vals <= 5) & (x_vals >= -5))[0]
+#             core_denses = n_e_to_plot_vals[core_x_idxs]
+#             core_dens = np.mean(core_denses)
+#             n_e_to_plot_vals = n_e_to_plot_vals / core_dens
+#             n_e_std_to_plot_vals = n_e_std_to_plot_vals / core_dens
+#
+#         axes.errorbar(x_vals, n_e_to_plot_vals, yerr=n_e_std_to_plot_vals, fmt=dataset_mark, capsize=3,
+#                       color=dataset_clor)
+#
+#         axes.set_ylabel(ylabel, rotation=0, labelpad=60)
+#
+#         if gradient_regions:
+#             for i, (start_x, stop_x) in enumerate(ne_edges):
+#                 axes.axvline(x=start_x, color='black', linestyle='--', linewidth=2)
+#                 axes.axvline(x=stop_x, color='black', linestyle='--', linewidth=2)
+#                 if plot_final_fit and i < len(ne_slopes) and not np.isnan(ne_slopes[i]):
+#                     region_mask = (x_vals >= start_x) & (x_vals <= stop_x)
+#                     axes.plot(x_vals[region_mask], ne_slopes[i] * x_vals[region_mask] + ne_intercepts[i],
+#                               color='gold', linestyle='--')
+#
+#         if not make_presentable and not sharex:
+#             if plot_axes:
+#                 axes.set_xlabel(f'x [{ds.attrs.get("x_units")}]')
+#                 probe_z = ds['z'].isel(probe=probe).item()
+#                 ss_start = ds.attrs.get(f'steady state start probe {probe}', 0)
+#                 ss_end = ds.attrs.get(f'steady state end probe {probe}', 0)
+#
+#                 title_str = f"{run_identifier} \n {n_e_name} \n z: {probe_z:.2f}"
+#                 if time is not None:
+#                     title_str += f" | t: {time} ms"
+#                 else:
+#                     title_str += f" \n Between times ({ss_start:.2f},{ss_end:.2f}) ms"
+#                 if shot is not None:
+#                     title_str += f" | Shot: {shot}"
+#                 axes.set_title(title_str)
+#
+#     return ne_edges, ne_slopes, ne_intercepts
+#
+# def create_temperature_radial_plots(
+#     ds, probe, run_identifier='', see_plots=True, axes=None,
+#     gradient_regions=True, dataset_clor=None, dataset_mark=None,
+#     make_presentable=False, sharex=False, bottomx=True,
+#     redo_grad_regions=False, regions_str=None, slopes_str=None,
+#     intercepts_str=None, ds_save_path=None, plot_final_fit=False,
+#     plot_axes=True, plot_title=True, normalize=False, hdf5_folder=None,
+#     save_plots=False, figure_folder=None, updated_nc_folder=None,
+#     time=None, core_width=False, shot=None
+# ):
+#     if dataset_clor is None:
+#         dataset_clor = 'royalblue'
+#         dataset_mark = 'o'
+#
+#     reg_key = get_time_aware_key(regions_str, time)
+#     slope_key = get_time_aware_key(slopes_str, time)
+#     intercept_key = get_time_aware_key(intercepts_str, time)
+#
+#     if time is not None and 'time' in ds.coords:
+#         if 'time' in ds.indexes:
+#             ds_proc = ds.sel(time=time)
+#         else:
+#             time_dim = ds['time'].dims[0] if ds['time'].dims else 'time'
+#             closest_idx = np.argmin(np.abs(ds['time'].values - time))
+#             ds_proc = ds.isel({time_dim: closest_idx})
+#     else:
+#         ds_proc = ds
+#
+#     # Auto-detect shot coordinate if sliced per shot
+#     if shot is None and 'shot' in ds_proc.coords and ds_proc.coords['shot'].ndim == 0:
+#         shot = ds_proc.coords['shot'].item()
+#
+#     shot_str = f" | Shot {shot}" if shot is not None else ""
+#
+#     t_e_to_plot_vals, t_e_std_to_plot_vals, x_vals = process_variable_data(ds_proc, probe, var_name='t_e')
+#     base_name = os.path.splitext(os.path.basename(ds_save_path))[0] if ds_save_path else "dataset"
+#
+#     if updated_nc_folder and (base_name + '_updated.nc' in os.listdir(updated_nc_folder)):
+#         ds_to_update = xr.load_dataset(os.path.join(updated_nc_folder, base_name + '_updated.nc'))
+#     else:
+#         ds_to_update = ds
+#
+#     if (not core_width) and (time is not None) and (np.any(np.isnan(t_e_to_plot_vals))) and (hdf5_folder is not None):
+#         updated_ds = double_check_temp_data(
+#             hdf5_folder, ds_to_update, probe, x_vals=x_vals, y_vals=t_e_to_plot_vals,
+#             save_plots=save_plots, figure_folder=figure_folder
+#         )
+#
+#         if updated_ds is not None:
+#             updated_ds = recalculate_derived_variables(updated_ds, probe=probe)
+#             updated_ds_save_path = os.path.join(updated_nc_folder, f"{base_name}_updated.nc")
+#             updated_ds.to_netcdf(updated_ds_save_path, mode='w', engine='netcdf4')
+#
+#     ylabel = fr"$T_e$ [{ds['t_e'].attrs.get('units', 't_e')}]"
+#     xlabel = f'x [{ds.attrs.get("x_units")}]'
+#
+#     if redo_grad_regions:
+#         print(f'Redo temperature regions for key: {reg_key}')
+#         grad_title = f"Temperature \n {run_identifier}, Probe {probe}" + (
+#             f" | t = {time} ms" if time is not None else "") + shot_str
+#
+#         te_edges = obtain_gradient_regions(
+#             ds_proc, x_vals, t_e_to_plot_vals, t_e_std_to_plot_vals,
+#             color=dataset_clor, marker=dataset_mark,
+#             ylabel=ylabel, xlabel=xlabel, regions_str=reg_key,
+#             title=grad_title
+#         )
+#
+#         te_slopes = []
+#         te_intercepts = []
+#         for start_x, stop_x in te_edges:
+#             region_mask = (x_vals >= start_x) & (x_vals <= stop_x)
+#             x_region = x_vals[region_mask]
+#             te_region = t_e_to_plot_vals[region_mask]
+#             valid_mask = ~np.isnan(x_region) & ~np.isnan(te_region)
+#             valid_x = x_region[valid_mask]
+#             valid_te = te_region[valid_mask]
+#
+#             if len(valid_x) >= 2:
+#                 te_slope, te_intercept = np.polyfit(valid_x, valid_te, deg=1)
+#                 te_slopes.append(float(te_slope))
+#                 te_intercepts.append(float(te_intercept))
+#             else:
+#                 te_slopes.append(np.nan)
+#                 te_intercepts.append(np.nan)
+#
+#         if ds_save_path is not None and reg_key is not None:
+#             ds.attrs[reg_key] = json.dumps(te_edges)
+#             ds.attrs[slope_key] = te_slopes
+#             ds.attrs[intercept_key] = te_intercepts
+#             ds.to_netcdf(ds_save_path, mode='a', engine='netcdf4')
+#             print(f'Saved Temperature gradient locations to NetCDF ({reg_key}) at: {ds_save_path}')
+#
+#     elif not redo_grad_regions and (reg_key in ds.attrs) and gradient_regions:
+#         loaded_edges = json.loads(ds.attrs[reg_key])
+#         te_edges = [tuple(edge) for edge in loaded_edges]
+#
+#         slope_val = ds.attrs.get(slope_key)
+#         has_slopes = (
+#                 slope_val is not None
+#                 and isinstance(slope_val, (list, tuple, np.ndarray))
+#                 and len(slope_val) == len(te_edges)
+#         )
+#         intercept_val = ds.attrs.get(intercept_key)
+#         has_intercepts = (
+#                 intercept_val is not None
+#                 and isinstance(intercept_val, (list, tuple, np.ndarray))
+#                 and len(intercept_val) == len(te_edges)
+#         )
+#         if has_slopes and has_intercepts:
+#             te_slopes = list(ds.attrs[slope_key])
+#             te_intercepts = list(ds.attrs[intercept_key])
+#         else:
+#             print(f"Regions found for '{reg_key}', but slopes/intercepts missing. Calculating automatically...")
+#             te_slopes = []
+#             te_intercepts = []
+#             for start_x, stop_x in te_edges:
+#                 region_mask = (x_vals >= start_x) & (x_vals <= stop_x)
+#                 x_region = x_vals[region_mask]
+#                 te_region = t_e_to_plot_vals[region_mask]
+#                 valid_mask = ~np.isnan(x_region) & ~np.isnan(te_region)
+#                 valid_x = x_region[valid_mask]
+#                 valid_te = te_region[valid_mask]
+#
+#                 if len(valid_x) >= 2:
+#                     te_slope, te_intercept = np.polyfit(valid_x, valid_te, deg=1)
+#                     te_slopes.append(float(te_slope))
+#                     te_intercepts.append(float(te_intercept))
+#                 else:
+#                     te_slopes.append(np.nan)
+#                     te_intercepts.append(np.nan)
+#
+#             if ds_save_path is not None and slope_key is not None:
+#                 ds.attrs[slope_key] = te_slopes
+#                 ds.attrs[intercept_key] = te_intercepts
+#                 ds.to_netcdf(ds_save_path, mode='a', engine='netcdf4')
+#                 print(f"Saved computed slopes and intercepts ({slope_key}) to NetCDF at:\n {ds_save_path}")
+#     else:
+#         te_edges = []
+#         te_slopes = []
+#         te_intercepts = []
+#
+#     if see_plots:
+#         if normalize:
+#             core_x_idxs = np.where((x_vals <= 5) & (x_vals >= -5))[0]
+#             core_temps = t_e_to_plot_vals[core_x_idxs]
+#             core_temp = np.mean(core_temps)
+#             t_e_to_plot_vals = t_e_to_plot_vals / core_temp
+#             t_e_std_to_plot_vals = t_e_std_to_plot_vals / core_temp
+#         if axes is None:
+#             fig, axes, letters = build_subplots([[1]])
+#             axes = axes[letters[0]]
+#
+#         axes.errorbar(x_vals, t_e_to_plot_vals, yerr=t_e_std_to_plot_vals, fmt=dataset_mark, capsize=3,
+#                       color=dataset_clor)
+#
+#         axes.set_ylabel(ylabel, rotation=0, labelpad=60)
+#         if gradient_regions:
+#             for i, (start_x, stop_x) in enumerate(te_edges):
+#                 axes.axvline(x=start_x, color='black', linestyle='--', linewidth=2)
+#                 axes.axvline(x=stop_x, color='black', linestyle='--', linewidth=2)
+#                 if plot_final_fit and i < len(te_slopes) and not np.isnan(te_slopes[i]):
+#                     region_mask = (x_vals >= start_x) & (x_vals <= stop_x)
+#                     axes.plot(x_vals[region_mask], te_slopes[i] * x_vals[region_mask] + te_intercepts[i],
+#                               color='gold', linestyle='--')
+#
+#         if not make_presentable:
+#             if plot_axes:
+#                 probe_z = ds['z'].isel(probe=probe).item()
+#                 ss_start = ds.attrs.get(f'steady state start probe {probe}', 0)
+#                 ss_end = ds.attrs.get(f'steady state end probe {probe}', 0)
+#
+#                 title_str = f"{run_identifier} \n z: {probe_z:.2f}"
+#                 if time is not None:
+#                     title_str += f" | t: {time} ms"
+#                 else:
+#                     title_str += f" \n Between times ({ss_start:.2f},{ss_end:.2f}) ms"
+#                 if shot is not None:
+#                     title_str += f" | Shot: {shot}"
+#                 axes.set_title(title_str)
+#
+#                 if not sharex:
+#                     axes.set_xlabel(xlabel)
+#
+#     return te_edges, te_slopes, te_intercepts
+
+def parse_region_input(user_input):
+    """
+    Parses region inputs without requiring parentheses or exact syntax.
+    Accepts: '-10 -5', '-10, -5', '-10 -5 5 10', '[(-10, -5)]', etc.
+    """
+    if isinstance(user_input, (list, tuple)):
+        return [tuple(pair) for pair in user_input]
+
+    # Extract all floating point / integer numbers (including negative signs)
+    numbers = [float(n) for n in re.findall(r"[-+]?\d*\.?\d+", str(user_input))]
+
+    # Group into pairs of (start_x, stop_x)
+    edges = []
+    for i in range(0, len(numbers) - 1, 2):
+        start_x, stop_x = numbers[i], numbers[i + 1]
+        edges.append((min(start_x, stop_x), max(start_x, stop_x)))
+
+    return edges
+
+def obtain_gradient_regions(
+    ds,
+    x,
+    y,
+    error,
+    color="royalblue",
+    marker="o",
+    ylabel="",
+    xlabel="",
+    regions_str="",
+    title="",
+    min_points=3,
+):
+    """
+    Interactively display and adjust radial gradient regions with fast, keyboard-friendly input.
+    """
+    # 1. Guarantee 1D numpy arrays to prevent matplotlib errorbar shape errors
+    x = np.asarray(x).squeeze()
+    y = np.asarray(y).squeeze()
+    if error is not None:
+        error = np.asarray(error).squeeze()
+
+    # 2. Determine initial candidate edges
+    if regions_str not in ds.attrs or not ds.attrs[regions_str]:
+        candidate_edges = find_pedestals_strict_thresh(x, y)
+        if isinstance(candidate_edges, dict):
+            data_edges = candidate_edges.get("left", []) + candidate_edges.get(
+                "right", []
+            )
         else:
-            if plot_axes:
-                axes.ticklabel_format(style='sci', axis='y', scilimits=(-1, 2))
-                if bottomx:
-                    axes.set_xlabel(xlabel)
-                    axes.tick_params(axis='x', labelbottom=True)
-                else:
-                    axes.set_xlabel("")
-                    axes.tick_params(axis='x', labelbottom=False)
-
-                # 2. FORCE THE MATH ENGINE (Bypass canvas.draw completely)
-                ax_formatter = axes.yaxis.get_major_formatter()
-                ax_formatter.set_locs(axes.yaxis.get_majorticklocs())
-                offset = ax_formatter.get_offset()
-
-                # 3. Hide the default floating text
-                axes.yaxis.get_offset_text().set_visible(False)
-
-                # 4. Build the dynamic label strings using f-strings
-                if not sharex:
-                    if offset:
-                        # Because we turned on 'use_mathtext' globally, offset is
-                        # automatically formatted as beautiful LaTeX (e.g., $\times10^{4}$)
-                        label_str = fr'{long_var_name} ({offset})'
-                    else:
-                        label_str = rf'{long_var_name}'
-                else:
-                    label_str = fr'{offset}' if offset else ''
-
-                axes.text(
-                    0.5, 0.05, label_str,
-                    transform=axes.transAxes,
-                    horizontalalignment='center',
-                    verticalalignment='bottom',
-                    color='k'
-                )
-
-    return ds
-
-
-
-
-
-
-
-def create_density_radial_plots(ds, probe, run_identifier = '', see_plots = True,
-                                axes = None, dataset_clor = None,
-                                dataset_mark = None,make_presentable = False,
-                                sharex = False, bottomx = True, gradient_regions = False, redo_grad_regions = False,
-                                regions_str = None, slopes_str = None, intercepts_str = None, ds_save_path = None,
-                                plot_final_fit = False, plot_axes = True, plot_title = True, normalize = False,
-                                hdf5_folder = None, save_plots = False, figure_folder = None, updated_nc_folder = None):
-
-    print('Building density radial plots...')
-    if dataset_clor is None:
-        dataset_clor = 'royalblue'
-        dataset_mark = 'o'
-    n_e_to_plot_vals, n_e_std_to_plot_vals, x_vals = process_variable_data(ds, probe, var_name = 'n_e')
-    n_e_name = ds['n_e'].attrs.get("long_name", 'n_e')
-    ylabel = fr"$n_e$ [$\mathregular{{{ds['n_e'].attrs.get('units', 'n_e')}}}$]"
-    xlabel = f'x [{ds.attrs.get("x_units")}]'
-    if redo_grad_regions:
-        print('redo n str: ', redo_grad_regions)
-        ne_edges = obtain_gradient_regions(ds,x_vals,n_e_to_plot_vals,n_e_std_to_plot_vals,color = dataset_clor,
-                                               marker=dataset_mark, ylabel = ylabel, xlabel = xlabel, regions_str = regions_str)
-
-        ne_slopes = []
-        ne_intercepts = []
-        for start_x, stop_x in ne_edges:
-            region_mask = (x_vals >= start_x) & (x_vals <= stop_x)
-            x_region = x_vals[region_mask]
-            ne_region = n_e_to_plot_vals[region_mask]
-            valid_mask = ~np.isnan(x_region) & ~np.isnan(ne_region)
-            valid_x = x_region[valid_mask]
-            valid_ne = ne_region[valid_mask]
-            ne_slope, ne_intercept = np.polyfit(valid_x, valid_ne, deg=1)
-            ne_slopes.append(ne_slope)
-            ne_intercepts.append(ne_intercept)
-        if ds_save_path is not None:
-            ds.attrs[regions_str] = json.dumps(ne_edges)
-            ds.attrs[slopes_str] = ne_slopes
-            ds.attrs[intercepts_str] = ne_intercepts
-            ds.to_netcdf(ds_save_path, mode='a', engine='netcdf4')
-            print(f'Updated the dataset at \n {ds_save_path} \n to include Density gradient locations.')
-    elif not redo_grad_regions and (regions_str in ds.attrs.keys()) and gradient_regions:
-        loaded_edges = json.loads(ds.attrs[regions_str])
-        ne_edges = [tuple(edge) for edge in loaded_edges]
-        ne_slopes = ds.attrs[slopes_str]
-        ne_intercepts = ds.attrs[intercepts_str]
-    else:
-        ne_edges = []
-        ne_slopes = []
-        ne_intercepts = []
-
-    if see_plots:
-        if axes is None:
-            fig = plt.figure()
-            axes = fig.add_subplot(111)
-        if normalize:
-            core_x_idxs = np.where((x_vals <= 5) & (x_vals >= -5))[0]
-            core_denses = n_e_to_plot_vals[core_x_idxs]
-            core_dens = np.mean(core_denses)
-            n_e_to_plot_vals = n_e_to_plot_vals/core_dens
-            n_e_std_to_plot_vals = n_e_std_to_plot_vals/core_dens
-
-        axes.errorbar(x_vals, n_e_to_plot_vals, yerr=n_e_std_to_plot_vals, fmt=dataset_mark, capsize=3,
-                      color = dataset_clor)
-
-        axes.set_ylabel(ylabel, rotation=0, labelpad=60)
-
-        if gradient_regions:
-            for i, (start_x, stop_x) in enumerate(ne_edges):
-                # Draw the start line
-                axes.axvline(x=start_x, color='black', linestyle='--', linewidth=2)
-                # Draw the stop line
-                axes.axvline(x=stop_x, color='black', linestyle='--', linewidth=2)
-                if plot_final_fit:
-                    region_mask = (x_vals >= start_x) & (x_vals <= stop_x)
-                    axes.plot(x_vals[region_mask], ne_slopes[i] * x_vals[region_mask] + ne_intercepts[i],
-                              color='gold', linestyle = '--')
-
-        if not make_presentable and not sharex:
-            if plot_axes:
-                if plot_title:
-                    axes.set_title(f"{n_e_name}")
-                axes.set_xlabel(f'x [{ds.attrs.get("x_units")}]')
-                probe_z = ds['z'].isel(probe=probe).item()
-                ss_start = ds.attrs[f'steady state start probe {probe}']
-                ss_end = ds.attrs[f'steady state end probe {probe}']
-                axes.set_title(f"{run_identifier} \n "
-                               f"{n_e_name} \n "
-                               f"z: {probe_z:.2f} \n "
-                               f"Between times ({ss_start:.2f},{ss_end:.2f}) ms")
-        else:
-            if plot_axes:
-                if bottomx:
-                    axes.ticklabel_format(style='sci', axis='y', scilimits=(-1, 2))
-                    axes.set_xlabel(f'x [{ds.attrs.get("x_units")}]')
-                    axes.tick_params(axis='x', labelbottom=True)
-                else:
-                    axes.set_xlabel("")
-                    axes.tick_params(axis='x', labelbottom=False)
-
-                # 2. FORCE THE MATH ENGINE (Bypass canvas.draw completely)
-                ax_formatter = axes.yaxis.get_major_formatter()
-                ax_formatter.set_locs(axes.yaxis.get_majorticklocs())
-                n_e_offset = ax_formatter.get_offset()
-
-                # 3. Hide the default floating text
-                axes.yaxis.get_offset_text().set_visible(False)
-
-                # 4. Build the dynamic label strings using f-strings
-                if not sharex:
-                    if n_e_offset:
-                        # Because we turned on 'use_mathtext' globally, rho_offset is
-                        # automatically formatted as beautiful LaTeX (e.g., $\times10^{4}$)
-                        n_e_label_str = fr'{n_e_name} ({n_e_offset})'
-                    else:
-                        n_e_label_str = rf'{n_e_name}'
-
-                else: n_e_label_str = fr'{n_e_offset}'
-
-
-                axes.text(0.5, 0.05, n_e_label_str,
-                                transform=axes.transAxes,
-                                horizontalalignment='center',
-                                verticalalignment='bottom',
-                                color='k')
-        # axes.legend(loc='best')
-
-
-def create_temperature_radial_plots(ds, probe, run_identifier = '', see_plots = True, axes = None,
-                                    gradient_regions = True, dataset_clor = None,
-                                    dataset_mark = None, make_presentable = False,
-                                    sharex = False, bottomx = True, redo_grad_regions = False,
-                                    regions_str = None, slopes_str = None, intercepts_str = None, ds_save_path = None,
-                                    plot_final_fit = False,plot_axes = True, plot_title = True, normalize = False,
-                                    hdf5_folder = None, save_plots = False, figure_folder = None, updated_nc_folder = None):
-
-    grad_region_str = 'te_grad_regions'
-    if dataset_clor is None:
-        dataset_clor = 'royalblue'
-        dataset_mark = 'o'
-
-    t_e_to_plot_vals, t_e_std_to_plot_vals, x_vals = process_variable_data(ds, probe, var_name='t_e')
-    base_name = os.path.splitext(os.path.basename(ds_save_path))[0]
-    if base_name + '_updated.nc' in os.listdir(updated_nc_folder):
-        print(f"{base_name}_updated already exists, overwriting if choose to update")
-        ds_to_update = xr.load_dataset(os.path.join(updated_nc_folder, base_name + '_updated.nc'))
-    else:
-        ds_to_update = ds
-
-    if (np.any(np.isnan(t_e_to_plot_vals))) and (hdf5_folder is not None):
-        updated_ds = double_check_temp_data(hdf5_folder, ds_to_update, probe, x_vals=x_vals, y_vals=t_e_to_plot_vals,
-                                            save_plots=save_plots, figure_folder=figure_folder)
-
-        if updated_ds is not None:
-            # Recompute every t_e-dependent variable (n_e, n_i, nu_ei, p_e, p_ei)
-            # now that t_e has changed.  v_f/v_p/ion_isat/electron_isat are untouched.
-            updated_ds = recalculate_derived_variables(updated_ds, probe = probe)
-
-            if base_name.endswith('_updated'):
-                # Keep the exact same name, no extra tags
-                updated_ds_save_path = os.path.join(updated_nc_folder, f"{base_name}.nc")
-                print("Existing updated file detected. Overwriting with new modifications...")
-            elif not base_name.endswith('_updated') and base_name + '_updated.nc' in os.listdir(updated_nc_folder):
-                # Updated ds already exists overwriting with new modifications
-                updated_ds_save_path = os.path.join(updated_nc_folder, f"{base_name}_updated.nc")
-                print("Existing updated file detected. Overwriting with new modifications...")
-
-            else:
-                updated_ds_save_path = os.path.join(updated_nc_folder, f"{base_name}_updated.nc")
-                print("Raw file detected. Creating new _updated.nc file...")
-
-
-            updated_ds.to_netcdf(updated_ds_save_path, mode='w', engine='netcdf4')
-
-            print(f'Successfully saved the dataset at: \n {updated_ds_save_path}.')
-
-    ylabel = fr"$T_e$ [{ds['t_e'].attrs.get('units', 't_e')}]"
-    xlabel = f'x [{ds.attrs.get("x_units")}]'
-    t_e_name = ds['t_e'].attrs.get("long_name", 't_e')
-    if redo_grad_regions:
-        print('redo t str: ', redo_grad_regions)
-        te_edges = obtain_gradient_regions(ds, x_vals, t_e_to_plot_vals,t_e_std_to_plot_vals,color = dataset_clor,
-                                           marker=dataset_mark, ylabel = ylabel, xlabel = xlabel, regions_str = regions_str)
-        te_slopes = []
-        te_intercepts = []
-        for start_x, stop_x in te_edges:
-            region_mask = (x_vals >= start_x) & (x_vals <= stop_x)
-            x_region = x_vals[region_mask]
-            te_region = t_e_to_plot_vals[region_mask]
-            valid_mask = ~np.isnan(x_region) & ~np.isnan(te_region)
-            valid_x = x_region[valid_mask]
-            valid_te = te_region[valid_mask]
-            te_slope, te_intercept = np.polyfit(valid_x, valid_te, deg=1)
-            te_slopes.append(te_slope)
-            te_intercepts.append(te_intercept)
-        if ds_save_path is not None:
-            ds.attrs[regions_str] = json.dumps(te_edges)
-            ds.attrs[slopes_str] = te_slopes
-            ds.attrs[intercepts_str] = te_intercepts
-            ds.to_netcdf(ds_save_path, mode='a', engine='netcdf4')
-            print(f'Updated the dataset at {ds_save_path} to include Temperature gradient locations.')
-    elif not redo_grad_regions and (regions_str in ds.attrs.keys()) and gradient_regions:
-        loaded_edges = json.loads(ds.attrs[regions_str])
-        te_edges = [tuple(edge) for edge in loaded_edges]
-        te_slopes = ds.attrs[slopes_str]
-        te_intercepts = ds.attrs[intercepts_str]
-    else:
-        te_edges = []
-        te_slopes = []
-        te_intercepts = []
-
-    if see_plots:
-        if normalize:
-            core_x_idxs = np.where((x_vals <= 5) & (x_vals >= -5))[0]
-            core_temps = t_e_to_plot_vals[core_x_idxs]
-            core_temp = np.mean(core_temps)
-            t_e_to_plot_vals = t_e_to_plot_vals/core_temp
-            t_e_std_to_plot_vals = t_e_std_to_plot_vals/core_temp
-        if axes is None:
-            fig, axes, letters = build_subplots([[1]])
-            axes = axes[letters[0]]
-
-        axes.errorbar(x_vals, t_e_to_plot_vals, yerr=t_e_std_to_plot_vals, fmt=dataset_mark, capsize=3,
-                      color = dataset_clor)
-
-        axes.set_ylabel(ylabel, rotation=0, labelpad=60)
-        if gradient_regions:
-            for i, (start_x, stop_x) in enumerate(te_edges):
-                # Draw the start line
-                axes.axvline(x=start_x, color='black', linestyle='--', linewidth=2)
-                # Draw the stop line
-                axes.axvline(x=stop_x, color='black', linestyle='--', linewidth=2)
-                if plot_final_fit:
-                    region_mask = (x_vals >= start_x) & (x_vals <= stop_x)
-                    axes.plot(x_vals[region_mask], te_slopes[i] * x_vals[region_mask] + te_intercepts[i],
-                              color='gold', linestyle = '--')
-
-        if not make_presentable:
-            if plot_axes:
-                if plot_title:
-                    axes.set_title(f"{t_e_name}")
-                probe_z = ds['z'].isel(probe=probe).item()
-                ss_start = ds.attrs[f'steady state start probe {probe}']
-                ss_end = ds.attrs[f'steady state end probe {probe}']
-                axes.set_title(f"{run_identifier} \n "
-                               f"z: {probe_z:.2f} \n "
-                               f"Between times ({ss_start:.2f},{ss_end:.2f}) ms")
-                if not sharex:
-                    axes.set_xlabel(xlabel)
-        else:
-            if plot_axes:
-                axes.ticklabel_format(style='sci', axis='y', scilimits=(-1, 2))
-                axes.tick_params(axis='x', labelbottom=False)
-
-                # 2. FORCE THE MATH ENGINE (Bypass canvas.draw completely)
-                ax_formatter = axes.yaxis.get_major_formatter()
-                ax_formatter.set_locs(axes.yaxis.get_majorticklocs())
-                t_e_offset = ax_formatter.get_offset()
-
-                # 3. Hide the default floating text
-                axes.yaxis.get_offset_text().set_visible(False)
-
-                # 4. Build the dynamic label strings using f-strings
-                if t_e_offset:
-                    # Because we turned on 'use_mathtext' globally, rho_offset is
-                    # automatically formatted as beautiful LaTeX (e.g., $\times10^{4}$)
-                    t_e_label_str =  f'{t_e_offset}'
-                else:
-                    t_e_label_str = ''
-
-                axes.text(0.5, 0.05, t_e_label_str,
-                                transform=axes.transAxes,
-                                horizontalalignment='center',
-                                verticalalignment='bottom',
-                                color='k')
-
-
-def obtain_gradient_regions(ds, x,y, error, color = 'royalblue', marker = 'o', ylabel ='', xlabel = '', regions_str = ''):
-    if regions_str not in ds.attrs.keys():
-        edges = find_pedestals_strict_thresh(x, y)
+            data_edges = list(candidate_edges)
     else:
         loaded_edges = json.loads(ds.attrs[regions_str])
         data_edges = [tuple(edge) for edge in loaded_edges]
-        edges = {'left': [], 'right': []}
-        for edge in data_edges:
-            if edge[0]<0:
-                edges['left'].append(edge)
-            else:
-                edges['right'].append(edge)
 
+    edges = {"left": [], "right": []}
+    for edge in data_edges:
+        if edge[0] < 0:
+            edges["left"].append(edge)
+        else:
+            edges["right"].append(edge)
+
+    # 3. Plot initial regions
     fig_post_grad, axes, letters = build_subplots([[1]])
     ax_post_grad = axes[letters[0]]
-    ax_post_grad.errorbar(x, y, yerr=error, fmt=marker, capsize=3,
-                          color=color)
+    ax_post_grad.errorbar(x, y, yerr=error, fmt=marker, capsize=3, color=color)
     ax_post_grad.set_ylabel(ylabel, rotation=90)
     ax_post_grad.set_xlabel(xlabel)
+    if title:
+        ax_post_grad.set_title(title)
 
-
-    for side in ['left', 'right']:
-        # ne_edges[side] looks like [(-21.0, -16.0)] or []
+    for side in ["left", "right"]:
         for start_x, stop_x in edges[side]:
-            # Draw the start line
-            ax_post_grad.axvline(x=start_x, color='red', linestyle='--', linewidth=2,
-                                 label='Edge Boundary' if side == 'left' else "")
-            # Draw the stop line
-            ax_post_grad.axvline(x=stop_x, color='red', linestyle='--', linewidth=2)
+            ax_post_grad.axvline(
+                x=start_x,
+                color="red",
+                linestyle="--",
+                linewidth=2,
+                label="Edge Boundary" if side == "left" else "",
+            )
+            ax_post_grad.axvline(
+                x=stop_x, color="red", linestyle="--", linewidth=2
+            )
 
     plt.tight_layout()
-    fig_post_grad.show()
+    show_keep_focus(fig_post_grad)
     plt.close(fig_post_grad)
-    while ask_yes_or_no('Adjust x-positions of gradients? (y/n) '):
+
+    # 4. Interactive adjustment loop
+    while ask_yes_or_no("Adjust x-positions of gradients? (y/n) "):
         print(f'Current Gradient edges: {edges["left"]}, {edges["right"]}')
         while True:
             chosen_edges_str = input(
-                'Choose where you would like the gradient edges. \n '
-                'Use the format (1,2),(3,4),(5,6)... ')
-            # Allow the user to skip by pressing Enter
+                "Choose gradient edges (e.g. -10 -5  5 10  or  -10,-5, 5,10):\n> "
+            )
             if not chosen_edges_str.strip():
-                print("No edges entered. Skipping.")
+                print("No edges entered. Clearing all regions.")
                 chosen_edges = []
                 break
 
-            try:
-                # Wrap the raw string in brackets.
-                # "(1,2)" becomes "[(1,2)]"
-                # "(1,2),(3,4)" becomes "[(1,2),(3,4)]"
-                formatted_str = f"[{chosen_edges_str}]"
+            # Extract numbers (floats, ints, negative signs, scientific notation)
+            num_matches = re.findall(
+                r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?", chosen_edges_str
+            )
 
-                # Safely evaluate the string into a literal Python list
-                chosen_edges = ast.literal_eval(formatted_str)
+            if not num_matches:
+                print("No valid numbers found. Try again.")
+                continue
 
-                # Verify the structure is what we expect
-                if all(isinstance(i, tuple) for i in chosen_edges):
-                    print(f"Successfully parsed {len(chosen_edges)} edges:", chosen_edges)
-                    break
-                else:
-                    print("Input parsed, but it didn't look like tuples. Try again.")
+            numbers = [float(n) for n in num_matches]
 
-            except (ValueError, SyntaxError):
-                print("Invalid format. Please make sure to use parentheses and commas, like (1,2),(3,4).")
+            if len(numbers) % 2 != 0:
+                print(
+                    f"Invalid input: You entered {len(numbers)} numbers. Region bounds must come in pairs (start end)."
+                )
+                continue
 
-        # chosen_edges is now a guaranteed list of tuples: [(1, 2), (3, 4)]
-        if len(chosen_edges) >= 0:
-            left_list = []
-            right_list = []
-            for chosen_edge in chosen_edges:
-                if chosen_edge[0] < 0:
-                    left_list.append(chosen_edge)
-                else:
-                    right_list.append(chosen_edge)
-            edges['left'] = left_list
-            edges['right'] = right_list
+            # Group into pairs & sort each pair
+            chosen_edges = []
+            for i in range(0, len(numbers), 2):
+                x1, x2 = numbers[i], numbers[i + 1]
+                pair = (min(x1, x2), max(x1, x2))
 
+                # Check minimum data point threshold
+                pts_count = np.sum((x >= pair[0]) & (x <= pair[1]) & ~np.isnan(y))
+                if pts_count < min_points:
+                    print(
+                        f"Warning: Region {pair} contains only {pts_count} data point(s) (min required: {min_points})."
+                    )
+
+                chosen_edges.append(pair)
+
+            print(
+                f"Successfully parsed {len(chosen_edges)} region pair(s):",
+                chosen_edges,
+            )
+            break
+
+        left_list = [e for e in chosen_edges if e[0] < 0]
+        right_list = [e for e in chosen_edges if e[0] >= 0]
+        edges["left"] = left_list
+        edges["right"] = right_list
+
+        # Re-plot updated regions for visual confirmation
         fig, axes, letters = build_subplots([[1]])
         ax_subfigure = axes[letters[0]]
-        ax_subfigure.errorbar(x, y, yerr=error, fmt=marker, capsize=3,
-                              color=color)
+        ax_subfigure.errorbar(
+            x, y, yerr=error, fmt=marker, capsize=3, color=color
+        )
         ax_subfigure.set_ylabel(ylabel, rotation=90)
         ax_subfigure.set_xlabel(xlabel)
+        if title:
+            ax_subfigure.set_title(title)
 
-        for side in ['left', 'right']:
-            # ne_edges[side] looks like [(-21.0, -16.0)] or []
+        for side in ["left", "right"]:
             for start_x, stop_x in edges[side]:
-                # Draw the start line
-                ax_subfigure.axvline(x=start_x, color='red', linestyle='--', linewidth=2,
-                                     label='Edge Boundary' if side == 'left' else "")
-                # Draw the stop line
-                ax_subfigure.axvline(x=stop_x, color='red', linestyle='--', linewidth=2)
+                ax_subfigure.axvline(
+                    x=start_x,
+                    color="red",
+                    linestyle="--",
+                    linewidth=2,
+                    label="Edge Boundary" if side == "left" else "",
+                )
+                ax_subfigure.axvline(
+                    x=stop_x, color="red", linestyle="--", linewidth=2
+                )
 
         plt.tight_layout()
-        fig.show()
+        show_keep_focus(fig)
         plt.close(fig)
-    edges_full = edges['left'] + edges['right']
+
+    edges_full = edges["left"] + edges["right"]
     return edges_full
 
 def find_pedestals_strict_thresh(x, y, slope_ratio=0.25, stop_ratio=0.05, max_slope_error=0.20,
@@ -665,11 +1356,33 @@ def find_pedestals_strict_thresh(x, y, slope_ratio=0.25, stop_ratio=0.05, max_sl
                                  edge_limit=15, max_center_bleed=0.98, gap_tolerance=2,
                                  min_width=0.0, min_height_ratio=0.15):
 
-    '''
-        Finds steep gradients, calculates opposing slopes independently to prevent merging,
-        but returns them in a flat dictionary: {'left': [(x1, x2)...], 'right': [(x1, x2)...]}
-        '''
+    """
+    Finds steep gradients, calculates opposing slopes independently to prevent merging,
+    but returns them in a flat dictionary: {'left': [(x1, x2)...], 'right': [(x1, x2)...]}
+    """
 
+    x = np.asarray(x)
+    y = np.asarray(y)
+
+    # 1. Guard against NaNs/Infs
+    valid_mask = np.isfinite(y)
+    if np.sum(valid_mask) <= poly_order:
+        return {'left': [], 'right': []}
+
+    # Interpolate internal NaNs/Infs across finite points
+    if np.any(~valid_mask):
+        y = np.interp(x, x[valid_mask], y[valid_mask])
+
+    # 2. Dynamically adjust window length to fit array size
+    n_points = len(y)
+    if window >= n_points:
+        window = n_points - 1 if n_points % 2 == 0 else n_points
+    if window % 2 == 0:
+        window -= 1
+    if window <= poly_order:
+        return {'left': [], 'right': []}
+
+    # 3. Safe Savitzky-Golay Filter execution
     y_smooth = savgol_filter(y, window_length=window, polyorder=poly_order)
     dy_dx = np.gradient(y_smooth, x)
 

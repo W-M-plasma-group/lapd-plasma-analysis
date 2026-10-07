@@ -40,7 +40,7 @@ def remove_outliers(time_series, window, threshold):
 
     return xr.DataArray(arr, coords=time_series.coords, dims=time_series.dims), outlier_mask
 
-def get_isat_vf(filename, hdf5_path, flux_nc_folder, main_luke = False):
+def get_isat_vf(filename, hdf5_path, flux_nc_folder, main_luke = False, use_updated_ds = False):
     """
     Obtains saturation current, floating potential, floating potential difference, sound speed,
     and density data from the HDF5 file specified by `filename`. Deposits a NetCDF file containing this data (as
@@ -57,6 +57,12 @@ def get_isat_vf(filename, hdf5_path, flux_nc_folder, main_luke = False):
     flux_nc_folder : `str`
         String giving path to the folder containing the NetCDF files for fluctuation data
 
+    main_luke : `bool`
+        If the function is called from Luke's main
+
+    use_updated_ds : `bool`
+        Whether or not to check for any updated datasets in the langmuir folder
+
     Returns
     -------
     dataset : `xarray.Dataset`
@@ -66,7 +72,7 @@ def get_isat_vf(filename, hdf5_path, flux_nc_folder, main_luke = False):
     assert os.path.exists(filename)
     assert get_config_id(lapd.File(filename).info['exp name']) in [1, 2, 3]
 
-    use_updated_ds = ask_yes_or_no('\n If it exists, use the updated Langmuir Dataset for temperatures? (y/n) ')
+
     file = lapd.File(filename)
 
 

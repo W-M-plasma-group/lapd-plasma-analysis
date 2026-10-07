@@ -28,34 +28,75 @@ def process_variable_data(ds, probe, var_name, mask_var='t_e'):
         Array of spatial x-positions corresponding to the output arrays.
     """
 
-    # Extract steady-state time boundaries
-    min_time = ds.attrs[f'steady state start probe {probe}']
-    max_time = ds.attrs[f'steady state end probe {probe}']
+    # Extract steady-state time boundaries safely (None if not computed)
+    min_time = ds.attrs.get(f"steady state start probe {probe}", None)
+    max_time = ds.attrs.get(f"steady state end probe {probe}", None)
+
+    # Extract probe slices safely
+    var_data = (
+        ds[var_name].sel(probe=probe)
+        if "probe" in ds[var_name].dims
+        else ds[var_name]
+    )
 
     # Quality filter based on mask_var (defaults to t_e)
     if mask_var is not None and mask_var in ds:
-        mask_mean = ds[mask_var].sel(probe=probe).mean('shot')
-        mask_std = ds[mask_var].sel(probe=probe).std('shot')
-        filtered_mask_data = filter_data(mask_mean, mask_std)
+        mask_data = (
+            ds[mask_var].sel(probe=probe)
+            if "probe" in ds[mask_var].dims
+            else ds[mask_var]
+        )
+
+        # Check if 'shot' dimension exists before taking mean/std
+        if "shot" in mask_data.dims:
+            mask_mean = mask_data.mean("shot")
+            mask_std = mask_data.std("shot")
+        else:
+            mask_mean = mask_data
+            mask_std = xr.zeros_like(mask_data)
+
+        if "sweep" in mask_mean.dims and mask_mean.sizes["sweep"] > 1:
+            filtered_mask_data = filter_data(mask_mean, mask_std)
+        else:
+            filtered_mask_data = mask_mean
         where_nans = filtered_mask_data.isnull()
     else:
         where_nans = None
 
     # Process target variable across shots
-    target_data = ds[var_name].sel(probe=probe).mean('shot')
+    if "shot" in var_data.dims:
+        target_data = var_data.mean("shot")
+    else:
+        target_data = var_data
+
     if where_nans is not None:
         target_data = target_data.where(~where_nans)
 
-    # Steady-state time window mask
-    time_mask = (target_data['time'] >= min_time) & (target_data['time'] <= max_time)
-    steady_state_sweeps = ds['sweep'][time_mask]
+    # Average across sweeps (time-filtered if steady state exists, otherwise full sweep average)
+    if "sweep" in target_data.dims and target_data.sizes["sweep"] > 1:
+        if min_time is not None and max_time is not None:
+            time_mask = (target_data["time"] >= min_time) & (
+                    target_data["time"] <= max_time
+            )
+            steady_state_sweeps = ds["sweep"].where(time_mask, drop=True)
 
-    # Average across steady-state sweeps
-    var_to_plot = target_data.sel(sweep=steady_state_sweeps).mean('sweep')
-    var_std_to_plot = target_data.sel(sweep=steady_state_sweeps).std('sweep')
+            var_to_plot = target_data.sel(sweep=steady_state_sweeps).mean(
+                "sweep"
+            )
+            var_std_to_plot = target_data.sel(sweep=steady_state_sweeps).std(
+                "sweep"
+            )
+        else:
+            # Fallback when steady state is not defined: average over all sweeps
+            var_to_plot = target_data.mean("sweep")
+            var_std_to_plot = target_data.std("sweep")
+    else:
+        # Single time slice: bypass sweep averaging and set std deviation to 0
+        var_to_plot = target_data
+        var_std_to_plot = xr.zeros_like(target_data)
 
-    # Extract numpy arrays for plotting
-    x_vals = target_data['x'].values
+    # Extract numpy arrays for plotting and ensure 1D shape
+    x_vals = target_data["x"].squeeze().values
     vals = var_to_plot.squeeze().values
     std_vals = var_std_to_plot.squeeze().values
 
